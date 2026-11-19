@@ -19,11 +19,12 @@ using Microsoft.Web.WebView2.WinForms;
 
 [assembly: System.Reflection.AssemblyTitle("Bébène")]
 [assembly: System.Reflection.AssemblyProduct("Bébène")]
-[assembly: System.Reflection.AssemblyVersion("1.33.0.0")]
+[assembly: System.Reflection.AssemblyVersion("1.34.0.0")]
 
 static class Program {
-    public const string Version = "1.33";
-    public static bool OpenSetup;   // --setup : ouvrir directement l'assistant d'installation
+    public const string Version = "1.34";
+    public static bool OpenSetup;
+    public static readonly uint Pid = (uint)Process.GetCurrentProcess().Id;   // identifiant de Bébène (lu une seule fois)   // --setup : ouvrir directement l'assistant d'installation
 
     // ---- Diagnostic : journal + détection des blocages de l'interface ----
     public static readonly string LogFile = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "ClaudeCompanion", "bebene.log");
@@ -200,7 +201,7 @@ static class Settings {
     public static bool AutoStart {
         get { using (var k = Registry.CurrentUser.OpenSubKey(RunKey)) return k != null && k.GetValue("ClaudeCompanion") != null; }
         set {
-            using (var k = Registry.CurrentUser.OpenSubKey(RunKey, true)) {
+            using (var k = Registry.CurrentUser.CreateSubKey(RunKey)) {
                 if (value) k.SetValue("ClaudeCompanion", "\"" + Application.ExecutablePath + "\" --background");
                 else k.DeleteValue("ClaudeCompanion", false);
             }
@@ -504,7 +505,7 @@ class Companion : Form {
     void TrackForeground() {
         if (++fgTick % 30 != 0) return;                                     // ~1 fois par seconde
         var h = GetForegroundWindow(); uint pid; GetWindowThreadProcessId(h, out pid);
-        if (h == IntPtr.Zero || pid == (uint)Process.GetCurrentProcess().Id) return;
+        if (h == IntPtr.Zero || pid == Program.Pid) return;
         var sb = new StringBuilder(300); GetWindowText(h, sb, 300);
         string tt = sb.ToString().Trim();
         if (tt.Length > 0 && tt != "Program Manager") LastWindow = tt;
@@ -663,7 +664,7 @@ class Companion : Form {
     void Frame(Graphics g, int f, float jumpY) {
         g.ResetTransform();
         if (Math.Abs(swing) > 0.3f) { g.TranslateTransform(32, 19); g.RotateTransform(swing); g.TranslateTransform(-32, -19); }   // pivot = peau du cou
-        if (f < 0) g.MultiplyTransform(new Matrix(-1, 0, 0, 1, CW, 0));
+        if (f < 0) using (var mx = new Matrix(-1, 0, 0, 1, CW, 0)) g.MultiplyTransform(mx);
         g.TranslateTransform(0, -jumpY);
     }
 
@@ -916,7 +917,7 @@ class Companion : Form {
     }
 
     // ---- App ----
-    void Quit() { Settings.Set("X", Left); Spell.Enable(false); if (Panel.Flash) ChatPanel.Forget(SessionId); tray.Visible = false; Application.Exit(); }
+    public void Quit() { Settings.Set("X", Left); Spell.Enable(false); if (Panel.Flash) ChatPanel.Forget(SessionId); tray.Visible = false; Application.Exit(); }
     public void RefreshSettings() { if (settingsWin != null && settingsWin.Visible) settingsWin.Refresh2(); }
 
     public SpellAssist Spell;
@@ -1306,7 +1307,7 @@ class SpellAssist : Form {
     bool ExcludedProcess() {
         try {
             uint pid; GetWindowThreadProcessId(fg, out pid);
-            if (pid == (uint)Process.GetCurrentProcess().Id) return false;
+            if (pid == Program.Pid) return false;
             string name = Process.GetProcessById((int)pid).ProcessName;
             foreach (var x in NoSpell) if (string.Equals(x, name, StringComparison.OrdinalIgnoreCase)) return true;
         } catch { }
@@ -1628,6 +1629,21 @@ static class Calendars {
                         var s = day + start.TimeOfDay; if (s < start) continue; if (s > until) break;
                         n++; add(s);
                     }
+            } else if (freq == "MONTHLY" && r.ContainsKey("BYDAY")) {        // ex. 2TU = 2e mardi du mois, -1FR = dernier vendredi
+                string[] codes = { "SU", "MO", "TU", "WE", "TH", "FR", "SA" };
+                for (var mo = new DateTime(start.Year, start.Month, 1); mo <= until && n < count && guard++ < 600; mo = mo.AddMonths(interval)) {
+                    var hits = new List<DateTime>();
+                    foreach (var bd in r["BYDAY"].Split(',')) {
+                        var mm = Regex.Match(bd.Trim().ToUpperInvariant(), @"^([+-]?\d+)?(SU|MO|TU|WE|TH|FR|SA)$"); if (!mm.Success) continue;
+                        var dow = (DayOfWeek)Array.IndexOf(codes, mm.Groups[2].Value);
+                        var inMonth = new List<DateTime>(); for (var x = mo; x.Month == mo.Month; x = x.AddDays(1)) if (x.DayOfWeek == dow) inMonth.Add(x);
+                        int ord = mm.Groups[1].Success ? int.Parse(mm.Groups[1].Value) : 0;
+                        if (ord == 0) hits.AddRange(inMonth);
+                        else { int ix = ord > 0 ? ord - 1 : inMonth.Count + ord; if (ix >= 0 && ix < inMonth.Count) hits.Add(inMonth[ix]); }
+                    }
+                    hits.Sort();
+                    foreach (var hd in hits) { var hs = hd + start.TimeOfDay; if (hs < start) continue; if (hs > until || n >= count) break; n++; add(hs); }
+                }
             } else {
                 for (var s = start; s <= until && n < count && guard++ < 3000; n++) {
                     add(s);
@@ -2382,9 +2398,13 @@ static class Setup {
         try {
             var psi = new ProcessStartInfo(file, args) { UseShellExecute = false, CreateNoWindow = true, RedirectStandardOutput = true, RedirectStandardError = true, StandardOutputEncoding = Encoding.UTF8 };
             using (var p = Process.Start(psi)) {
-                string o = p.StandardOutput.ReadToEnd();
+                var o = new StringBuilder();
+                p.OutputDataReceived += (s, e) => { if (e.Data != null) lock (o) o.AppendLine(e.Data); };
+                p.ErrorDataReceived += (s, e) => { };
+                p.BeginOutputReadLine(); p.BeginErrorReadLine();
                 if (!p.WaitForExit(ms)) { try { p.Kill(); } catch { } return null; }
-                return p.ExitCode == 0 ? o.Trim() : null;
+                p.WaitForExit();
+                lock (o) return p.ExitCode == 0 ? o.ToString().Trim() : null;
             }
         } catch { return null; }
     }
@@ -2544,7 +2564,7 @@ class ChatPanel : Form {
             t.Stop(); t.Dispose();
             if (!Visible || Pinned || ContainsFocus) return;
             uint pid; GetWindowThreadProcessId(GetForegroundWindow(), out pid);
-            if (pid == (uint)Process.GetCurrentProcess().Id) return;      // le chat, les réglages, un dialogue de Bébène…
+            if (pid == Program.Pid) return;      // le chat, les réglages, un dialogue de Bébène…
             Hide();
         };
         t.Start();
@@ -2599,6 +2619,7 @@ class ChatPanel : Form {
                     StandardOutputEncoding = Encoding.UTF8, WorkingDirectory = Path.GetTempPath() };
                 psi.EnvironmentVariables["CAVEMAN_DEFAULT_MODE"] = "off";
                 using (var p = Process.Start(psi)) {
+                    KillAfter(p, 60000);
                     p.StandardInput.Write("."); p.StandardInput.Close();
                     p.ErrorDataReceived += (s, e) => { }; p.BeginErrorReadLine();
                     string line;
@@ -2624,6 +2645,7 @@ class ChatPanel : Form {
                     StandardOutputEncoding = Encoding.UTF8, WorkingDirectory = Path.GetTempPath() };
                 psi.EnvironmentVariables["CAVEMAN_DEFAULT_MODE"] = "off";
                 using (var p = Process.Start(psi)) {
+                    KillAfter(p, 60000);
                     var bytes = Encoding.UTF8.GetBytes(excerpt);
                     p.StandardInput.BaseStream.Write(bytes, 0, bytes.Length); p.StandardInput.Close();
                     p.ErrorDataReceived += (s, e) => { }; p.BeginErrorReadLine();
@@ -2633,6 +2655,10 @@ class ChatPanel : Form {
                 }
             } catch (Exception ex) { Program.Log("Titre", ex.Message); }
         }) { IsBackground = true, Name = "titre" }.Start();
+    }
+
+    static void KillAfter(Process p, int ms) {
+        new Thread(() => { try { if (!p.WaitForExit(ms)) p.Kill(); } catch { } }) { IsBackground = true, Name = "délai" }.Start();
     }
 
     public const int ChatW = 460;
@@ -2912,7 +2938,7 @@ class SettingsWindow : Form {
             case "chat": owner.ShowPanel(); break;
             case "terminal": owner.OpenTerminal(false); break;
             case "resume": owner.OpenTerminal(true); break;
-            case "quit": Application.Exit(); break;
+            case "quit": owner.Quit(); break;
         }
     }
 

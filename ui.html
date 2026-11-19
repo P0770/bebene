@@ -329,6 +329,10 @@ textarea { min-height: 28px; }
 .cpy.code:hover { background: rgba(235,154,120,.16); color: var(--accent-2); }
 .cpy.ok { color: #7bc67e !important; }
 .msg.bot { margin-bottom: 6px; }
+#lhint { display: none; font-size: 11.5px; color: var(--muted); padding: 0 10px 7px; }
+#lhint.on { display: block; animation: rise .15s ease; }
+#lhint b { color: var(--accent-2); font-weight: 600; }
+#lhint kbd { font-size: 10.5px; }
 </style>
 </head>
 <body>
@@ -412,6 +416,7 @@ textarea { min-height: 28px; }
 </main>
 
 <footer>
+  <div id="lhint"></div>
   <div class="box">
     <textarea id="input" rows="1" placeholder="Écris à Claude…"></textarea>
     <button id="send" disabled title="Envoyer (Entrée)">
@@ -722,7 +727,7 @@ $('#mFolder').onclick = () => { closeMenu(); newChat({ project: '' }); post('fol
 $('#mProjAdd').onclick = () => { const n = $('#mProjName').value.trim(); if (n) { post('newproject\n' + n); $('#mProjName').value = ''; } };
 $('#mProjName').onkeydown = e => { if (e.key === 'Enter') $('#mProjAdd').click(); };
 
-function autosize() { input.style.height = 'auto'; input.style.height = Math.min(input.scrollHeight, 150) + 'px'; refresh(); }
+function autosize() { input.style.height = 'auto'; input.style.height = Math.min(input.scrollHeight, 150) + 'px'; refresh(); listHint(); }
 
 window.chrome.webview.addEventListener('message', e => {
   const d = String(e.data), i = d.indexOf('\n');
@@ -775,6 +780,14 @@ input.addEventListener('keydown', e => {
   }
   if (!e.shiftKey) { e.preventDefault(); submit(); }
 });
+// Indication visible quand on est dans une liste (sinon « 1. » + espace ne montre rien)
+function listHint() {
+  const pos = input.selectionStart, v = input.value, ls = v.lastIndexOf('\n', pos - 1) + 1, le = v.indexOf('\n', pos);
+  const m = v.slice(ls, le < 0 ? v.length : le).match(/^\s*(•|(\d+)[.)])\s/);
+  const h = $('#lhint'); h.classList.toggle('on', !!m);
+  if (m) h.innerHTML = '<b>' + (m[2] ? 'Liste numérotée' : 'Liste à puces') + '</b> · <kbd>Entrée</kbd> élément suivant · <kbd>Entrée</kbd> sur un élément vide : fin · <kbd>Ctrl</kbd>+<kbd>Entrée</kbd> envoyer';
+}
+input.addEventListener('keyup', listHint); input.addEventListener('click', listHint);
 document.addEventListener('keydown', e => { if (e.key === 'Escape') { if (document.querySelector('.dd.open')) closeMenu(); else post('hide'); } });
 send.onclick = () => busy ? post('stop') : submit();
 $('#new').onclick = () => newChat({ project: project });
