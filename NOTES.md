@@ -25,3 +25,5 @@ Compagnon de bureau Windows : un chat noir animé, et une fenêtre de discussion
 ## Idées
 - Réponses affichées mot par mot (`--include-partial-messages`).
 - Raccourci clavier configurable.
+
+- Dépôt GitHub (privé) : https://github.com/P0770/bebene — après une évolution : `git add -A; git commit -m "..."; git push`.
