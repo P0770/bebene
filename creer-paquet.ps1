@@ -2,6 +2,7 @@
 # Lancé par « Créer le paquet Bébène.cmd » (double-clic). Résultat : paquets\Bebene-<version>-<date>.zip
 #   Contenu : l'application compilée (dossier d'installation), un modèle de mémoire ClaudeHub SANS tes infos
 #   personnelles (outils + skills à jour, noyau générique) et un mode d'emploi.
+param([switch]$NoOpen)
 $ErrorActionPreference = 'Stop'
 $src = $PSScriptRoot
 $app = Join-Path $env:USERPROFILE 'ClaudeCompanion'
@@ -63,4 +64,4 @@ Add-Type -AssemblyName System.IO.Compression.FileSystem
 [IO.Compression.ZipFile]::CreateFromDirectory($stage, $zip)
 Remove-Item $stage -Recurse -Force
 Write-Host "Paquet créé : $zip" -ForegroundColor Green
-Start-Process explorer.exe "/select,`"$zip`""
+if (-not $NoOpen) { Start-Process explorer.exe "/select,`"$zip`"" }

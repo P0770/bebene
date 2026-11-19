@@ -19,10 +19,10 @@ using Microsoft.Web.WebView2.WinForms;
 
 [assembly: System.Reflection.AssemblyTitle("Bébène")]
 [assembly: System.Reflection.AssemblyProduct("Bébène")]
-[assembly: System.Reflection.AssemblyVersion("1.29.0.0")]
+[assembly: System.Reflection.AssemblyVersion("1.30.0.0")]
 
 static class Program {
-    public const string Version = "1.29";
+    public const string Version = "1.30";
     public static bool OpenSetup;   // --setup : ouvrir directement l'assistant d'installation
 
     // ---- Diagnostic : journal + détection des blocages de l'interface ----
@@ -162,6 +162,7 @@ static class Program {
             d.Shown += (s, e) => { t1.Start(); t2.Start(); };
             Application.Run(d); return;
         }
+        if (args.Length == 2 && args[0] == "--readytest") { new Companion(false).ReadyPreview(args[1]); return; }
         if (args.Length == 2 && args[0] == "--preview") { new Companion(false).Preview(args[1]); return; } // planche des poses
         bool first;
         using (new Mutex(true, "ClaudeCompanion_Singleton", out first)) {
@@ -430,9 +431,12 @@ class Companion : Form {
     public bool AltSpace;
     protected override void WndProc(ref Message m) { if (m.Msg == 0x0312) TogglePanel(); base.WndProc(ref m); }
 
+    public string State { get { return state; } }
+    float readyT;
+    // "ready" : la réponse est arrivée pendant que la discussion était fermée → Bébène, content, attend qu'on l'ouvre
     public void SetState(string s) {
-        state = s; happyT = 0;
-        if (s == "happy") { jumpT = 0; heartT = 1.4f; }
+        state = s; happyT = 0; readyT = 0;
+        if (s == "happy" || s == "ready") { jumpT = 0; heartT = 1.4f; }
     }
 
     public void Preview(string path) {
@@ -449,6 +453,20 @@ class Companion : Form {
                 var p = poses[i].Clone();
                 if (act == "rub") { p.ht += 12; p.hx += 1.3f; p.ba += 3.5f; }
                 using (var b = RenderSmall(p, 1, 0, true)) g.DrawImage(b, (i % 4) * W, (i / 4) * H);
+            }
+            sheet.Save(path, ImageFormat.Png);
+        }
+    }
+
+    // test : Bébène content qui attend qu on lise sa réponse (deux sens + avec cœur)
+    public void ReadyPreview(string path) {
+        tray.Visible = false; state = "ready"; act = "sit"; t = 0.3f;
+        using (var sheet = new Bitmap(W * 3, H)) using (var g = Graphics.FromImage(sheet)) {
+            g.Clear(Color.FromArgb(255, 40, 44, 52));
+            for (int i = 0; i < 3; i++) {
+                heartT = i == 2 ? 0.9f : 0; t = 0.3f + i * 0.4f;
+                for (int k = 0; k < tang.Length; k++) tang[k] = SIT.ta + SIT.tc * k;
+                using (var b = RenderSmall(SIT.Clone(), i == 1 ? -1 : 1, i == 2 ? 6 : 0, true)) g.DrawImage(b, i * W, 0);
             }
             sheet.Save(path, ImageFormat.Png);
         }
@@ -501,10 +519,11 @@ class Companion : Form {
         if (petT > 0) petT -= dt;
         if (heartT > 0) heartT -= dt;
         if (state == "happy") { happyT += dt; if (happyT > 1.6f) state = "idle"; }
+        if (state == "ready") { readyT += dt; if (readyT > 3.5f) { readyT = 0; jumpT = 0; heartT = 1.4f; } }   // petit saut + cœur toutes les 3,5 s
 
         var wa = Screen.FromPoint(new Point(Left + W / 2, Top + H / 2)).WorkingArea;
         int groundTop = wa.Bottom - 51 * Px;
-        bool busy = state == "thinking" || Panel.Visible;
+        bool busy = state == "thinking" || state == "ready" || Panel.Visible;
         Pose tgt = SIT; int dx = 0;
 
         if (held) tgt = HANG;
@@ -575,8 +594,8 @@ class Companion : Form {
         }
 
         // queue : chaîne avec inertie
-        float amp = state == "thinking" ? 24 : act == "lie" ? 4 : held ? 16 : walkAmp > 0.3f ? 7 : 10;
-        float freq = state == "thinking" ? 6 : 1.8f;
+        float amp = state == "thinking" ? 24 : state == "ready" ? 20 : act == "lie" ? 4 : held ? 16 : walkAmp > 0.3f ? 7 : 10;
+        float freq = state == "thinking" ? 6 : state == "ready" ? 4.5f : 1.8f;
         for (int i = 0; i < tang.Length; i++) {
             float target = cur.ta + cur.tc * i + amp * (float)Math.Sin(t * freq - i * 0.55f) * (i + 1) / tang.Length;
             tang[i] += (target - tang[i]) * Math.Max(0.06f, 0.3f - i * 0.025f);
@@ -737,7 +756,7 @@ class Companion : Form {
     void DrawFace(Graphics g, Pose p) {
         // bâillement pendant l'étirement : 0 → 1 → 0 sur la durée de l'étirement
         float yawn = act == "stretch" && !held && !falling ? (float)Math.Sin(Math.Min(1.0, actT / Math.Max(0.1f, actDur)) * Math.PI) : 0f;
-        bool happyEyes = petT > 0 || state == "happy" || act == "rub" || act == "scratch";
+        bool happyEyes = petT > 0 || state == "happy" || state == "ready" || act == "rub" || act == "scratch";
         bool dilated = held || falling || state == "thinking" || act == "chase";
         float es = p.eyeShift + lookX, open = blink > 0 ? 0 : p.eye;
         using (var eye = new SolidBrush(EYE)) using (var ep = new Pen(EYE, 0.9f)) using (var dk = new Pen(EYEDK, 0.8f))
@@ -806,6 +825,16 @@ class Companion : Form {
                 using (var b = new SolidBrush(Color.FromArgb(240, 235, 235, 245)))
                     for (int i = 0; i < Math.Min(k, 3); i++) g.FillRectangle(b, (int)(hx + dir * (8 + i * 4)), (int)Math.Max(0, hy - 12 - i * 3), 2, 2);
             }
+            if (state == "ready" && !held && !falling) {                // bulle « ! » : une réponse t attend
+                int bob = (int)(t * 2.5f) % 2;
+                string[] rows = { ".XXXXXXX.", "XXXXOXXXX", "XXXXOXXXX", "XXXXOXXXX", "XXXXXXXXX", "XXXXOXXXX", ".XXXXXXX.", "..XX.....", ".X......." };
+                int x0 = (int)(hx + dir * 10) - (dir > 0 ? 1 : 8), y0 = (int)Math.Max(0, hy - 24) - bob;
+                using (var w = new SolidBrush(Color.FromArgb(245, 240, 238, 245))) using (var o = new SolidBrush(Color.FromArgb(255, 217, 119, 87)))
+                    for (int rr = 0; rr < rows.Length; rr++) for (int c = 0; c < 9; c++) {
+                        char ch = rows[rr][dir > 0 ? c : 8 - c];
+                        if (ch == 'X') g.FillRectangle(w, x0 + c, y0 + rr, 1, 1); else if (ch == 'O') g.FillRectangle(o, x0 + c, y0 + rr, 1, 1);
+                    }
+            }
             if (act == "lie" && actT > 2.5f && !held && !falling) {
                 for (int i = 0; i < 3; i++) {
                     float ph = (t * 0.5f + i / 3f) % 1f;
@@ -828,7 +857,7 @@ class Companion : Form {
             }
             if (heartT > 0) {
                 float rise = (1.4f - heartT) * 6;
-                int x0 = (int)(hx + dir * 9) - 2, y0 = (int)(hy - 11 - rise);
+                int x0 = (int)(hx + (state == "ready" ? -dir : dir) * 9) - 2, y0 = (int)(hy - 11 - rise);
                 string[] rows = { ".X.X.", "XXXXX", ".XXX.", "..X.." };
                 using (var b = new SolidBrush(Color.FromArgb((int)(255 * Math.Min(1, heartT)), HEART)))
                     for (int r = 0; r < rows.Length; r++) for (int c = 0; c < 5; c++) if (rows[r][c] == 'X') g.FillRectangle(b, x0 + c, y0 + r, 1, 1);
@@ -2483,7 +2512,7 @@ class ChatPanel : Form {
         calTimer.Tick += (s, e) => RefreshCalendars();                 // rafraîchit les calendriers toutes les 30 min
         calTimer.Start();
         InitSide();
-        VisibleChanged += (s, e) => { if (Visible) ProbeQuota(false); };    // quota à jour à chaque ouverture
+        VisibleChanged += (s, e) => { if (Visible) { ProbeQuota(false); if (owner.State == "ready") owner.SetState("happy"); } };    // quota à jour à chaque ouverture
         quotaTimer.Tick += (s, e) => { if (Visible) ProbeQuota(true); }; quotaTimer.Start();
         Mailbox.LoadCache();                                         // derniers résultats tout de suite, nouvelle analyse en fond
         mailTimer.Tick += (s, e) => ScanMail(); mailTimer.Start();
@@ -2772,7 +2801,7 @@ class ChatPanel : Form {
                 BeginInvoke((Action)(() => {
                     Post("done\n" + code + "\n" + er);
                     p.Dispose(); proc = null;
-                    owner.SetState(code == 0 ? "happy" : "idle");
+                    owner.SetState(!Visible ? "ready" : code == 0 ? "happy" : "idle");   // fermée : il attend content qu on vienne lire
                 }));
             } catch { } // l'app se ferme pendant que Claude répond
         };
