@@ -1,0 +1,786 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<title>Bébène</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/marked/12.0.2/marked.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/dompurify/3.1.6/purify.min.js"></script>
+<style>
+:root {
+  --bg: rgba(16,16,20,.62); --surface: rgba(44,44,52,.55); --raised: rgba(70,70,80,.5); --line: rgba(255,255,255,.09);
+  --text: #ececef; --muted: #8d8d97; --accent: #d97757; --accent-2: #eb9a78;
+}
+* { box-sizing: border-box; margin: 0; }
+html, body { height: 100%; background: transparent; color: var(--text); overflow: hidden;
+  font: 14px/1.55 "Segoe UI Variable Text", "Segoe UI", system-ui, sans-serif; user-select: none; }
+body { display: flex; flex-direction: row; }
+#chat { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+
+/* ---- tableau de bord ---- */
+body { background: rgba(14,14,18,.38); }            /* fenêtre en verre dépoli : le bureau se devine derrière */
+#dash, #dashbtn, #dashmenu { display: none !important; }   /* remplacé par les volets transparents à côté de la fenêtre */
+#dash { width: 330px; flex: none; border-right: 1px solid var(--line); background: rgba(0,0,0,.16); display: flex; flex-direction: column; overflow-y: auto; padding: 16px 14px 14px; gap: 6px; }
+body.nocal #secCal, body.noup #secUp { display: none; }
+body.nocal.noup #dash { display: none; }
+#dashmenu { position: fixed; z-index: 20; display: none; min-width: 230px; background: rgba(30,30,36,.92); border: 1px solid var(--line); border-radius: 12px; padding: 6px; box-shadow: 0 12px 30px rgba(0,0,0,.4); backdrop-filter: blur(12px); }
+#dashmenu.open { display: block; }
+#dashmenu label { display: flex; align-items: center; justify-content: space-between; gap: 14px; padding: 8px 10px; border-radius: 8px; cursor: pointer; font-size: 13px; }
+#dashmenu label:hover { background: var(--raised); }
+#dashmenu .switch { gap: 0; }
+#dashbtn.on { color: var(--accent-2); }
+.dh { display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px; }
+.dh b { font-size: 15px; font-weight: 600; text-transform: capitalize; }
+.dh .icon-btn { width: 28px; height: 28px; }
+.cal { display: grid; grid-template-columns: repeat(7, 1fr); gap: 2px; text-align: center; }
+.cal .wd { font-size: 11px; color: var(--muted); padding-bottom: 4px; }
+.cal .d { position: relative; height: 34px; border-radius: 9px; font-size: 12.5px; cursor: pointer; display: grid; place-items: center; color: var(--text); }
+.cal .d:hover { background: var(--raised); }
+.cal .d.out { color: #55555d; }
+.cal .d.today { background: rgba(217,119,87,.16); color: var(--accent-2); font-weight: 600; }
+.cal .d.sel { outline: 1.5px solid var(--accent); }
+.cal .dots { position: absolute; bottom: 3px; left: 0; right: 0; display: flex; justify-content: center; gap: 2px; }
+.cal .dots i { width: 4px; height: 4px; border-radius: 50%; }
+.cal .d.exam::after { content: ""; position: absolute; top: 3px; right: 5px; width: 5px; height: 5px; border-radius: 50%; background: #e8504a; }
+.day { margin: 8px 0 4px; display: flex; flex-direction: column; gap: 5px; }
+.day .dt { font-size: 12px; color: var(--muted); text-transform: capitalize; }
+.ev { display: flex; gap: 9px; align-items: stretch; background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 7px 10px; font-size: 12.5px; }
+.ev .bar { width: 3px; border-radius: 3px; flex: none; }
+.ev .tt { font-weight: 500; overflow-wrap: anywhere; }
+.ev .mt { color: var(--muted); font-size: 11.5px; overflow-wrap: anywhere; }
+.none { color: var(--muted); font-size: 12px; padding: 4px 2px; }
+#dash h3 { font-size: 11.5px; font-weight: 600; text-transform: uppercase; letter-spacing: .7px; color: var(--muted); margin: 12px 2px 4px; display: flex; justify-content: space-between; }
+.up { display: flex; gap: 10px; align-items: center; background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 8px 10px; }
+.up .dte { width: 42px; flex: none; text-align: center; border-radius: 9px; background: var(--raised); padding: 4px 0; line-height: 1.15; }
+.up .dte b { display: block; font-size: 16px; }
+.up .dte span { font-size: 10.5px; color: var(--muted); text-transform: uppercase; }
+.up .inf { flex: 1; min-width: 0; font-size: 12.5px; }
+.up .inf .tt { font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.up .inf .mt { color: var(--muted); font-size: 11.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.tag { font-size: 10.5px; font-weight: 600; border-radius: 6px; padding: 1px 6px; margin-right: 4px; }
+.tag.exam { background: rgba(232,80,74,.16); color: #f08a85; }
+.tag.rdv { background: rgba(95,168,211,.16); color: #8cc4e6; }
+.soon { font-size: 11px; color: var(--accent-2); white-space: nowrap; flex: none; }
+.cstat { font-size: 11px; color: var(--muted); margin-top: 8px; }
+.cstat a { cursor: pointer; }
+.empty-cal { font-size: 12.5px; color: var(--muted); background: var(--surface); border: 1px dashed var(--line); border-radius: 12px; padding: 14px; text-align: center; }
+.empty-cal button { margin-top: 8px; font: inherit; font-size: 12.5px; background: var(--accent); color: #fff; border: 0; border-radius: 8px; padding: 6px 12px; cursor: pointer; }
+::-webkit-scrollbar { width: 10px; }
+::-webkit-scrollbar-thumb { background: #3a3a41; border-radius: 10px; border: 3px solid var(--bg); }
+
+header { display: flex; align-items: center; gap: 11px; padding: 14px 12px 12px 16px; border-bottom: 1px solid var(--line); }
+.orb { width: 34px; height: 34px; border-radius: 50%; flex: none; display: grid; place-items: center;
+  background: #26262b; box-shadow: 0 0 0 3px rgba(217,119,87,.14); }
+.orb svg { width: 82%; height: 82%; }
+.orb.busy { animation: pulse 1.3s ease-in-out infinite; }
+@keyframes pulse { 50% { box-shadow: 0 0 0 7px rgba(217,119,87,.22); } }
+.title { flex: 1; min-width: 0; }
+.title b { font-weight: 600; font-size: 14.5px; letter-spacing: .1px; }
+.dir { display: block; color: var(--muted); font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; cursor: pointer; }
+.dir:hover { color: var(--accent-2); }
+.icon-btn { background: none; border: 0; color: var(--muted); width: 32px; height: 32px; border-radius: 9px; cursor: pointer; display: grid; place-items: center; }
+.icon-btn:hover { background: var(--raised); color: var(--text); }
+
+main { flex: 1; position: relative; min-height: 0; }
+#log { position: absolute; inset: 0; overflow-y: auto; padding: 18px 16px 10px; display: flex; flex-direction: column; gap: 16px; user-select: text; }
+.msg.user { align-self: flex-end; max-width: 85%; background: var(--raised); padding: 9px 14px; border-radius: 18px 18px 5px 18px; white-space: pre-wrap; overflow-wrap: anywhere; }
+.msg.bot { overflow-wrap: anywhere; animation: rise .25s ease; }
+@keyframes rise { from { opacity: 0; transform: translateY(4px); } }
+.msg.bot p { margin: .45em 0; } .msg.bot ul, .msg.bot ol { padding-left: 1.3em; margin: .4em 0; }
+.msg.bot h1, .msg.bot h2, .msg.bot h3 { font-size: 15px; margin: .8em 0 .3em; }
+.msg.bot table { border-collapse: collapse; margin: .5em 0; font-size: 13px; }
+.msg.bot th, .msg.bot td { border: 1px solid var(--line); padding: 4px 8px; }
+pre { background: #111114; border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; overflow-x: auto; margin: .5em 0; }
+code { font: 12.5px "Cascadia Code", Consolas, monospace; background: var(--raised); padding: 1px 5px; border-radius: 5px; }
+pre code { background: none; padding: 0; }
+a { color: var(--accent-2); }
+.tool { display: flex; align-items: center; gap: 7px; width: fit-content; max-width: 100%; font-size: 12px; color: var(--muted);
+  background: var(--surface); border: 1px solid var(--line); border-radius: 999px; padding: 3px 11px; margin: 5px 0; }
+.tool span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.tool i { width: 6px; height: 6px; border-radius: 50%; background: var(--accent); flex: none; font-style: normal; }
+.err { color: #f0a3a3; font-size: 13px; background: rgba(240,100,100,.08); border: 1px solid rgba(240,100,100,.25); border-radius: 10px; padding: 8px 12px; margin-top: 4px; white-space: pre-wrap; }
+.typing { display: flex; gap: 5px; padding: 8px 0; }
+.typing span { width: 7px; height: 7px; border-radius: 50%; background: var(--muted); animation: dot 1.2s infinite; }
+.typing span:nth-child(2) { animation-delay: .15s; } .typing span:nth-child(3) { animation-delay: .3s; }
+@keyframes dot { 30% { transform: translateY(-5px); background: var(--accent); } }
+
+#empty { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; padding: 24px; text-align: center; }
+#empty .orb { width: 64px; height: 64px; margin-bottom: 10px; }
+#empty h2 { font-size: 19px; font-weight: 600; }
+#empty p { color: var(--muted); font-size: 13px; margin-bottom: 14px; }
+.chips { display: flex; flex-direction: column; gap: 8px; width: 100%; max-width: 320px; }
+.chip { background: var(--surface); border: 1px solid var(--line); color: var(--text); border-radius: 12px; padding: 10px 14px; text-align: left; font: inherit; font-size: 13px; cursor: pointer; transition: border-color .15s, background .15s; }
+.chip:hover { border-color: var(--accent); background: var(--raised); }
+
+footer { padding: 10px 12px 12px; }
+.box { display: flex; align-items: flex-end; gap: 8px; background: var(--surface); border: 1px solid var(--line); border-radius: 16px; padding: 8px 8px 8px 14px; transition: border-color .15s; }
+.box:focus-within { border-color: #5a4038; }
+textarea { flex: 1; resize: none; border: 0; outline: 0; background: none; color: var(--text); font: inherit; max-height: 150px; padding: 5px 0; user-select: text; }
+textarea::placeholder { color: #66666f; }
+#send { width: 34px; height: 34px; border-radius: 11px; border: 0; background: var(--accent); color: #fff; cursor: pointer; display: grid; place-items: center; flex: none; transition: opacity .15s, background .15s; }
+#send:hover { background: var(--accent-2); }
+#send:disabled { opacity: .3; cursor: default; background: var(--accent); }
+#send.stop { background: #3b3b42; }
+.opts { display: flex; justify-content: space-between; align-items: center; margin-top: 9px; padding: 0 4px; font-size: 12px; color: var(--muted); }
+.switch { display: flex; align-items: center; gap: 8px; cursor: pointer; }
+.switch input { display: none; }
+.track { width: 28px; height: 16px; border-radius: 9px; background: #3b3b42; position: relative; transition: background .15s; }
+.track::after { content: ""; position: absolute; left: 2px; top: 2px; width: 12px; height: 12px; border-radius: 50%; background: #fff; transition: transform .15s; }
+.switch input:checked + .track { background: var(--accent); }
+.switch input:checked + .track::after { transform: translateX(12px); }
+kbd { font: 11px "Segoe UI", sans-serif; background: var(--raised); border-radius: 4px; padding: 1px 5px; }
+
+.diff { margin: -2px 0 6px; font-size: 12px; }
+.diff summary { color: var(--muted); cursor: pointer; width: fit-content; padding: 2px 4px; border-radius: 6px; }
+.diff summary:hover { color: var(--accent-2); }
+.diff pre { max-height: 260px; padding: 6px 0; }
+.diff pre div { padding: 0 12px; white-space: pre-wrap; font: 12px "Cascadia Code", Consolas, monospace; }
+.diff .del { background: rgba(240,90,90,.12); color: #f2aaaa; }
+.diff .ins { background: rgba(80,200,120,.12); color: #9fe0b4; }
+.diff .more { color: var(--muted); }
+
+.approve { border: 1px solid #5a4038; background: rgba(217,119,87,.07); border-radius: 12px; padding: 10px 12px; font-size: 13px; animation: rise .25s ease; }
+.approve .ah { font-weight: 600; }
+.approve ul { margin: 8px 0 10px; padding-left: 1.1em; color: var(--muted); }
+.approve li { margin: 3px 0; overflow-wrap: anywhere; }
+.approve .ab { display: flex; justify-content: flex-end; gap: 8px; }
+.approve button { font: inherit; font-size: 13px; border-radius: 9px; padding: 6px 14px; cursor: pointer; border: 1px solid var(--line); background: var(--raised); color: var(--text); }
+.approve .yes { background: var(--accent); border-color: var(--accent); color: #fff; }
+.approve .yes:hover { background: var(--accent-2); }
+
+body.drop main::after { content: "Dépose tes fichiers ici"; position: absolute; inset: 10px; display: grid; place-items: center;
+  border: 2px dashed var(--accent); border-radius: 16px; background: rgba(24,24,27,.88); color: var(--accent-2); font-size: 15px; font-weight: 600; }
+
+.orb img, .avatar img { width: 88%; image-rendering: pixelated; }
+
+/* ================= Habillage v2 : plus aéré, plus doux ================= */
+header { padding: 12px 10px 10px 14px; gap: 8px; border-bottom: 1px solid rgba(255,255,255,.06); position: relative; z-index: 5; }
+.orb { width: 34px; height: 34px; background: rgba(255,255,255,.06); box-shadow: none; }
+#dir { display: none !important; }
+#chat { overflow: hidden; }
+header .icon-btn { flex: none; }
+.ctx { display: flex; align-items: center; gap: 8px; min-width: 0; max-width: 215px; flex: 0 1 auto; background: none; border: 0; color: var(--text); font: inherit;
+  padding: 5px 8px 5px 6px; border-radius: 10px; cursor: pointer; transition: background .15s; }
+.ctx:hover, .ctx.open { background: rgba(255,255,255,.06); }
+.ctx b { font-weight: 600; font-size: 14px; flex: none; }
+.pill { font-size: 11.5px; color: var(--muted); background: rgba(255,255,255,.06); border-radius: 999px; padding: 2px 9px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+.pill.pr { color: var(--accent-2); background: rgba(217,119,87,.13); }
+.pill.pr::before { content: "# "; opacity: .7; }
+.pill.fl { color: #f2c66d; background: rgba(242,198,109,.12); }
+.chev { flex: none; color: var(--muted); transition: transform .2s; }
+.ctx.open .chev { transform: rotate(180deg); }
+.icon-btn { width: 30px; height: 30px; border-radius: 9px; }
+
+/* menu sobre */
+#oldmenu { position: absolute; top: 58px; left: 10px; width: 290px; max-height: calc(100% - 140px); overflow-y: auto; z-index: 30;
+  background: rgba(26,26,31,.97); border: 1px solid rgba(255,255,255,.08); border-radius: 14px; padding: 8px;
+  box-shadow: 0 18px 40px rgba(0,0,0,.45); opacity: 0; transform: translateY(-6px); pointer-events: none; transition: opacity .16s, transform .16s; }
+.mrow { display: flex; gap: 6px; margin-bottom: 4px; }
+.mbtn { flex: 1; display: flex; align-items: center; justify-content: center; gap: 7px; font: inherit; font-size: 12.5px; color: var(--text);
+  background: rgba(255,255,255,.05); border: 1px solid rgba(255,255,255,.06); border-radius: 10px; padding: 8px 6px; cursor: pointer; transition: background .15s, border-color .15s; }
+.mbtn:hover { background: rgba(255,255,255,.09); }
+.mbtn.flash { flex: .6; color: #f2c66d; }
+.mbtn.flash:hover { border-color: rgba(242,198,109,.4); }
+.msec { font-size: 10.5px; font-weight: 600; letter-spacing: .8px; text-transform: uppercase; color: #6f6f79; padding: 10px 8px 4px; }
+.mitem { display: flex; align-items: center; gap: 8px; width: 100%; text-align: left; font: inherit; font-size: 13px; color: var(--text); background: none; border: 0;
+  border-radius: 8px; padding: 6px 8px; cursor: pointer; }
+.mitem:hover { background: rgba(255,255,255,.06); }
+.mitem.on { background: rgba(217,119,87,.12); }
+.mitem .ic { color: var(--accent-2); font-weight: 600; width: 12px; text-align: center; }
+.mitem .tx { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.mitem small { display: block; font-size: 11px; color: var(--muted); }
+.mitem .del { opacity: 0; background: none; border: 0; color: var(--muted); font-size: 16px; cursor: pointer; border-radius: 6px; width: 22px; height: 22px; }
+.mitem:hover .del { opacity: 1; }
+.mitem .del:hover { color: #f08a85; background: rgba(240,100,100,.1); }
+.mnone { font-size: 12px; color: var(--muted); padding: 4px 8px; }
+.mnewp { display: flex; gap: 4px; padding: 2px 4px; }
+.mnewp input { flex: 1; min-width: 0; font: inherit; font-size: 12.5px; color: var(--text); background: rgba(255,255,255,.04); border: 1px solid rgba(255,255,255,.06); border-radius: 8px; padding: 5px 9px; outline: none; user-select: text; }
+.mnewp input:focus { border-color: rgba(217,119,87,.5); }
+.mnewp button { background: none; border: 0; color: var(--accent-2); font-size: 16px; cursor: pointer; width: 28px; border-radius: 8px; }
+.mnewp button:hover { background: rgba(255,255,255,.06); }
+.mlink { display: block; width: 100%; text-align: left; background: none; border: 0; border-top: 1px solid rgba(255,255,255,.06); margin-top: 8px; padding: 9px 8px 4px; font: inherit; font-size: 12px; color: var(--muted); cursor: pointer; }
+.mlink:hover { color: var(--text); }
+
+/* bulles */
+#log { padding: 20px 16px 12px; gap: 14px; }
+.msg.user { background: linear-gradient(135deg, #d9785a, #c4603f); color: #fff; padding: 9px 14px; border-radius: 18px 18px 6px 18px;
+  box-shadow: 0 6px 18px rgba(196,96,63,.25); max-width: 82%; animation: rise .22s ease; }
+.msg.bot { background: rgba(255,255,255,.045); border: 1px solid rgba(255,255,255,.06); border-radius: 6px 18px 18px 18px; padding: 10px 14px; max-width: 94%; align-self: flex-start; }
+.msg.bot:empty { display: none; }
+.msg.bot .md > :first-child { margin-top: 0; } .msg.bot .md > :last-child { margin-bottom: 0; }
+.tool { background: rgba(255,255,255,.04); border-color: rgba(255,255,255,.06); }
+pre { background: rgba(0,0,0,.35); border-color: rgba(255,255,255,.06); }
+.typing { padding: 2px 0; }
+
+/* zone de saisie */
+footer { padding: 8px 12px 12px; }
+.box { background: rgba(255,255,255,.05); border-color: rgba(255,255,255,.08); border-radius: 18px; box-shadow: 0 8px 24px rgba(0,0,0,.18); }
+.box:focus-within { border-color: rgba(217,119,87,.45); }
+#send { border-radius: 12px; }
+body.flash .box { border-style: dashed; border-color: rgba(242,198,109,.45); }
+body.flash #send:not(.stop) { background: #d9a94a; }
+#empty h2 { font-size: 18px; } .chip { background: rgba(255,255,255,.04); border-color: rgba(255,255,255,.07); }
+
+/* ================= Habillage v3 : tout arrondi, couleurs chaudes, fondu orange sur les bords ================= */
+html, body { border-radius: 8px; overflow: hidden; }          /* même rayon que les coins Windows 11 : pas d angle mal fini */
+body {
+  background:
+    rgba(17,17,21,.66);
+}
+body::after {                                   /* fondu orange léger tout autour */
+  content: ""; position: fixed; inset: 0; border-radius: 8px; pointer-events: none; z-index: 60;
+  box-shadow: inset 0 0 14px rgba(217,119,87,.13), inset 0 0 36px rgba(217,119,87,.06), inset 0 0 70px rgba(217,119,87,.025);   /* fondu très diffus, seulement sur les bords */
+}
+header { background: none; border-bottom: none; }                 /* plus de bande orange qui s arrête net */
+main::before { content: ""; position: absolute; top: 0; left: 18px; right: 18px; height: 1px; z-index: 2; pointer-events: none;
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,.09) 20%, rgba(255,255,255,.09) 80%, transparent); }   /* séparation douce, fondue aux deux bouts */
+.icon-btn, #send { border-radius: 50%; }
+.icon-btn:hover { background: rgba(235,154,120,.14); color: var(--accent-2); }
+#send { width: 36px; height: 36px; background: linear-gradient(135deg, #e8906d, #c75f3e); box-shadow: 0 4px 14px rgba(217,119,87,.35); }
+#send:hover { background: linear-gradient(135deg, #f0a07f, #d06a48); }
+#pin.on { color: var(--accent-2); background: rgba(235,154,120,.16); }
+#pin.on svg { transform: rotate(-30deg); }
+.orb { box-shadow: 0 0 0 1.5px rgba(235,154,120,.30); }
+.ctx:hover, .ctx.open { background: rgba(235,154,120,.10); }
+.msg.user { background: linear-gradient(135deg, #e48a67, #c65d3c); border-radius: 20px 20px 8px 20px; }
+.msg.bot { background: rgba(255,255,255,.055); border: 1px solid rgba(255,255,255,.07); border-radius: 8px 20px 20px 20px; }
+.tool { border-radius: 999px; background: rgba(255,255,255,.05); border-color: rgba(255,255,255,.08); }
+pre { border-radius: 14px; } code { border-radius: 7px; }
+.box { border-radius: 22px; background: rgba(255,255,255,.06); border-color: rgba(255,255,255,.09); }
+.box:focus-within { border-color: rgba(235,154,120,.55); box-shadow: 0 0 0 3px rgba(217,119,87,.12), 0 8px 24px rgba(0,0,0,.2); }
+kbd { border-radius: 7px; }
+.switch .track, .track { border-radius: 999px; }
+.ddmenu { border-radius: 18px; background: linear-gradient(170deg, rgba(36,28,30,.98), rgba(24,22,26,.98)); border-color: rgba(235,154,120,.18); }
+.mbtn, .mitem, .mnewp input, .mnewp button { border-radius: 12px; }
+.mbtn { background: rgba(235,154,120,.08); border-color: rgba(235,154,120,.14); }
+.mbtn:hover { background: rgba(235,154,120,.16); }
+.chip { border-radius: 16px; background: rgba(255,255,255,.05); border-color: rgba(255,255,255,.08); }
+.chip:hover { border-color: rgba(235,154,120,.5); }
+.approve, .err { border-radius: 16px; }
+::-webkit-scrollbar-thumb { background: rgba(235,154,120,.25); border-radius: 999px; border: 3px solid transparent; background-clip: content-box; }
+
+/* barre de quota (tokens restants), sobre */
+#quota { display: none; gap: 16px; padding: 5px 16px 3px; font-size: 10.5px; color: var(--muted); }
+#quota.on { display: flex; }
+.q { flex: 1; display: flex; align-items: center; gap: 7px; min-width: 0; }
+.q i { flex: 1; height: 3px; border-radius: 999px; background: rgba(255,255,255,.08); overflow: hidden; }
+.q b { display: block; height: 100%; border-radius: 999px; transition: width .5s, background .5s; }
+.q span { white-space: nowrap; }
+.q em { font-style: normal; min-width: 30px; color: var(--text); text-align: right; font-variant-numeric: tabular-nums; }
+
+/* ================= Habillage v4 : en-tête aéré, choix en un clic ================= */
+html, body { font-size: 14.5px; }
+body { background: rgba(18,18,23,.9); }                       /* fond uniforme jusqu'au bout (le bureau ne transparaît plus) */
+header { padding: 16px 12px 6px 18px; gap: 12px; cursor: default; }
+header .orb { width: 40px; height: 40px; }
+.who { flex: 1; min-width: 0; display: flex; flex-direction: column; line-height: 1.3; }
+.who b { font-size: 15.5px; font-weight: 600; }
+#sub { font-size: 12px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+body.flash #sub { color: #f2c66d; }
+.hbtns { display: flex; gap: 2px; flex: none; }
+.hbtns .icon-btn { width: 34px; height: 34px; }
+.modebar { display: flex; align-items: center; gap: 8px; padding: 10px 18px 14px; position: relative; z-index: 6; }
+.seg2 { display: flex; flex: none; padding: 3px; gap: 2px; border-radius: 999px; background: rgba(255,255,255,.05); border: 1px solid rgba(255,255,255,.07); }
+.seg2 button { display: flex; align-items: center; gap: 5px; font: inherit; font-size: 12.5px; color: var(--muted); background: none; border: 0; border-radius: 999px; padding: 5px 13px; cursor: pointer; transition: background .15s, color .15s; }
+.seg2 button:hover { color: var(--text); }
+.seg2 button.on { background: rgba(235,154,120,.17); color: var(--accent-2); }
+.seg2 #mFlash.on { background: rgba(242,198,109,.16); color: #f2c66d; }
+.dd { position: relative; min-width: 0; }
+#ddP { flex: 1; }
+.ddbtn { display: flex; align-items: center; gap: 7px; width: 100%; font: inherit; font-size: 12.5px; color: var(--muted); background: rgba(255,255,255,.05);
+  border: 1px solid rgba(255,255,255,.07); border-radius: 999px; padding: 6px 11px 6px 13px; cursor: pointer; transition: background .15s, border-color .15s, color .15s; }
+.ddbtn:hover, .dd.open .ddbtn { background: rgba(235,154,120,.10); border-color: rgba(235,154,120,.28); color: var(--text); }
+.ddbtn.has { color: var(--text); }
+#projLabel { flex: 1; min-width: 0; text-align: left; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ddbtn .hash { color: var(--accent-2); font-weight: 700; }
+.ddbtn.icon-only { padding: 6px 9px 6px 10px; gap: 4px; }
+.dd.open .chev { transform: rotate(180deg); }
+body.flash #ddP { opacity: .35; pointer-events: none; }
+.ddmenu { position: absolute; top: calc(100% + 6px); left: 0; width: 280px; max-height: 400px; overflow-y: auto; z-index: 30; padding: 8px;
+  box-shadow: 0 18px 40px rgba(0,0,0,.5); opacity: 0; transform: translateY(-6px); pointer-events: none; transition: opacity .16s, transform .16s; }
+.ddmenu.right, #ddP .ddmenu { left: auto; right: 0; } .ddmenu.right { width: 310px; }
+.dd.open .ddmenu { opacity: 1; transform: none; pointer-events: auto; }
+main::before { left: 22px; right: 22px; }
+#log { padding: 22px 20px 14px; gap: 18px; }
+.msg.user { padding: 10px 16px; } .msg.bot { padding: 12px 16px; }
+footer { padding: 10px 16px 14px; }
+.box { padding: 10px 10px 10px 18px; }
+textarea { min-height: 28px; }
+.opts { margin-top: 10px; gap: 16px; padding: 0 6px; }
+#quota { padding: 0; flex: 1; max-width: 250px; gap: 14px; }
+.q { gap: 6px; }
+.q i { min-width: 26px; }
+.q em { min-width: 0; }
+.q small { font-size: 10.5px; color: var(--muted); white-space: nowrap; font-variant-numeric: tabular-nums; }
+</style>
+</head>
+<body>
+<aside id="dash">
+  <div id="secCal">
+  <div class="dh">
+    <b id="mtitle"></b>
+    <span><button class="icon-btn" id="mprev" title="Mois précédent">‹</button><button class="icon-btn" id="mnext" title="Mois suivant">›</button></span>
+  </div>
+  <div class="cal" id="cal"></div>
+  <div class="day" id="dayev"></div>
+  </div>
+  <div id="secUp">
+  <h3><span>Examens & rendez-vous</span></h3>
+  <div id="upcoming" style="display:flex;flex-direction:column;gap:6px"></div>
+  <div class="cstat" id="cstat"></div>
+  </div>
+</aside>
+<div id="chat">
+<header>
+  <div class="orb" id="orb"></div>
+  <div class="who"><b id="name">Bébène</b><span id="sub">Prêt à t'aider</span></div>
+  <span class="dir" id="dir" hidden>…</span>
+  <div class="hbtns">
+    <button class="icon-btn" id="new" title="Nouvelle conversation">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/></svg>
+    </button>
+    <button class="icon-btn" id="pin" title="Épingler : garder ouverte quand je clique ailleurs">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 17v5"/><path d="M9 3h6l-1 6 3 3v2H7v-2l3-3z"/></svg>
+    </button>
+    <button class="icon-btn" id="cfg" title="Réglages">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg>
+    </button>
+    <button class="icon-btn" id="close" title="Fermer (Échap)">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>
+    </button>
+  </div>
+</header>
+
+<!-- barre de choix : mode (toggle) + menus dépliants Projet et Historique -->
+<div class="modebar">
+  <div class="seg2" role="tablist">
+    <button id="mNormal" class="on" title="Conversation enregistrée dans l'historique">Conversation</button>
+    <button id="mFlash" title="Rien n'est enregistré : ni historique, ni archive">
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M13 2L4 14h7l-1 8 9-12h-7l1-8z"/></svg>Flash</button>
+  </div>
+  <div class="dd" id="ddP">
+    <button class="ddbtn" id="ddProj" title="Travailler dans un projet"><span class="hash">#</span><span id="projLabel">Aucun projet</span>
+      <svg class="chev" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg></button>
+    <div class="ddmenu">
+      <button class="mitem" id="mNoProj"><span class="ic">∅</span><span class="tx">Aucun projet</span></button>
+      <div id="mProjects"></div>
+      <div class="mnewp"><input id="mProjName" placeholder="Nouveau projet…" maxlength="40"><button id="mProjAdd" title="Créer le projet">＋</button></div>
+      <button class="mlink" id="mFolder">Travailler dans un autre dossier…</button>
+    </div>
+  </div>
+  <div class="dd" id="ddH">
+    <button class="ddbtn icon-only" id="ddHist" title="Historique des conversations">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5"/><path d="M12 7v5l3 2"/></svg>
+      <svg class="chev" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg></button>
+    <div class="ddmenu right">
+      <div class="msec">Conversations récentes</div>
+      <div id="mConvs"></div>
+      <button class="mlink" id="term">Continuer cette conversation dans le terminal ›</button>
+    </div>
+  </div>
+</div>
+
+<main>
+  <div id="log"></div>
+  <div id="empty">
+    <div class="orb"></div>
+    <h2>Salut ! On fait quoi ?</h2>
+    <p>Pose-moi une question, demande-moi d'agir sur tes fichiers,<br>ou dépose un fichier ici (ou sur moi).</p>
+    <div class="chips">
+      <button class="chip" data-q="Fais-moi un état des lieux de mon dossier Téléchargements et propose un rangement.">📂 Ranger mes Téléchargements</button>
+      <button class="chip" data-q="Quels sont les plus gros fichiers et dossiers dans mon dossier actuel ?">📊 Trouver ce qui prend de la place</button>
+      <button class="chip" data-q="Aide-moi à rédiger un e-mail professionnel. Demande-moi d'abord le contexte.">✍️ Rédiger un e-mail</button>
+    </div>
+  </div>
+</main>
+
+<footer>
+  <div class="box">
+    <textarea id="input" rows="1" placeholder="Écris à Claude…"></textarea>
+    <button id="send" disabled title="Envoyer (Entrée)">
+      <svg id="ico-send" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5M5 12l7-7 7 7"/></svg>
+      <svg id="ico-stop" width="12" height="12" viewBox="0 0 12 12" style="display:none"><rect width="12" height="12" rx="2.5" fill="currentColor"/></svg>
+    </button>
+  </div>
+  <div class="opts">
+    <label class="switch" title="Activé : Claude agit sans demander. Désactivé : il modifie les fichiers du dossier de travail, et te demande avant de lancer une commande.">
+      <input type="checkbox" id="auto"><span class="track"></span>Mode autonome
+    </label>
+    <div id="quota" title="Ce qu'il te reste sur tes limites Claude">
+      <div class="q" id="qs"><span>5 h</span><i><b id="q5"></b></i><em id="q5t"></em><small id="q5r"></small></div>
+      <div class="q" id="qw"><span>sem.</span><i><b id="q7"></b></i><em id="q7t"></em><small id="q7r"></small></div>
+    </div>
+  </div>
+</footer>
+</div>
+
+<div id="dashmenu">
+  <label>Calendrier<span class="switch"><input type="checkbox" id="tgCal"><span class="track"></span></span></label>
+  <label>Examens & rendez-vous<span class="switch"><input type="checkbox" id="tgUp"><span class="track"></span></span></label>
+</div>
+<script>
+const $ = s => document.querySelector(s);
+const log = $('#log'), input = $('#input'), send = $('#send'), auto = $('#auto');
+const store = {
+  get(k, d) { try { const v = localStorage.getItem(k); return v === null ? d : v; } catch { return d; } },
+  set(k, v) { try { localStorage.setItem(k, v); } catch {} }
+};
+const post = m => window.chrome.webview.postMessage(m);
+const esc = s => s.replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+const md = t => (window.marked && window.DOMPurify) ? DOMPurify.sanitize(marked.parse(t)) : esc(t).replace(/\n/g, '<br>');
+const TOOLS = { Read: 'Lecture', Write: 'Écriture', Edit: 'Modification', MultiEdit: 'Modification', Bash: 'Commande',
+  PowerShell: 'Commande', Glob: 'Recherche', Grep: 'Recherche', WebSearch: 'Recherche web', WebFetch: 'Page web', TodoWrite: 'Plan', Task: 'Sous-tâche' };
+
+const CAT = '<svg viewBox="0 0 40 40"><path d="M7 15 L9 3 L17 10 Q20 9 23 10 L31 3 L33 15 Q36 20 34 27 Q30 36 20 36 Q10 36 6 27 Q4 20 7 15Z" fill="#141417" stroke="#55555f" stroke-width="1.2"/>'
+  + '<path d="M10 12 L10.5 6 L14.5 10Z M30 12 L29.5 6 L25.5 10Z" fill="#5c3440"/>'
+  + '<ellipse cx="14" cy="21" rx="3.8" ry="4.4" fill="#f2c14e"/><ellipse cx="26" cy="21" rx="3.8" ry="4.4" fill="#f2c14e"/>'
+  + '<ellipse cx="14" cy="21" rx="1.1" ry="3.4" fill="#0c0c0e"/><ellipse cx="26" cy="21" rx="1.1" ry="3.4" fill="#0c0c0e"/>'
+  + '<path d="M18.8 27 L21.2 27 L20 28.4Z" fill="#e89aa8"/></svg>';
+document.querySelectorAll('.orb').forEach(o => o.innerHTML = '<img src="avatar.png" alt="">');
+
+// ---- conversations enregistrées, projets, mode flash ----
+let convs = []; try { convs = JSON.parse(store.get('convs', '[]')) || []; } catch { convs = []; }
+if (!convs.length && store.get('hist', '')) {                       // reprise de l'ancien historique unique
+  convs.push({ id: 'c' + Date.now().toString(36), title: 'Conversation précédente', sid: store.get('sid', ''), hist: store.get('hist', ''), project: '', updated: Date.now() });
+  store.set('hist', ''); store.set('sid', '');
+}
+let conv = convs.find(c => c.id === store.get('cur', '')) || null;
+let flash = false, project = conv ? conv.project || '' : store.get('project', ''), projects = [];
+let granted = new Set(conv && conv.granted ? conv.granted : []);   // actions autorisées pour la conversation en cours
+let sid = conv ? conv.sid || '' : '', busy = false, cur = null, gotResult = false, denials = [];
+auto.checked = store.get('auto', '0') === '1';
+log.innerHTML = conv ? conv.hist || '' : '';
+log.querySelectorAll('.approve .ab').forEach(b => b.outerHTML = '<div style="color:var(--muted)">Demande expirée.</div>');
+refresh();
+// Le stockage local est limité (~5 Mo) : on garde au plus 40 conversations, on raccourcit les vieilles,
+// et si c'est plein on retire les plus anciennes au lieu de perdre l'enregistrement sans rien dire.
+function persist() {
+  convs.sort((a, b) => b.updated - a.updated);
+  if (convs.length > 40) convs.length = 40;
+  convs.forEach((c, i) => { if (i >= 10 && c.hist && c.hist.length > 120000) c.hist = c.hist.slice(-120000); });
+  for (let tries = 0; tries < 40; tries++) {
+    try { localStorage.setItem('convs', JSON.stringify(convs)); return; }
+    catch (e) { if (convs.length <= 1) return; convs.pop(); }
+  }
+}
+function save() {
+  if (flash || !log.children.length) return;                       // flash : rien n'est enregistré
+  if (!conv) { conv = { id: 'c' + Date.now().toString(36), title: '', sid: sid, project: project, updated: Date.now(), hist: '' }; convs.unshift(conv); }
+  conv.sid = sid; conv.hist = log.innerHTML; conv.updated = Date.now(); conv.project = project; conv.granted = [...granted];
+  if (!conv.title) { const u = log.querySelector('.msg.user'); conv.title = u ? u.textContent.trim().slice(0, 70) : 'Conversation'; }
+  persist(); store.set('cur', conv.id); renderMenu(); setSub();
+}
+
+function diffHtml(name, i) {
+  const rows = [];
+  const add = (s, cls, p) => String(s == null ? '' : s).split('\n').forEach(l => rows.push('<div class="' + cls + '">' + p + ' ' + esc(l) + '</div>'));
+  if (name === 'Edit') { add(i.old_string, 'del', '-'); add(i.new_string, 'ins', '+'); }
+  else if (name === 'MultiEdit') (i.edits || []).forEach(e => { add(e.old_string, 'del', '-'); add(e.new_string, 'ins', '+'); });
+  else if (name === 'Write') add(i.content, 'ins', '+');
+  else return '';
+  const more = rows.length > 200 ? '<div class="more">… ' + (rows.length - 200) + ' lignes de plus</div>' : '';
+  return '<details class="diff"><summary>Voir les changements</summary><pre>' + rows.slice(0, 200).join('') + more + '</pre></details>';
+}
+
+function askApproval(list) {
+  const names = [...new Set(list.map(d => d.tool_name))].filter(n => /^[A-Za-z]+$/.test(n));
+  const items = list.map(d => {
+    const i = d.tool_input || {};
+    const what = String(i.command || i.file_path || i.url || i.path || '').slice(0, 300);
+    return '<li><b>' + esc(TOOLS[d.tool_name] || d.tool_name) + '</b>' + (what ? ' <code>' + esc(what) + '</code>' : '') + '</li>';
+  }).join('');
+  const card = el('approve', '<div class="ah">🔐 Claude a besoin de ton accord</div><ul>' + items + '</ul>'
+    + '<div class="ab"><button class="no">Refuser</button><button class="yes">Autoriser</button></div>');
+  card.querySelector('.yes').onclick = () => {
+    card.innerHTML = '<div class="ah">✅ Autorisé</div>';
+    names.forEach(n => granted.add(n)); if (conv) conv.granted = [...granted];   // valable pour toute la conversation
+    submit("Je t'autorise. Continue ce que tu faisais (tu as mon accord pour ces actions jusqu'à la fin de cette conversation).", '', true);
+  };
+  card.querySelector('.no').onclick = () => { card.innerHTML = '<div class="ah">⛔ Refusé</div>'; save(); };
+  scroll();
+}
+
+function refresh() {
+  $('#empty').style.display = log.children.length ? 'none' : 'flex';
+  send.disabled = !busy && !input.value.trim();
+  send.classList.toggle('stop', busy);
+  $('#ico-send').style.display = busy ? 'none' : '';
+  $('#ico-stop').style.display = busy ? '' : 'none';
+  send.title = busy ? 'Arrêter' : 'Envoyer (Entrée)';
+  $('#orb').classList.toggle('busy', busy);
+}
+function scroll() { log.scrollTop = log.scrollHeight; }
+function el(cls, html, parent) {
+  const d = document.createElement('div'); d.className = cls; d.innerHTML = html;
+  (parent || log).appendChild(d); return d;
+}
+function addToCur(cls, html) {
+  const typing = cur.querySelector('.typing');
+  const d = document.createElement('div'); d.className = cls; d.innerHTML = html;
+  cur.insertBefore(d, typing); scroll();
+}
+
+function submit(text, allowed, silent) {
+  text = (text || input.value).trim();
+  if (busy || !text) return;
+  if (!silent) { input.value = ''; autosize(); el('msg user', esc(text)); }
+  cur = el('msg bot', '<div class="typing"><span></span><span></span><span></span></div>');
+  busy = true; gotResult = false; denials = []; refresh(); scroll();
+  post('send\n' + (auto.checked ? 1 : 0) + '\n' + sid + '\n' + (allowed || [...granted].join(',')) + '\n' + text);
+}
+
+// Quota restant, d'après les infos officielles renvoyées par Claude Code (rate_limit_event)
+let lastQuota = null, lastAsk = 0;
+function left(t) {
+  const sec = t - Date.now() / 1000; if (sec <= 0) return null;
+  const m = Math.ceil(sec / 60);
+  return m < 60 ? m + ' min' : m < 1440 ? Math.floor(m / 60) + 'h' + String(m % 60).padStart(2, '0') : Math.round(m / 1440) + ' j';
+}
+setInterval(() => { if (lastQuota) setQuota(lastQuota); }, 30000);   // le compte à rebours avance tout seul
+function setQuota(info) {
+  lastQuota = info;
+  const w = (info && info.unifiedWindows) || {};
+  const when = t => new Date(t * 1000).toLocaleString('fr-CH', { weekday: 'short', hour: '2-digit', minute: '2-digit' });
+  let any = false;
+  [['five_hour', 'q5', 'qs', 'Session (5 h)'], ['seven_day', 'q7', 'qw', 'Semaine']].forEach(([k, id, box, label]) => {
+    const x = w[k]; if (!x || typeof x.utilization !== 'number') { $('#' + box).style.display = 'none'; return; }
+    any = true; $('#' + box).style.display = '';
+    const l = x.resetsAt ? left(x.resetsAt) : '', past = !!x.resetsAt && l === null;
+    if (past && Date.now() - lastAsk > 120000) { lastAsk = Date.now(); post('quotaprobe'); }   // fenêtre écoulée : on redemande
+    const rem = past ? 1 : Math.max(0, Math.min(1, 1 - x.utilization));
+    const b = $('#' + id); b.style.width = (rem * 100).toFixed(1) + '%';
+    b.style.background = rem > .5 ? '#7bc67e' : rem > .2 ? '#e0b84f' : '#e8504a';
+    $('#' + id + 't').textContent = Math.round(rem * 100) + ' %';
+    $('#' + id + 'r').textContent = l ? '↻ ' + l : '';
+    $('#' + box).title = label + ' : ' + Math.round(rem * 100) + ' % restant' + (past ? ' · rechargé' : l ? ' · recharge complète dans ' + l + ' (' + when(x.resetsAt) + ')' : '');
+  });
+  $('#quota').classList.toggle('on', any);
+}
+
+function onLine(l) {
+  let o; try { o = JSON.parse(l); } catch { return; }
+  if (o.session_id && o.session_id !== sid) setSid(o.session_id);
+  if (o.type === "rate_limit_event" && o.rate_limit_info) { store.set("quota", JSON.stringify(o.rate_limit_info)); setQuota(o.rate_limit_info); }
+  if (o.type === 'assistant' && o.message && o.message.content) {
+    for (const c of o.message.content) {
+      if (c.type === 'text' && c.text.trim()) addToCur('md', md(c.text));
+      if (c.type === 'tool_use') {
+        const i = c.input || {};
+        const what = i.command || i.file_path || i.pattern || i.url || i.query || i.description || '';
+        addToCur('tool', '<i></i><span>' + esc((TOOLS[c.name] || c.name) + (what ? ' · ' + String(what).split('\n')[0] : '')) + '</span>');
+        const d = diffHtml(c.name, i);
+        if (d) addToCur('', d);
+      }
+    }
+  }
+  if (o.type === 'result') {
+    gotResult = true;
+    if (o.permission_denials && o.permission_denials.length) denials = o.permission_denials;
+    if (o.is_error || o.subtype !== 'success') addToCur('err', esc(String(o.result || o.subtype || 'Erreur')));
+  }
+}
+
+function finish(code, err) {
+  if (cur) {
+    const t = cur.querySelector('.typing'); if (t) t.remove();
+    if (code !== '0' && !gotResult)
+      addToCur('err', esc(err.trim() || (code === '1' ? 'Arrêté.' : 'Erreur (code ' + code + ').')));
+    if (!cur.children.length) cur.remove();
+  }
+  cur = null; busy = false; refresh();
+  if (denials.length) askApproval(denials);
+  denials = []; scroll(); save();
+}
+
+// opts : { flash, project } ; ouvre une conversation vide
+function newChat(opts) {
+  if (busy) return;
+  opts = opts || {};
+  if (flash && sid) post('forget\n' + sid);                         // on efface la trace de la conversation flash
+  flash = !!opts.flash; granted = new Set();
+  if (opts.project !== undefined) project = opts.project;
+  if (flash) project = '';
+  conv = null; store.set('cur', ''); store.set('project', project);
+  sid = ''; post('sid\n'); log.innerHTML = ''; applyMode(); refresh(); input.focus(); closeMenu();
+}
+function openConv(c) {
+  if (busy) return;
+  if (flash && sid) post('forget\n' + sid);
+  flash = false; conv = c; sid = c.sid || ''; project = c.project || ''; granted = new Set(c.granted || []);
+  store.set('cur', c.id); post('sid\n' + sid);
+  log.innerHTML = c.hist || ''; log.querySelectorAll('.approve .ab').forEach(b => b.outerHTML = '<div style="color:var(--muted)">Demande expirée.</div>');
+  applyMode(); refresh(); scroll(); closeMenu();
+}
+function applyMode() {
+  post('mode\n' + (flash ? 1 : 0) + '\n' + project);
+  document.body.classList.toggle('flash', flash);
+  $('#mNormal').classList.toggle('on', !flash); $('#mFlash').classList.toggle('on', flash);
+  $('#projLabel').textContent = project || 'Aucun projet'; $('#ddProj').classList.toggle('has', !!project);
+  setSub();
+  input.placeholder = flash ? 'Question rapide… (non enregistrée)' : 'Écris à ' + ($('#name').textContent || 'Bébène') + '…';
+  renderMenu();
+}
+function setSub() {
+  $('#sub').textContent = flash ? 'Flash · rien n\'est enregistré' : conv && conv.title ? conv.title : 'Nouvelle conversation' + (project ? ' · ' + project : '');
+}
+function ago(t) {
+  const m = Math.round((Date.now() - t) / 60000);
+  return m < 1 ? "à l'instant" : m < 60 ? 'il y a ' + m + ' min' : m < 1440 ? 'il y a ' + Math.round(m / 60) + ' h' : 'il y a ' + Math.round(m / 1440) + ' j';
+}
+function renderMenu() {
+  $('#mProjects').innerHTML = projects.length ? projects.map(p =>
+    '<button class="mitem' + (p === project && !flash ? ' on' : '') + '" data-p="' + esc(p) + '"><span class="ic">#</span><span class="tx">' + esc(p) + '</span></button>').join('')
+    : '<div class="mnone">Aucun projet pour l\'instant.</div>';
+  $('#mNoProj').classList.toggle('on', !project && !flash);
+  $('#mProjects').querySelectorAll('[data-p]').forEach(b => b.onclick = () => newChat({ project: b.dataset.p }));
+  $('#mConvs').innerHTML = convs.length ? convs.slice(0, 15).map(c =>
+    '<div class="mitem conv' + (conv && c.id === conv.id ? ' on' : '') + '" data-c="' + c.id + '"><span class="tx">' + esc(c.title || 'Conversation')
+    + '<small>' + (c.project ? esc(c.project) + ' · ' : '') + ago(c.updated) + '</small></span><button class="del" data-del="' + c.id + '" title="Supprimer">×</button></div>').join('')
+    : '<div class="mnone">Pas encore de conversation.</div>';
+  $('#mConvs').querySelectorAll('[data-c]').forEach(el => el.onclick = e => {
+    if (e.target.dataset.del) { e.stopPropagation(); convs = convs.filter(c => c.id !== e.target.dataset.del); if (conv && conv.id === e.target.dataset.del) conv = null; persist(); renderMenu(); return; }
+    const c = convs.find(x => x.id === el.dataset.c); if (c) openConv(c);
+  });
+}
+function closeMenu() { document.querySelectorAll('.dd.open').forEach(d => d.classList.remove('open')); }
+function toggleDd(id) { const d = $(id), was = d.classList.contains('open'); closeMenu(); if (!was) { d.classList.add('open'); post('projects'); renderMenu(); } }
+$('#ddProj').onclick = e => { e.stopPropagation(); toggleDd('#ddP'); };
+$('#ddHist').onclick = e => { e.stopPropagation(); toggleDd('#ddH'); };
+document.addEventListener('click', e => { if (!e.target.closest('.dd')) closeMenu(); });
+$('#mNormal').onclick = () => { if (flash) newChat({ project: '' }); };
+$('#mFlash').onclick = () => { if (!flash) newChat({ flash: true }); };
+$('#mNoProj').onclick = () => newChat({ project: '' });
+// glisser l'en-tête = déplacer la fenêtre
+$('header').addEventListener('mousedown', e => { if (e.button === 0 && !e.target.closest('button')) { e.preventDefault(); post('drag'); } });
+$('#mFolder').onclick = () => { closeMenu(); newChat({ project: '' }); post('folder'); };
+$('#mProjAdd').onclick = () => { const n = $('#mProjName').value.trim(); if (n) { post('newproject\n' + n); $('#mProjName').value = ''; } };
+$('#mProjName').onkeydown = e => { if (e.key === 'Enter') $('#mProjAdd').click(); };
+
+function autosize() { input.style.height = 'auto'; input.style.height = Math.min(input.scrollHeight, 150) + 'px'; refresh(); }
+
+window.chrome.webview.addEventListener('message', e => {
+  const d = String(e.data), i = d.indexOf('\n');
+  const k = i < 0 ? d : d.slice(0, i), v = i < 0 ? '' : d.slice(i + 1);
+  if (k === 'line') onLine(v);
+  else if (k === 'done') { const j = v.indexOf('\n'); finish(j < 0 ? v : v.slice(0, j), j < 0 ? '' : v.slice(j + 1)); }
+  else if (k === 'dir') { $('#dir').textContent = v; $('#dir').title = v + ' — cliquer pour changer'; }
+  else if (k === 'new') newChat();
+  else if (k === 'focus') input.focus();
+  else if (k === 'pinned') { $('#pin').classList.toggle('on', v === '1'); }
+  else if (k === 'cal') { CAL = JSON.parse(v); renderDash(); }
+  else if (k === 'calbusy') { $('#cstat').textContent = 'Mise à jour des calendriers…'; }
+  else if (k === 'quota') { try { const q = JSON.parse(v); store.set('quota', v); setQuota(q); } catch {} }
+  else if (k === 'dash') { const p = v.split('\n'); applyDash(p[0] === '1', p[1] === '1'); }
+  else if (k === 'name') { $('#name').textContent = v; document.title = v; applyMode(); }
+  else if (k === 'projects') { try { projects = JSON.parse(v); } catch { projects = []; } renderMenu(); }
+  else if (k === 'project') { newChat({ project: v }); }
+  else if (k === 'paths') {
+    const add = v.split('\n').filter(Boolean).map(p => '"' + p + '"').join(' ');
+    input.value = (input.value.trim() ? input.value.trimEnd() + ' ' : '') + add + ' ';
+    autosize(); input.focus();
+  }
+});
+
+document.addEventListener('dragover', e => { e.preventDefault(); document.body.classList.add('drop'); });
+document.addEventListener('dragleave', e => { if (!e.relatedTarget) document.body.classList.remove('drop'); });
+document.addEventListener('drop', e => {
+  e.preventDefault(); document.body.classList.remove('drop');
+  if (e.dataTransfer.files.length) window.chrome.webview.postMessageWithAdditionalObjects('files', e.dataTransfer.files);
+});
+
+input.addEventListener('input', autosize);
+input.addEventListener('keydown', e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); submit(); } });
+document.addEventListener('keydown', e => { if (e.key === 'Escape') { if (document.querySelector('.dd.open')) closeMenu(); else post('hide'); } });
+send.onclick = () => busy ? post('stop') : submit();
+$('#new').onclick = () => newChat({ project: project });
+$('#term').onclick = () => post('terminal');
+$('#cfg').onclick = () => post('settings');
+function setSid(v) { sid = v; post('sid\n' + v); save(); }
+$('#close').onclick = () => post('hide');
+$('#pin').onclick = () => { const on = !$('#pin').classList.contains('on'); $('#pin').classList.toggle('on', on); $('#pin').title = on ? 'Épinglée : reste ouverte (cliquer pour libérer)' : 'Épingler : garder ouverte quand je clique ailleurs'; post('pin\n' + (on ? 1 : 0)); };
+$('#dir').onclick = () => post('folder');
+auto.onchange = () => store.set('auto', auto.checked ? '1' : '0');
+document.querySelectorAll('.chip').forEach(b => b.onclick = () => submit(b.dataset.q));
+document.addEventListener('click', e => { const a = e.target.closest('a'); if (a) { e.preventDefault(); window.open(a.href); } });
+// ---- tableau de bord : calendrier + examens & rendez-vous ----
+let CAL = { events: [], status: '', filter: '', count: 0 }, mOff = 0, selDay = null;
+const norm = s => (s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
+const key = d => d.getFullYear() + '-' + d.getMonth() + '-' + d.getDate();
+const fmtT = d => d.toLocaleTimeString('fr-CH', { hour: '2-digit', minute: '2-digit' });
+function evs() { return CAL.events.map(e => Object.assign({}, e, { S: new Date(e.s), E: new Date(e.e) })); }
+function onDay(list, d) {                       // événements qui touchent ce jour
+  const a = new Date(d.getFullYear(), d.getMonth(), d.getDate()), b = new Date(a); b.setDate(b.getDate() + 1);
+  return list.filter(e => e.S < b && (e.E > a || +e.S === +a));
+}
+function evHtml(e) {
+  const time = e.a ? 'Toute la journée' : fmtT(e.S) + '–' + fmtT(e.E);
+  return '<div class="ev"><i class="bar" style="background:' + e.col + '"></i><div><div class="tt">' + esc(e.t || '(sans titre)') + '</div>'
+    + '<div class="mt">' + time + (e.l ? ' · ' + esc(e.l) : '') + '</div></div></div>';
+}
+function renderDash() {
+  const list = evs(), now = new Date();
+  const m = new Date(now.getFullYear(), now.getMonth() + mOff, 1);
+  $('#mtitle').textContent = m.toLocaleDateString('fr-CH', { month: 'long', year: 'numeric' });
+  const first = new Date(m); first.setDate(1 - ((m.getDay() + 6) % 7));
+  let h = ['lu', 'ma', 'me', 'je', 've', 'sa', 'di'].map(x => '<div class="wd">' + x + '</div>').join('');
+  if (!selDay) selDay = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  for (let i = 0; i < 42; i++) {
+    const d = new Date(first); d.setDate(first.getDate() + i);
+    const de = onDay(list, d), cls = ['d'];
+    if (d.getMonth() !== m.getMonth()) cls.push('out');
+    if (key(d) === key(now)) cls.push('today');
+    if (key(d) === key(selDay)) cls.push('sel');
+    if (de.some(e => e.k === 'exam' && e.u)) cls.push('exam');
+    const cols = [...new Set(de.map(e => e.col))].slice(0, 3).map(c => '<i style="background:' + c + '"></i>').join('');
+    h += '<div class="' + cls.join(' ') + '" data-d="' + d.toISOString() + '">' + d.getDate() + (cols ? '<span class="dots">' + cols + '</span>' : '') + '</div>';
+  }
+  $('#cal').innerHTML = h;
+  $('#cal').querySelectorAll('.d').forEach(el => el.onclick = () => { const d = new Date(el.dataset.d); selDay = new Date(d.getFullYear(), d.getMonth(), d.getDate()); renderDash(); });
+  const de = onDay(list, selDay);
+  $('#dayev').innerHTML = '<div class="dt">' + selDay.toLocaleDateString('fr-CH', { weekday: 'long', day: 'numeric', month: 'long' }) + '</div>'
+    + (de.length ? de.map(evHtml).join('') : '<div class="none">Rien de prévu.</div>');
+
+  // prochains examens & rendez-vous
+  const f = norm(CAL.filter);
+  const up = list.filter(e => e.u && e.k && e.E >= now && (!f || norm(e.l).includes(f) || norm(e.t).includes(f))).slice(0, 8);
+  if (!CAL.count) {
+    $('#upcoming').innerHTML = '<div class="empty-cal">Ajoute tes calendriers (liens webcal ou .ics) pour voir tes examens et rendez-vous ici.<br><button id="addcal">Ajouter un calendrier</button></div>';
+    $('#addcal').onclick = () => post('settings');
+  } else {
+    $('#upcoming').innerHTML = up.length ? up.map(e => {
+      const days = Math.round((new Date(e.S.getFullYear(), e.S.getMonth(), e.S.getDate()) - new Date(now.getFullYear(), now.getMonth(), now.getDate())) / 864e5);
+      const soon = days <= 0 ? "aujourd'hui" : days === 1 ? 'demain' : 'dans ' + days + ' j';
+      return '<div class="up"><div class="dte"><b>' + e.S.getDate() + '</b><span>' + e.S.toLocaleDateString('fr-CH', { month: 'short' }).replace('.', '') + '</span></div>'
+        + '<div class="inf"><div class="tt"><span class="tag ' + e.k + '">' + (e.k === 'exam' ? 'Examen' : 'RDV') + '</span>' + esc(e.t) + '</div>'
+        + '<div class="mt">' + (e.a ? 'Toute la journée' : fmtT(e.S)) + (e.l ? ' · ' + esc(e.l) : '') + '</div></div>'
+        + '<span class="soon">' + soon + '</span></div>';
+    }).join('') : '<div class="none">Aucun examen ni rendez-vous à venir' + (f ? ' à « ' + esc(CAL.filter) + ' »' : '') + '.</div>';
+  }
+  $('#cstat').innerHTML = (CAL.status ? esc(CAL.status) + ' · ' : '') + (CAL.count ? '<a id="calref">Actualiser</a>' : '');
+  const r = $('#calref'); if (r) r.onclick = () => post('calrefresh');
+}
+$('#mprev').onclick = () => { mOff--; renderDash(); };
+$('#mnext').onclick = () => { mOff++; renderDash(); };
+// ---- bouton « tableau de bord » : un interrupteur par élément ----
+function applyDash(c, u) {
+  $('#tgCal').checked = c; $('#tgUp').checked = u;
+  document.body.classList.toggle('nocal', !c); document.body.classList.toggle('noup', !u);
+
+}
+function sendDash() { applyDash($('#tgCal').checked, $('#tgUp').checked); post('dash\n' + ($('#tgCal').checked ? 1 : 0) + '\n' + ($('#tgUp').checked ? 1 : 0)); }
+$('#tgCal').onchange = sendDash; $('#tgUp').onchange = sendDash;
+if ($('#dashbtn')) $('#dashbtn').onclick = e => {
+  e.stopPropagation();
+  const m = $('#dashmenu'), r = $('#dashbtn').getBoundingClientRect();
+  m.classList.toggle('open');
+  m.style.top = (r.bottom + 6) + 'px'; m.style.left = Math.max(8, Math.min(r.right - 230, innerWidth - 240)) + 'px';
+};
+document.addEventListener('click', e => { if (!e.target.closest('#dashmenu')) $('#dashmenu').classList.remove('open'); });
+renderDash();
+
+post('ready');
+post('sid\n' + sid);
+applyMode(); post('projects');
+try { setQuota(JSON.parse(store.get("quota", ""))); } catch {}
+</script>
+</body>
+</html>

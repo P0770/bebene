@@ -1,0 +1,542 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<title>Bébène</title>
+<style>
+:root {
+  --bg: #18181b; --surface: #1f1f23; --raised: #27272c; --line: #2f2f35;
+  --text: #ececef; --muted: #8d8d97; --accent: #d97757; --accent-2: #eb9a78; --danger: #e5787a;
+}
+* { box-sizing: border-box; margin: 0; }
+html, body { background: var(--bg); color: var(--text); font: 14px/1.5 "Segoe UI Variable Text", "Segoe UI", system-ui, sans-serif; user-select: none; }
+body { padding: 26px 26px 40px; max-width: 640px; margin: 0 auto; }
+::-webkit-scrollbar { width: 10px; }
+::-webkit-scrollbar-thumb { background: #3a3a41; border-radius: 10px; border: 3px solid var(--bg); }
+
+.hero { display: flex; align-items: center; gap: 18px; margin-bottom: 26px; }
+.avatar { width: 72px; height: 72px; border-radius: 22px; background: #26262b; display: grid; place-items: center; flex: none;
+  box-shadow: 0 0 0 1px var(--line), 0 10px 30px rgba(0,0,0,.35); }
+.avatar svg { width: 76%; height: 76%; }
+.hero h1 { font-size: 24px; font-weight: 600; letter-spacing: -.2px; }
+.hero p { color: var(--muted); font-size: 13px; }
+.hero .grow { flex: 1; min-width: 0; }
+
+.btn { font: inherit; font-size: 13.5px; border-radius: 10px; padding: 8px 16px; cursor: pointer; border: 1px solid var(--line); background: var(--raised); color: var(--text); transition: background .15s, border-color .15s; white-space: nowrap; }
+.btn:hover { border-color: #45454d; background: #2e2e34; }
+.btn.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+.btn.primary:hover { background: var(--accent-2); border-color: var(--accent-2); }
+.btn.danger { color: var(--danger); }
+.btn.danger:hover { border-color: var(--danger); }
+.btn:disabled { opacity: .4; cursor: default; }
+
+h2 { font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: .8px; color: var(--muted); margin: 26px 4px 10px; }
+.card { background: var(--surface); border: 1px solid var(--line); border-radius: 14px; overflow: hidden; }
+.row { display: flex; align-items: center; gap: 16px; padding: 13px 16px; }
+.row + .row { border-top: 1px solid var(--line); }
+.row .lbl { flex: 1; min-width: 0; }
+.row .lbl b { display: block; font-weight: 500; }
+.row .lbl span { display: block; color: var(--muted); font-size: 12.5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.row.col { flex-direction: column; align-items: stretch; gap: 8px; }
+
+.tiles { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.tile { text-align: left; font: inherit; color: var(--text); background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: 16px; cursor: pointer; transition: border-color .15s, transform .15s, background .15s; }
+.tile:hover:not(:disabled) { border-color: var(--accent); background: var(--raised); transform: translateY(-1px); }
+.tile:disabled { opacity: .45; cursor: default; }
+.tile .ic { width: 34px; height: 34px; border-radius: 10px; background: rgba(217,119,87,.14); color: var(--accent-2); display: grid; place-items: center; margin-bottom: 10px; }
+.tile b { display: block; font-weight: 600; font-size: 14px; }
+.tile span { color: var(--muted); font-size: 12.5px; }
+
+input[type=text], select, textarea { font: inherit; color: var(--text); background: var(--bg); border: 1px solid var(--line); border-radius: 9px; padding: 7px 11px; outline: none; user-select: text; transition: border-color .15s; }
+input[type=text]:focus, select:focus, textarea:focus { border-color: var(--accent); }
+input[type=text] { width: 180px; }
+select { width: 180px; cursor: pointer; }
+textarea { width: 100%; min-height: 84px; resize: vertical; }
+
+.switch { position: relative; flex: none; cursor: pointer; }
+.switch input { display: none; }
+.switch .track { display: block; width: 40px; height: 22px; border-radius: 12px; background: #3b3b42; transition: background .15s; position: relative; }
+.switch .track::after { content: ""; position: absolute; left: 3px; top: 3px; width: 16px; height: 16px; border-radius: 50%; background: #fff; transition: transform .18s; }
+.switch input:checked + .track { background: var(--accent); }
+.switch input:checked + .track::after { transform: translateX(18px); }
+
+.seg { display: flex; background: var(--bg); border: 1px solid var(--line); border-radius: 10px; padding: 3px; }
+.seg button { font: inherit; font-size: 13px; color: var(--muted); background: none; border: 0; border-radius: 7px; padding: 5px 13px; cursor: pointer; }
+.seg button.on { background: var(--raised); color: var(--text); box-shadow: 0 1px 3px rgba(0,0,0,.3); }
+
+kbd { font: 12px "Segoe UI", sans-serif; background: var(--raised); border: 1px solid var(--line); border-bottom-width: 2px; border-radius: 6px; padding: 2px 7px; }
+
+#toast { position: fixed; bottom: 22px; left: 50%; transform: translate(-50%, 20px); opacity: 0; background: var(--raised); border: 1px solid var(--line); color: var(--text); padding: 8px 16px; border-radius: 999px; font-size: 13px; transition: .25s; pointer-events: none; }
+#toast.show { opacity: 1; transform: translate(-50%, 0); }
+
+@media (max-width: 520px) { .tiles { grid-template-columns: 1fr; } input[type=text], select { width: 140px; } }
+
+.orb img, .avatar img { width: 88%; image-rendering: pixelated; }
+.fcat { font-size: 11px; font-weight: 600; letter-spacing: .6px; text-transform: uppercase; color: var(--accent-2); padding: 12px 16px 2px; }
+.feat .lbl b { display: flex; align-items: center; gap: 6px; }
+.fex { display: block; margin-top: 4px; font-size: 12px !important; color: #c9c9d2 !important; background: rgba(255,255,255,.04); border-radius: 8px; padding: 4px 8px; white-space: normal !important; }
+.new { font-size: 10px; font-weight: 600; color: #fff; background: var(--accent); border-radius: 999px; padding: 1px 7px; }
+.tagk { font-size: 10.5px; font-weight: 600; border-radius: 6px; padding: 2px 7px; flex: none; }
+.tagk.exam { background: rgba(232,80,74,.16); color: #f08a85; }
+.tagk.rdv { background: rgba(95,168,211,.16); color: #8cc4e6; }
+/* ---- sections dépliables ---- */
+details.sec { margin-top: 10px; background: var(--surface); border: 1px solid var(--line); border-radius: 14px; overflow: hidden; }
+details.sec > summary { list-style: none; display: flex; align-items: center; gap: 12px; padding: 14px 16px; cursor: pointer; transition: background .15s; }
+details.sec > summary::-webkit-details-marker { display: none; }
+details.sec > summary:hover { background: rgba(255,255,255,.03); }
+details.sec .st { flex: 1; min-width: 0; }
+details.sec .st b { display: block; font-weight: 600; font-size: 14px; }
+details.sec .st span { display: block; font-size: 12px; color: var(--muted); }
+details.sec .chev { color: var(--muted); flex: none; transition: transform .2s; }
+details.sec[open] .chev { transform: rotate(180deg); color: var(--accent-2); }
+details.sec[open] > summary { border-bottom: 1px solid var(--line); }
+details.sec .sb { padding: 10px; }
+details.sec .sb > .card { background: var(--bg); }
+details.sec .sb > .card + .card { margin-top: 10px; }
+/* ---- assistant d'installation ---- */
+.setupcard { display: flex; align-items: center; gap: 14px; width: 100%; margin-top: 10px; text-align: left; font: inherit; color: var(--text); cursor: pointer;
+  background: linear-gradient(135deg, rgba(217,119,87,.14), rgba(217,119,87,.04)); border: 1px solid rgba(235,154,120,.3); border-radius: 14px; padding: 14px 16px; transition: border-color .15s, transform .15s; }
+.setupcard:hover { border-color: var(--accent); transform: translateY(-1px); }
+.setupcard .sic { font-size: 22px; } .setupcard .st { flex: 1; } .setupcard .st b { display: block; font-weight: 600; } .setupcard .st span { display: block; font-size: 12px; color: var(--muted); }
+.setupcard svg { color: var(--accent-2); }
+#setupView { position: fixed; inset: 0; overflow-y: auto; background: var(--bg); z-index: 50; padding: 22px 26px 40px; }
+.sv { max-width: 640px; margin: 0 auto; }
+.back { background: none; border: 0; color: var(--accent-2); font: inherit; font-size: 13.5px; cursor: pointer; padding: 4px 0; }
+.svt { font-size: 22px; font-weight: 600; margin: 8px 0 4px; } .svs { color: var(--muted); font-size: 13px; margin-bottom: 14px; }
+.prog { display: flex; align-items: center; gap: 12px; margin-bottom: 14px; font-size: 12.5px; color: var(--muted); }
+.pbar { flex: 1; height: 6px; border-radius: 999px; background: var(--raised); overflow: hidden; }
+.pbar i { display: block; height: 100%; width: 0; border-radius: 999px; background: linear-gradient(90deg, #d97757, #7bc67e); transition: width .5s; }
+.smsg { background: rgba(217,119,87,.1); border: 1px solid rgba(235,154,120,.3); border-radius: 12px; padding: 10px 14px; font-size: 13px; margin-bottom: 12px; }
+.step { display: flex; gap: 14px; align-items: flex-start; background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: 14px 16px; margin-bottom: 8px; transition: border-color .2s; }
+.step.next { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(217,119,87,.12); }
+.step .ico { width: 28px; height: 28px; flex: none; border-radius: 50%; display: grid; place-items: center; font-size: 13px; font-weight: 700; background: var(--raised); color: var(--muted); }
+.step.ok .ico { background: rgba(123,198,126,.18); color: #7bc67e; }
+.step.no .ico { background: rgba(217,119,87,.18); color: var(--accent-2); }
+.step.warn .ico { background: rgba(224,184,79,.16); color: #e0b84f; }
+.step .bd { flex: 1; min-width: 0; } .step .bd b { display: block; font-weight: 600; } .step .bd p { font-size: 12.5px; color: var(--muted); margin-top: 2px; }
+.step .det { font-size: 11.5px; color: #8a8a96; margin-top: 4px; overflow-wrap: anywhere; }
+.step .tag { font-size: 10.5px; font-weight: 600; border-radius: 999px; padding: 1px 8px; margin-left: 6px; vertical-align: 1px; }
+.step.next .tag { background: var(--accent); color: #fff; }
+.step .btn { flex: none; align-self: center; }
+</style>
+</head>
+<body>
+<div class="hero">
+  <div class="avatar" id="avatar"></div>
+  <div class="grow">
+    <h1 id="hname">Bébène</h1>
+    <p>Ton compagnon Claude · Centre de contrôle</p>
+  </div>
+  <button class="btn primary" data-act="chat">Ouvrir la discussion</button>
+</div>
+
+<h2>Lancer</h2>
+<div class="tiles">
+  <button class="tile" data-act="terminal">
+    <div class="ic"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 17l6-5-6-5M12 19h8"/></svg></div>
+    <b>Ouvrir Claude Code</b><span>Session complète dans le terminal, prête dans ton dossier de travail.</span>
+  </button>
+  <button class="tile" data-act="resume" id="resume">
+    <div class="ic"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-3-6.7L21 8M21 3v5h-5"/></svg></div>
+    <b>Reprendre dans le terminal</b><span id="resume-sub">Continue la conversation du chat dans Claude Code.</span>
+  </button>
+</div>
+<div class="card" style="margin-top:10px">
+  <div class="row">
+    <div class="lbl"><b>Dossier de travail</b><span id="workDir">…</span></div>
+    <button class="btn" data-act="folder">Changer…</button>
+  </div>
+</div>
+
+<details class="sec" id="manual"><summary><span class="st"><b>Mes examens et rendez-vous</b><span>Ajouter, retirer, retrouver</span></span><svg class="chev" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg></summary><div class="sb">
+<div class="card">
+  <div class="row col">
+    <div class="lbl"><b>Ajouter à la main</b><span style="white-space:normal">Pour ce qui n'est ni dans tes calendriers ni dans tes mails. Laisse l'heure vide pour toute la journée.</span></div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap">
+      <select id="mKind" style="width:120px"><option value="exam">Examen</option><option value="rdv">Rendez-vous</option></select>
+      <input type="text" id="mTitle" placeholder="Titre (ex. Examen d'analyse)" style="flex:1;min-width:180px;width:auto" maxlength="120">
+    </div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap">
+      <input type="date" id="mDate" style="width:150px;color-scheme:dark">
+      <input type="time" id="mTime" style="width:110px;color-scheme:dark">
+      <input type="text" id="mLoc" placeholder="Lieu (facultatif)" style="flex:1;min-width:140px;width:auto" maxlength="120">
+      <button class="btn primary" id="mAdd">Ajouter</button>
+    </div>
+  </div>
+  <div id="mList"></div>
+</div>
+<div class="card" id="hBox" style="margin-top:10px;display:none">
+  <div class="row"><div class="lbl"><b>Retirés de la liste</b><span>Tu les as enlevés avec la croix ×. « Remettre » pour les faire réapparaître.</span></div></div>
+  <div id="hList"></div>
+</div>
+</div></details>
+
+<details class="sec" id="alertes"><summary><span class="st"><b>Alertes et rappels</b><span>Rappels, demandes d'accord, correcteur</span></span><svg class="chev" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg></summary><div class="sb">
+<div class="card">
+  <div class="row"><div class="lbl"><b style="font-weight:600">Ne plus demander mon accord pour…</b><span style="white-space:normal">Coche ce pour quoi tu ne veux plus la carte « 🔐 Claude a besoin de ton accord ». Les modifications de fichiers dans le dossier de travail ne demandent déjà jamais.</span></div></div>
+  <div class="row">
+    <div class="lbl"><b>Les commandes</b><span style="white-space:normal">PowerShell, Bash : agir dans Excel/Word, lancer un script, ranger des fichiers…</span></div>
+    <label class="switch"><input type="checkbox" class="aa" data-t="Bash,PowerShell"><span class="track"></span></label>
+  </div>
+  <div class="row">
+    <div class="lbl"><b>Le web</b><span style="white-space:normal">Recherches et lecture de pages internet.</span></div>
+    <label class="switch"><input type="checkbox" class="aa" data-t="WebSearch,WebFetch"><span class="track"></span></label>
+  </div>
+  <div class="row">
+    <div class="lbl"><b>Les fichiers hors du dossier de travail</b><span style="white-space:normal">Lire et modifier des fichiers ailleurs sur ton PC.</span></div>
+    <label class="switch"><input type="checkbox" class="aa" data-t="Read,Edit,Write,Glob,Grep"><span class="track"></span></label>
+  </div>
+  <div class="row">
+    <div class="lbl"><b>Rappels d'examens</b><span style="white-space:normal">Une carte au-dessus de Bébène avant chaque examen (calendrier et mails).</span></div>
+    <label class="switch"><input type="checkbox" id="remindExam"><span class="track"></span></label>
+  </div>
+  <div class="row">
+    <div class="lbl"><b>Rappels de rendez-vous</b></div>
+    <label class="switch"><input type="checkbox" id="remindRdv"><span class="track"></span></label>
+  </div>
+  <div class="row">
+    <div class="lbl"><b>Quand me prévenir</b></div>
+    <div class="seg" id="remindWhen">
+      <button data-v="veille">La veille</button><button data-v="heure">1 h avant</button><button data-v="both">Les deux</button>
+    </div>
+  </div>
+  <div class="row">
+    <div class="lbl"><b>Croix rouges du correcteur</b><span style="white-space:normal">Même réglage que « Correcteur d'orthographe » plus bas.</span></div>
+    <label class="switch"><input type="checkbox" id="spell2"><span class="track"></span></label>
+  </div>
+</div>
+</div></details>
+
+<details class="sec" id="claude"><summary><span class="st"><b>Claude</b><span>Modèle, mode économe, instructions</span></span><svg class="chev" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg></summary><div class="sb">
+<div class="card">
+  <div class="row">
+    <div class="lbl"><b>Modèle</b><span>Utilisé par le chat et par Claude Code lancé d'ici.</span></div>
+    <select id="model">
+      <option value="">Par défaut</option>
+      <option value="haiku">Haiku : rapide et économique</option>
+      <option value="sonnet">Sonnet : équilibré</option>
+      <option value="opus">Opus : le plus capable</option>
+    </select>
+  </div>
+  <div class="row">
+    <div class="lbl"><b>Mode économe (Caveman)</b><span>Réponses concises : moins de tokens, même contenu.</span></div>
+    <label class="switch"><input type="checkbox" id="caveman"><span class="track"></span></label>
+  </div>
+  <div class="row col">
+    <div class="lbl"><b>Instructions personnalisées</b><span>Ce que le chat doit toujours savoir sur toi ou ta façon de travailler.</span></div>
+    <textarea id="prompt" placeholder="Ex. : Je débute en programmation, explique simplement. Je travaille surtout en Python."></textarea>
+  </div>
+</div>
+</div></details>
+
+<details class="sec" id="features"><summary><span class="st"><b>Ce que Bébène sait faire</b><span>Toutes les fonctions, avec un exemple</span></span><svg class="chev" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg></summary><div class="sb">
+<div class="card">
+  <div class="row"><input type="text" id="fSearch" placeholder="Chercher une fonction… (ex. excel, rappel, mail)" style="width:100%"></div>
+  <div id="fList"></div>
+</div>
+</div></details>
+
+<details class="sec" id="compagnon"><summary><span class="st"><b>Compagnon</b><span>Nom, affichage, taille</span></span><svg class="chev" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg></summary><div class="sb">
+<div class="card">
+  <div class="row">
+    <div class="lbl"><b>Nom</b><span>Comment ton chat s'appelle.</span></div>
+    <input type="text" id="name" maxlength="30">
+  </div>
+  <div class="row">
+    <div class="lbl"><b>Afficher sur le bureau</b><span>Sinon, il reste dans la zone de notification.</span></div>
+    <label class="switch"><input type="checkbox" id="showCat"><span class="track"></span></label>
+  </div>
+  <div class="row">
+    <div class="lbl"><b>Toujours au premier plan</b><span>Le chat reste visible au-dessus des fenêtres.</span></div>
+    <label class="switch"><input type="checkbox" id="topMost"><span class="track"></span></label>
+  </div>
+  <div class="row">
+    <div class="lbl"><b>Taille</b></div>
+    <div class="seg" id="scale">
+      <button data-v="75">Petit</button><button data-v="100">Normal</button><button data-v="130">Grand</button>
+    </div>
+  </div>
+</div>
+</div></details>
+
+<details class="sec" id="calendriers"><summary><span class="st"><b>Calendriers</b><span>Liens d'abonnement webcal / .ics</span></span><svg class="chev" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg></summary><div class="sb">
+<div class="card" id="cals"></div>
+<div class="card" style="margin-top:10px">
+  <div class="row col">
+    <div class="lbl"><b>Ajouter un calendrier</b><span style="white-space:normal">Colle un lien d'abonnement : webcal://… ou https://….ics (Google Agenda : « adresse secrète au format iCal » ; Outlook : « publier un calendrier » ; horaire de l'école…)</span></div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap">
+      <input type="text" id="cname" placeholder="Nom (ex. Cours)" style="width:140px">
+      <input type="text" id="curl" placeholder="webcal://…" style="flex:1;min-width:180px;width:auto">
+      <button class="btn primary" id="cadd">Ajouter</button>
+    </div>
+  </div>
+  <div class="row">
+    <div class="lbl"><b>Lieu des examens et rendez-vous</b><span style="white-space:normal">Optionnel : ne garder que ceux dont le lieu contient ce texte (ex. ton adresse, « HES-SO »…). Vide = tous.</span></div>
+    <input type="text" id="locFilter" placeholder="Tous les lieux">
+  </div>
+</div>
+</div></details>
+
+<details class="sec" id="mails"><summary><span class="st"><b>Boîtes mail</b><span>Gmail, Outlook HES-SO</span></span><svg class="chev" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg></summary><div class="sb">
+<div class="card">
+  <div class="row col">
+    <div class="lbl"><b>Gmail</b><span style="white-space:normal">Bébène cherche tes examens et rendez-vous dans les mails des 6 derniers mois. Tout est analysé sur ton PC (0 token). Il faut un « mot de passe d'application » Google : myaccount.google.com/apppasswords (la validation en 2 étapes doit être activée).</span></div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+      <input type="text" id="gmailUser" placeholder="adresse@gmail.com" style="width:190px">
+      <input type="text" id="gmailPass" placeholder="mot de passe d'application" style="flex:1;min-width:160px;width:auto;-webkit-text-security:disc">
+      <button class="btn primary" id="gmailSave">Connecter</button>
+      <button class="btn danger" id="gmailClear" style="display:none">Déconnecter</button>
+    </div>
+    <span id="gmailState" style="font-size:12px;color:var(--muted)"></span>
+  </div>
+  <div class="row">
+    <div class="lbl"><b>Outlook / HES-SO</b><span style="white-space:normal">Lit la boîte de ton école via Outlook CLASSIQUE (le nouvel Outlook ne permet pas aux autres programmes de lire les mails) : ouvre une fois « Outlook (classic) » et ajoute ton compte HES-SO, puis clique sur « Analyser maintenant ».</span></div>
+    <label class="switch"><input type="checkbox" id="outlookOn"><span class="track"></span></label>
+  </div>
+  <div class="row">
+    <div class="lbl"><b>Dernière analyse</b><span id="mailStatus" style="white-space:normal">—</span></div>
+    <button class="btn" id="mailScan">Analyser maintenant</button>
+  </div>
+</div>
+</div></details>
+
+<button class="setupcard" id="openSetup">
+  <span class="sic">🧭</span>
+  <span class="st"><b>Installation et transfert</b><span>Vérifier que tout est prêt · guide d'installation pas à pas (aussi utile sur un nouveau PC)</span></span>
+  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6l6 6-6 6"/></svg>
+</button>
+
+<details class="sec" id="systeme"><summary><span class="st"><b>Système</b><span>Démarrage, raccourci, quitter</span></span><svg class="chev" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg></summary><div class="sb">
+<div class="card">
+  <div class="row">
+    <div class="lbl"><b>Correcteur d'orthographe</b><span>Pendant que tu écris, n'importe où, propose les corrections dès que tu fais une pause. Local, 0 token.</span></div>
+    <label class="switch"><input type="checkbox" id="spell"><span class="track"></span></label>
+  </div>
+  <div class="row">
+    <div class="lbl"><b>Lancer au démarrage de Windows</b></div>
+    <label class="switch"><input type="checkbox" id="autoStart"><span class="track"></span></label>
+  </div>
+  <div class="row">
+    <div class="lbl"><b>Raccourci clavier</b><span>Ouvre ou ferme la discussion, de n'importe où.</span></div>
+    <span><kbd>Alt</kbd> + <kbd>Espace</kbd> &nbsp;ou&nbsp; <kbd>Ctrl</kbd> + <kbd>Alt</kbd> + <kbd>C</kbd></span>
+  </div>
+  <div class="row">
+    <div class="lbl"><b>Bébène</b><span id="version">Version</span></div>
+    <button class="btn danger" data-act="quit">Quitter l'application</button>
+  </div>
+</div>
+</div></details>
+
+
+<div id="setupView" hidden>
+  <div class="sv">
+    <button class="back" id="setupBack">‹ Réglages</button>
+    <h1 class="svt">Installer Bébène</h1>
+    <p class="svs">Suis les étapes dans l'ordre. Chaque étape est vérifiée automatiquement, et le bouton fait le travail à ta place.</p>
+    <div class="prog"><div class="pbar"><i id="pFill"></i></div><span id="pText">…</span></div>
+    <div id="setupMsg" class="smsg" hidden></div>
+    <div id="steps"></div>
+    <button class="btn" id="setupRefresh" style="margin-top:12px">↻ Vérifier à nouveau</button>
+  </div>
+</div>
+<div id="toast">Enregistré ✓</div>
+
+<script>
+const $ = s => document.querySelector(s);
+const post = m => window.chrome.webview.postMessage(m);
+$('#avatar').innerHTML = '<img src="avatar.png" alt="">';
+
+let toastT;
+function toast() { const t = $('#toast'); t.classList.add('show'); clearTimeout(toastT); toastT = setTimeout(() => t.classList.remove('show'), 1400); }
+function set(obj) { post('set\n' + JSON.stringify(obj)); toast(); }
+
+const PAL = ['#d97757', '#5fa8d3', '#8fbf6a', '#c38ad6', '#e0b84f', '#5ec4b6'];
+let cals = [];
+const escH = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+function renderCals() {
+  $('#cals').innerHTML = cals.length ? cals.map((c, i) =>
+    '<div class="row"><span style="width:10px;height:10px;border-radius:50%;flex:none;background:' + PAL[i % PAL.length] + '"></span>'
+    + '<div class="lbl"><b>' + escH(c.name) + '</b><span>' + escH(c.url) + '</span></div>'
+    + '<label title="Utiliser pour la liste « Examens & rendez-vous »" style="display:flex;align-items:center;gap:8px;font-size:12px;color:var(--muted)">Examens & RDV'
+    + '<span class="switch"><input type="checkbox" data-i="' + i + '" class="clist"' + (c.list !== false ? ' checked' : '') + '><span class="track"></span></span></label>'
+    + '<button class="btn danger" data-del="' + i + '">Retirer</button></div>').join('')
+    : '<div class="row"><div class="lbl"><span>Aucun calendrier pour l\'instant.</span></div></div>';
+  document.querySelectorAll('.clist').forEach(x => x.onchange = () => { cals[+x.dataset.i].list = x.checked; set({ calendars: cals }); });
+  document.querySelectorAll('[data-del]').forEach(b => b.onclick = () => { cals.splice(+b.dataset.del, 1); set({ calendars: cals }); renderCals(); });
+}
+$('#cadd').onclick = () => {
+  const url = $('#curl').value.trim();
+  if (!/^(webcal|https?|file):\/\//i.test(url) && !/^[a-z]:\\/i.test(url)) { $('#curl').focus(); $('#curl').style.borderColor = 'var(--danger)'; return; }
+  $('#curl').style.borderColor = '';
+  cals.push({ name: $('#cname').value.trim() || 'Calendrier ' + (cals.length + 1), url: url, list: true });
+  $('#cname').value = ''; $('#curl').value = '';
+  set({ calendars: cals }); renderCals();
+};
+$('#locFilter').onchange = e => set({ locFilter: e.target.value });
+
+$('#gmailSave').onclick = () => {
+  const u = $('#gmailUser').value.trim(), p = $('#gmailPass').value.replace(/\s+/g, '');
+  if (!/@/.test(u)) { $('#gmailUser').focus(); return; }
+  if (!p) { $('#gmailPass').focus(); return; }
+  $('#gmailPass').value = '';
+  set({ gmailUser: u, gmailPass: p }); post('set\n' + JSON.stringify({ mailScan: true }));
+};
+$('#gmailClear').onclick = () => set({ gmailClear: true });
+$('#outlookOn').onchange = e => { set({ outlookOn: e.target.checked }); if (e.target.checked) post('set\n' + JSON.stringify({ mailScan: true })); };
+$('#mailScan').onclick = () => post('set\n' + JSON.stringify({ mailScan: true }));
+
+function sendAutoAllow() {
+  const t = []; document.querySelectorAll('.aa').forEach(x => { if (x.checked) t.push(x.dataset.t); });
+  set({ autoAllow: t.join(',') });
+}
+document.querySelectorAll('.aa').forEach(x => x.onchange = sendAutoAllow);
+$('#spell2').onchange = e => set({ spell: e.target.checked });
+$('#remindExam').onchange = e => set({ remindExam: e.target.checked });
+$('#remindRdv').onchange = e => set({ remindRdv: e.target.checked });
+document.querySelectorAll('#remindWhen button').forEach(b => b.onclick = () => set({ remindWhen: b.dataset.v }));
+
+// ---- catalogue des fonctions (fonctions.json, complété à chaque amélioration de Bébène) ----
+let FEAT = [], VERSION = '';
+function renderFeatures() {
+  const q = ($('#fSearch').value || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
+  const n = s => String(s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
+  const major = v => String(v || '').split('.').slice(0, 2).join('.');
+  const items = FEAT.filter(f => !q || n(f.titre + ' ' + f.desc + ' ' + f.ex + ' ' + f.cat).includes(q));
+  const cats = [...new Set(items.map(f => f.cat))];
+  $('#fList').innerHTML = cats.map(c => '<div class="fcat">' + escH(c) + '</div>' + items.filter(f => f.cat === c).map(f =>
+    '<div class="row feat"><div class="lbl"><b>' + escH(f.titre) + (major(f.depuis) === major(VERSION) ? ' <span class="new">Nouveau</span>' : '') + '</b>'
+    + '<span style="white-space:normal">' + escH(f.desc) + '</span>'
+    + (f.ex ? '<span class="fex">' + escH(f.ex) + '</span>' : '') + '</div></div>').join('')).join('')
+    || '<div class="row"><div class="lbl"><span>Aucune fonction ne correspond.</span></div></div>';
+}
+$('#fSearch').oninput = renderFeatures;
+
+function render(s) {
+  FEAT = s.features || []; VERSION = s.version || ''; renderFeatures();
+  renderManual(s);
+  const aa = (s.autoAllow || '').split(',');
+  document.querySelectorAll('.aa').forEach(x => x.checked = x.dataset.t.split(',').every(n => aa.includes(n)));
+  $('#spell2').checked = !!s.spell;
+  $('#remindExam').checked = s.remindExam !== false; $('#remindRdv').checked = s.remindRdv !== false;
+  document.querySelectorAll('#remindWhen button').forEach(b => b.classList.toggle('on', b.dataset.v === (s.remindWhen || 'both')));
+  if (document.activeElement !== $('#gmailUser')) $('#gmailUser').value = s.gmailUser || '';
+  $('#gmailState').textContent = s.gmailSet ? '✓ Connecté : ' + s.gmailUser : '';
+  $('#gmailClear').style.display = s.gmailSet ? '' : 'none';
+  $('#outlookOn').checked = !!s.outlookOn;
+  $('#mailStatus').textContent = s.mailRunning ? 'Analyse en cours…' : (s.mailStatus || 'Pas encore analysé');
+  $('#mailScan').disabled = !!s.mailRunning;
+  cals = s.calendars || []; renderCals();
+  if (document.activeElement !== $('#locFilter')) $('#locFilter').value = s.locFilter || '';
+  $('#hname').textContent = s.name;
+  if (document.activeElement !== $('#name')) $('#name').value = s.name;
+  if (document.activeElement !== $('#prompt')) $('#prompt').value = s.prompt;
+  $('#showCat').checked = s.showCat; $('#topMost').checked = s.topMost; $('#autoStart').checked = s.autoStart; $('#caveman').checked = s.caveman; $('#spell').checked = s.spell;
+  $('#model').value = s.model;
+  $('#workDir').textContent = s.workDir; $('#workDir').title = s.workDir;
+  $('#version').textContent = 'Version ' + s.version;
+  $('#resume').disabled = !s.hasSession;
+  $('#resume-sub').textContent = s.hasSession ? 'Continue la conversation du chat dans Claude Code.' : 'Démarre d\'abord une conversation avec le chat.';
+  document.querySelectorAll('#scale button').forEach(b => b.classList.toggle('on', +b.dataset.v === s.scale));
+}
+
+window.chrome.webview.addEventListener('message', e => {
+  const d = String(e.data), i = d.indexOf('\n');
+  if (d.slice(0, i) === 'settings') render(JSON.parse(d.slice(i + 1)));
+  if (d.slice(0, i) === 'goto') { const el = document.getElementById(d.slice(i + 1)); if (el) { if (el.tagName === 'DETAILS') el.open = true; el.scrollIntoView({ behavior: 'smooth', block: 'start' }); const f = $('#mTitle'); if (f && el.id === 'manual') setTimeout(() => f.focus(), 400); } }
+});
+
+// ---- examens et rendez-vous ajoutés / retirés à la main ----
+function renderManual(s) {
+  const list = s.manual || [], hid = s.hidden || [];
+  const fmt = x => { const d = new Date(x.s); return d.toLocaleDateString('fr-CH', { weekday: 'short', day: 'numeric', month: 'short' }) + (String(x.a) === 'true' ? '' : ' · ' + d.toLocaleTimeString('fr-CH', { hour: '2-digit', minute: '2-digit' })); };
+  $('#mList').innerHTML = list.length ? list.map(x =>
+    '<div class="row"><span class="tagk ' + x.k + '">' + (x.k === 'rdv' ? 'RDV' : 'EXAMEN') + '</span><div class="lbl"><b>' + escH(x.t) + '</b><span>' + fmt(x) + (x.l ? ' · ' + escH(x.l) : '') + '</span></div>'
+    + '<button class="btn danger" data-mdel="' + x.id + '">Retirer</button></div>').join('')
+    : '<div class="row"><div class="lbl"><span>Aucun pour l\'instant.</span></div></div>';
+  $('#mList').querySelectorAll('[data-mdel]').forEach(b => b.onclick = () => set({ manualDel: b.dataset.mdel }));
+  $('#hList').innerHTML = hid.map(k => { const p = k.split('|'), d = p[1] || '';
+    const when = d.length >= 8 ? d.slice(6, 8) + '.' + d.slice(4, 6) + '.' + d.slice(0, 4) : '';
+    return '<div class="row"><div class="lbl"><b>' + escH(p.slice(2).join('|') || '(sans titre)') + '</b><span>' + (p[0] === 'rdv' ? 'Rendez-vous' : 'Examen') + ' · ' + when + '</span></div>'
+      + '<button class="btn" data-unhide="' + escH(k) + '">Remettre</button></div>'; }).join('');
+  $('#hBox').style.display = hid.length ? '' : 'none';
+  $('#hList').querySelectorAll('[data-unhide]').forEach(b => b.onclick = () => set({ unhide: b.dataset.unhide }));
+}
+$('#mAdd').onclick = () => {
+  const t = $('#mTitle').value.trim(), d = $('#mDate').value;
+  if (!t) { $('#mTitle').focus(); return; }
+  if (!d) { $('#mDate').focus(); return; }
+  set({ manualAdd: { k: $('#mKind').value, t: t, d: d, h: $('#mTime').value, l: $('#mLoc').value.trim() } });
+  $('#mTitle').value = ''; $('#mTime').value = ''; $('#mLoc').value = '';
+};
+
+document.querySelectorAll('[data-act]').forEach(b => b.onclick = () => post(b.dataset.act));
+['showCat', 'topMost', 'autoStart', 'caveman', 'spell'].forEach(id => $('#' + id).onchange = e => set({ [id]: e.target.checked }));
+$('#model').onchange = e => set({ model: e.target.value });
+$('#name').onchange = e => set({ name: e.target.value });
+$('#name').onkeydown = e => { if (e.key === 'Enter') e.target.blur(); };
+$('#prompt').onchange = e => set({ prompt: e.target.value });
+document.querySelectorAll('#scale button').forEach(b => b.onclick = () => set({ scale: +b.dataset.v }));
+// ---- assistant d'installation : checklist interactive ----
+const STEPS = [
+  { id: 'windows', t: 'Windows et .NET', d: "Bébène fonctionne sur Windows 10 ou 11. Si tu vois cette page, c'est bon." },
+  { id: 'webview', t: "Composant d'affichage (WebView2)", d: 'Sert à afficher la discussion. Déjà présent sur Windows 11.', b: 'Télécharger' },
+  { id: 'claude', t: 'Installer Claude Code', d: "Le moteur de Bébène : c'est lui qui parle à Claude et agit sur ton PC.", b: 'Installer' },
+  { id: 'login', t: 'Se connecter à son compte Claude', d: "Il faut un abonnement Claude Pro ou Max. Une fenêtre s'ouvre : connecte-toi dans la page web, puis tape /exit.", b: 'Se connecter' },
+  { id: 'onedrive', t: 'OneDrive personnel', opt: 1, d: 'Conseillé : pour retrouver la même mémoire et les mêmes projets sur tous tes PC.', b: 'Ouvrir OneDrive' },
+  { id: 'hub', t: 'Mémoire ClaudeHub', d: "Le dossier où Bébène garde ta mémoire, ton journal et tes projets. Avec le même OneDrive qu'un autre PC, il arrive tout seul.", b: 'Créer' },
+  { id: 'wire', t: 'Brancher la mémoire sur Claude', d: 'Charge ta mémoire dans chaque conversation, active l\'archivage des projets et les compétences (skills).', b: 'Configurer' },
+  { id: 'tools', t: "Outils d'économie de tokens", opt: 1, d: 'Conseillé : RTK, Node.js et Caveman, pour des réponses plus courtes et moins de tokens consommés.', b: 'Installer' },
+  { id: 'install', t: 'Installer Bébène sur ce PC', d: "Range Bébène à sa place, l'ajoute au menu Démarrer et le lance avec Windows.", b: 'Installer' },
+  { id: 'calendars', t: 'Calendriers', opt: 2, d: 'Option : pour voir tes cours, examens et rendez-vous.', b: 'Ajouter', go: 'calendriers' },
+  { id: 'mail', t: 'Boîtes mail', opt: 2, d: 'Option : pour retrouver examens et rendez-vous dans tes mails.', b: 'Configurer', go: 'mails' }
+];
+let SETUP = {};
+function renderSetup() {
+  const req = STEPS.filter(s => !s.opt), done = req.filter(s => SETUP[s.id] && SETUP[s.id].state === 'ok').length;
+  $('#pFill').style.width = (req.length ? done / req.length * 100 : 0) + '%';
+  $('#pText').textContent = Object.keys(SETUP).length ? done + ' / ' + req.length + ' étapes essentielles' + (done === req.length ? ' · tout est prêt 🎉' : '') : 'Vérification…';
+  const next = req.find(s => !SETUP[s.id] || SETUP[s.id].state !== 'ok');
+  let n = 0;
+  $('#steps').innerHTML = STEPS.map(s => {
+    const r = SETUP[s.id], st = r ? r.state : 'wait'; n++;
+    const icon = st === 'ok' ? '✓' : st === 'warn' ? '!' : st === 'opt' ? '○' : n;
+    const isNext = next && next.id === s.id && Object.keys(SETUP).length;
+    const tag = isNext ? '<span class="tag">À faire maintenant</span>' : s.opt === 1 ? '<span class="tag" style="color:#e0b84f">conseillé</span>' : s.opt === 2 ? '<span class="tag" style="color:var(--muted)">option</span>' : '';
+    const btn = st !== 'ok' && s.b && r ? '<button class="btn' + (isNext ? ' primary' : '') + '" data-do="' + s.id + '"' + (s.go ? ' data-go="' + s.go + '"' : '') + '>' + s.b + '</button>' : '';
+    return '<div class="step ' + st + (isNext ? ' next' : '') + '"><span class="ico">' + icon + '</span><div class="bd"><b>' + s.t + tag + '</b><p>' + s.d + '</p>'
+      + (r && r.detail ? '<div class="det">' + escH(r.detail) + '</div>' : '') + '</div>' + btn + '</div>';
+  }).join('');
+  $('#steps').querySelectorAll('[data-do]').forEach(b => b.onclick = () => {
+    if (b.dataset.go) { closeSetup(); const el = document.getElementById(b.dataset.go); if (el) { el.open = true; el.scrollIntoView({ behavior: 'smooth' }); } return; }
+    b.disabled = true; b.textContent = '…'; post('setupdo\n' + b.dataset.do);
+  });
+}
+function openSetup() { $('#setupView').hidden = false; $('#setupView').scrollTop = 0; renderSetup(); post('setupcheck'); }
+function closeSetup() { $('#setupView').hidden = true; }
+$('#openSetup').onclick = openSetup;
+$('#setupBack').onclick = closeSetup;
+$('#setupRefresh').onclick = () => post('setupcheck');
+window.chrome.webview.addEventListener('message', e => {
+  const d = String(e.data), i = d.indexOf('\n'), k = i < 0 ? d : d.slice(0, i), v = i < 0 ? '' : d.slice(i + 1);
+  if (k === 'setup') { SETUP = {}; JSON.parse(v).forEach(x => SETUP[x.id] = x); renderSetup(); }
+  else if (k === 'setupbusy') { $('#pText').textContent = 'Vérification…'; }
+  else if (k === 'setupmsg' && v) { $('#setupMsg').hidden = false; $('#setupMsg').textContent = v; }
+  else if (k === 'goto' && v === 'setup') openSetup();
+});
+post('get');
+// ---- sections dépliables : on se souvient de celles qui sont ouvertes ----
+(function () {
+  let open = null;
+  try { open = JSON.parse(localStorage.getItem('openSections') || 'null'); } catch (e) { }
+  if (!Array.isArray(open)) open = ['manual'];                       // par défaut : seulement « Mes examens et rendez-vous »
+  document.querySelectorAll('details.sec').forEach(d => {
+    d.open = open.includes(d.id);
+    d.addEventListener('toggle', () => {
+      const ids = [...document.querySelectorAll('details.sec')].filter(x => x.open).map(x => x.id);
+      try { localStorage.setItem('openSections', JSON.stringify(ids)); } catch (e) { }
+    });
+  });
+})();
+</script>
+</body>
+</html>
