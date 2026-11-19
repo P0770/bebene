@@ -19,10 +19,10 @@ using Microsoft.Web.WebView2.WinForms;
 
 [assembly: System.Reflection.AssemblyTitle("Bébène")]
 [assembly: System.Reflection.AssemblyProduct("Bébène")]
-[assembly: System.Reflection.AssemblyVersion("1.30.0.0")]
+[assembly: System.Reflection.AssemblyVersion("1.31.0.0")]
 
 static class Program {
-    public const string Version = "1.30";
+    public const string Version = "1.31";
     public static bool OpenSetup;   // --setup : ouvrir directement l'assistant d'installation
 
     // ---- Diagnostic : journal + détection des blocages de l'interface ----

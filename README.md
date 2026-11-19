@@ -72,13 +72,15 @@ Clic sur le chat, **Alt + Espace** ou **Ctrl + Alt + C** : la discussion s'ouvre
 |---|---|
 | **Conversation \| ⚡ Flash** | interrupteur. *Conversation* = enregistrée dans l'historique. *Flash* = question rapide qui n'est enregistrée **nulle part** (ni historique, ni archive, et la transcription de Claude Code est effacée). |
 | **# Projet ▾** | travailler dans un projet ClaudeHub : Claude travaille dans `ClaudeHub/projets/<nom>/` et la conversation y est **archivée automatiquement**. On peut créer un projet directement depuis le menu, ou choisir n'importe quel autre dossier. |
-| **🕘 Historique ▾** | les 15 dernières conversations (titre, projet, il y a combien de temps), × pour en supprimer une, et « Continuer dans le terminal » pour reprendre la même conversation dans Claude Code. |
+| **🕘 Historique ▾** | l'historique **du contexte en cours** : dans un projet, uniquement les conversations de ce projet ; sans projet, uniquement les conversations sans projet. × pour en supprimer une, « Continuer dans le terminal » pour reprendre la conversation dans Claude Code. |
 
 <p align="center">
   <img src="docs/images/discussion-projets.png" width="300" alt="Menu des projets">
   &nbsp;
-  <img src="docs/images/discussion-hist.png" width="300" alt="Historique des conversations">
+  <img src="docs/images/discussion-hist-projet.png" width="300" alt="Historique d'un projet">
 </p>
+
+> Un **projet** rassemble toutes les conversations d'un même sujet. Le menu **#** affiche combien de conversations chaque projet contient ; une fois dans un projet, l'historique ne montre que les siennes.
 
 **Le mode Flash** change la couleur de la zone de saisie (pointillés dorés) pour qu'on ne l'oublie pas :
 

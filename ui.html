@@ -311,6 +311,7 @@ textarea { min-height: 28px; }
 .q i { min-width: 26px; }
 .q em { min-width: 0; }
 .q small { font-size: 10.5px; color: var(--muted); white-space: nowrap; font-variant-numeric: tabular-nums; }
+.mitem .cnt { font-size: 11px; color: var(--muted); background: rgba(255,255,255,.06); border-radius: 999px; padding: 0 7px; flex: none; }
 </style>
 </head>
 <body>
@@ -372,7 +373,7 @@ textarea { min-height: 28px; }
       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5"/><path d="M12 7v5l3 2"/></svg>
       <svg class="chev" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg></button>
     <div class="ddmenu right">
-      <div class="msec">Conversations récentes</div>
+      <div class="msec" id="mConvTitle">Conversations récentes</div>
       <div id="mConvs"></div>
       <button class="mlink" id="term">Continuer cette conversation dans le terminal ›</button>
     </div>
@@ -628,14 +629,17 @@ function ago(t) {
 }
 function renderMenu() {
   $('#mProjects').innerHTML = projects.length ? projects.map(p =>
-    '<button class="mitem' + (p === project && !flash ? ' on' : '') + '" data-p="' + esc(p) + '"><span class="ic">#</span><span class="tx">' + esc(p) + '</span></button>').join('')
+    '<button class="mitem' + (p === project && !flash ? ' on' : '') + '" data-p="' + esc(p) + '"><span class="ic">#</span><span class="tx">' + esc(p) + '</span>' + (n => n ? '<small class="cnt">' + n + '</small>' : '')(convs.filter(c => c.project === p).length) + '</button>').join('')
     : '<div class="mnone">Aucun projet pour l\'instant.</div>';
   $('#mNoProj').classList.toggle('on', !project && !flash);
   $('#mProjects').querySelectorAll('[data-p]').forEach(b => b.onclick = () => newChat({ project: b.dataset.p }));
-  $('#mConvs').innerHTML = convs.length ? convs.slice(0, 15).map(c =>
+  // historique du contexte courant : dans un projet = ses conversations seulement ; sans projet = les conversations sans projet
+  const scope = flash ? '' : project, mine = convs.filter(c => (c.project || '') === scope);
+  $('#mConvTitle').textContent = scope ? 'Conversations · ' + scope : 'Conversations sans projet';
+  $('#mConvs').innerHTML = mine.length ? mine.slice(0, 20).map(c =>
     '<div class="mitem conv' + (conv && c.id === conv.id ? ' on' : '') + '" data-c="' + c.id + '"><span class="tx">' + esc(c.title || 'Conversation')
-    + '<small>' + (c.project ? esc(c.project) + ' · ' : '') + ago(c.updated) + '</small></span><button class="del" data-del="' + c.id + '" title="Supprimer">×</button></div>').join('')
-    : '<div class="mnone">Pas encore de conversation.</div>';
+    + '<small>' + ago(c.updated) + '</small></span><button class="del" data-del="' + c.id + '" title="Supprimer">×</button></div>').join('')
+    : '<div class="mnone">' + (scope ? 'Pas encore de conversation dans ce projet.' : 'Pas encore de conversation.') + '</div>';
   $('#mConvs').querySelectorAll('[data-c]').forEach(el => el.onclick = e => {
     if (e.target.dataset.del) { e.stopPropagation(); convs = convs.filter(c => c.id !== e.target.dataset.del); if (conv && conv.id === e.target.dataset.del) conv = null; persist(); renderMenu(); return; }
     const c = convs.find(x => x.id === el.dataset.c); if (c) openConv(c);
