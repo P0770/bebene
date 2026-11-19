@@ -641,7 +641,7 @@ function finish(code, err) {
   }
   cur = null; busy = false; refresh();
   if (denials.length) askApproval(denials);
-  denials = []; decorate(); scroll(); save();
+  denials = []; decorate(); scroll(); save(); askTitle(code);
 }
 
 // opts : { flash, project } ; ouvre une conversation vide
@@ -674,6 +674,17 @@ function applyMode() {
 }
 function setSub() {
   $('#sub').textContent = flash ? 'Flash · rien n\'est enregistré' : conv && conv.title ? conv.title : 'Nouvelle conversation' + (project ? ' · ' + project : '');
+}
+// Titre résumé par Claude : après les 3 premiers échanges, puis tous les 3 (la conversation évolue)
+function askTitle(code) {
+  if (flash || !conv || code !== '0') return;
+  const n = log.querySelectorAll('.msg.user').length;
+  if (!(n <= 3 || n % 3 === 0) || conv.titledAt === n) return;
+  conv.titledAt = n;
+  let parts = [...log.querySelectorAll('.msg.user, .msg.bot')].map(m => (m.classList.contains('user') ? 'Utilisateur : ' : 'Assistant : ') + textOf(m).slice(0, 700)).filter(x => x.length > 14);
+  let ex = parts.join('\n\n');
+  if (ex.length > 4000) ex = ex.slice(0, 1500) + '\n[…]\n' + ex.slice(-2500);
+  post('title\n' + conv.id + '\n' + ex);
 }
 function ago(t) {
   const m = Math.round((Date.now() - t) / 60000);
@@ -729,6 +740,7 @@ window.chrome.webview.addEventListener('message', e => {
   else if (k === 'name') { $('#name').textContent = v; document.title = v; applyMode(); }
   else if (k === 'projects') { try { projects = JSON.parse(v); } catch { projects = []; } renderMenu(); }
   else if (k === 'project') { newChat({ project: v }); }
+  else if (k === 'title') { const j = v.indexOf('\n'), c = convs.find(x => x.id === v.slice(0, j)); if (c) { c.title = v.slice(j + 1).trim(); persist(); renderMenu(); setSub(); } }
   else if (k === 'paths') {
     const add = v.split('\n').filter(Boolean).map(p => '"' + p + '"').join(' ');
     input.value = (input.value.trim() ? input.value.trimEnd() + ' ' : '') + add + ' ';
@@ -744,7 +756,25 @@ document.addEventListener('drop', e => {
 });
 
 input.addEventListener('input', autosize);
-input.addEventListener('keydown', e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); submit(); } });
+// Listes : « 1. » ou « * » / « - » + espace en début de ligne ; Entrée continue la liste, Entrée sur un élément vide la termine.
+// Ctrl+Entrée envoie toujours, Maj+Entrée = simple retour à la ligne.
+input.addEventListener('input', e => {
+  if (e.inputType !== 'insertText' || e.data !== ' ') return;
+  const pos = input.selectionStart, v = input.value, ls = v.lastIndexOf('\n', pos - 1) + 1, before = v.slice(ls, pos);
+  if (/^\s*[*-] $/.test(before)) { input.setRangeText(before.replace(/[*-] $/, '• '), ls, pos, 'end'); }
+});
+input.addEventListener('keydown', e => {
+  if (e.key !== 'Enter' || e.isComposing) return;
+  if (e.ctrlKey) { e.preventDefault(); submit(); return; }
+  const pos = input.selectionStart, v = input.value, ls = v.lastIndexOf('\n', pos - 1) + 1;
+  const m = v.slice(ls, pos).match(/^(\s*)(•|(\d+)([.)]))\s+(.*)$/);
+  if (m && pos === input.selectionEnd) {
+    e.preventDefault();
+    if (!m[5].trim()) { input.setRangeText('', ls, pos, 'end'); autosize(); return; }     // élément vide : fin de la liste
+    input.setRangeText('\n' + m[1] + (m[3] ? (+m[3] + 1) + m[4] : '•') + ' ', pos, pos, 'end'); autosize(); return;
+  }
+  if (!e.shiftKey) { e.preventDefault(); submit(); }
+});
 document.addEventListener('keydown', e => { if (e.key === 'Escape') { if (document.querySelector('.dd.open')) closeMenu(); else post('hide'); } });
 send.onclick = () => busy ? post('stop') : submit();
 $('#new').onclick = () => newChat({ project: project });

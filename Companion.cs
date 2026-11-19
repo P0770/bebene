@@ -19,10 +19,10 @@ using Microsoft.Web.WebView2.WinForms;
 
 [assembly: System.Reflection.AssemblyTitle("Bébène")]
 [assembly: System.Reflection.AssemblyProduct("Bébène")]
-[assembly: System.Reflection.AssemblyVersion("1.32.0.0")]
+[assembly: System.Reflection.AssemblyVersion("1.33.0.0")]
 
 static class Program {
-    public const string Version = "1.32";
+    public const string Version = "1.33";
     public static bool OpenSetup;   // --setup : ouvrir directement l'assistant d'installation
 
     // ---- Diagnostic : journal + détection des blocages de l'interface ----
@@ -461,13 +461,15 @@ class Companion : Form {
     // test : Bébène content qui attend qu on lise sa réponse (deux sens + avec cœur)
     public void ReadyPreview(string path) {
         tray.Visible = false; state = "ready"; act = "sit"; t = 0.3f;
-        using (var sheet = new Bitmap(W * 3, H)) using (var g = Graphics.FromImage(sheet)) {
+        using (var sheet = new Bitmap(W * 4, H)) using (var g = Graphics.FromImage(sheet)) {
             g.Clear(Color.FromArgb(255, 40, 44, 52));
-            for (int i = 0; i < 3; i++) {
-                heartT = i == 2 ? 0.9f : 0; t = 0.3f + i * 0.4f;
-                for (int k = 0; k < tang.Length; k++) tang[k] = SIT.ta + SIT.tc * k;
-                using (var b = RenderSmall(SIT.Clone(), i == 1 ? -1 : 1, i == 2 ? 6 : 0, true)) g.DrawImage(b, i * W, 0);
+            for (int i = 0; i < 4; i++) {
+                heartT = i >= 2 ? 0.9f : 0; t = 0.3f + i * 0.4f; held = i == 3;   // 4e : porté par la peau du cou
+                var pose = held ? HANG : SIT;
+                for (int k = 0; k < tang.Length; k++) tang[k] = pose.ta + pose.tc * k;
+                using (var b = RenderSmall(pose.Clone(), i == 1 ? -1 : 1, i == 2 ? 6 : 0, true)) g.DrawImage(b, i * W, 0);
             }
+            held = false;
             sheet.Save(path, ImageFormat.Png);
         }
     }
@@ -825,10 +827,10 @@ class Companion : Form {
                 using (var b = new SolidBrush(Color.FromArgb(240, 235, 235, 245)))
                     for (int i = 0; i < Math.Min(k, 3); i++) g.FillRectangle(b, (int)(hx + dir * (8 + i * 4)), (int)Math.Max(0, hy - 12 - i * 3), 2, 2);
             }
-            if (state == "ready" && !held && !falling) {                // bulle « ! » : une réponse t attend
+            if (state == "ready") {                                      // bulle « ! » : une réponse t attend (aussi quand on le porte)
                 int bob = (int)(t * 2.5f) % 2;
                 string[] rows = { ".XXXXXXX.", "XXXXOXXXX", "XXXXOXXXX", "XXXXOXXXX", "XXXXXXXXX", "XXXXOXXXX", ".XXXXXXX.", "..XX.....", ".X......." };
-                int x0 = (int)(hx + dir * 10) - (dir > 0 ? 1 : 8), y0 = (int)Math.Max(0, hy - 24) - bob;
+                int x0 = (int)(hx + dir * (held ? 14 : 10)) - (dir > 0 ? 1 : 8), y0 = (held ? (int)Math.Max(0, hy - 9) : (int)Math.Max(0, hy - 24)) - bob;   // porté : à côté de la tête
                 using (var w = new SolidBrush(Color.FromArgb(245, 240, 238, 245))) using (var o = new SolidBrush(Color.FromArgb(255, 217, 119, 87)))
                     for (int rr = 0; rr < rows.Length; rr++) for (int c = 0; c < 9; c++) {
                         char ch = rows[rr][dir > 0 ? c : 8 - c];
@@ -928,7 +930,7 @@ class Companion : Form {
         var wa = Screen.FromControl(this).WorkingArea;
         int x = Visible ? Left + W / 2 - 160 : wa.Right - 340, y = Visible ? Top - 116 : wa.Bottom - 130;
         remindCard.ShowAt(new Point(Math.Max(wa.Left + 4, Math.Min(x, wa.Right - 324)), Math.Max(wa.Top + 4, y)));
-        SetState("happy");                                                  // le chat saute pour attirer l attention
+        if (state != "ready") SetState("happy");                            // le chat saute pour attirer l attention (sans perdre « réponse prête »)
     }
     ToolStripMenuItem spellItem;
     void SetSpell(bool on) {
@@ -2611,6 +2613,28 @@ class ChatPanel : Form {
         }) { IsBackground = true, Name = "quota" }.Start();
     }
 
+    // ---- titre de conversation résumé par Claude (Haiku, quelques tokens, en arrière-plan) ----
+    void MakeTitle(string id, string excerpt) {
+        new Thread(() => {
+            try {
+                var psi = new ProcessStartInfo("claude", "-p --model haiku --setting-sources \"\" --strict-mcp-config --no-session-persistence --tools \"\" "
+                    + "--system-prompt \"Tu donnes un titre a une conversation entre un utilisateur et son assistant. Reponds UNIQUEMENT par le titre : 3 a 7 mots en francais, "
+                    + "precis, qui resume le sujet principal de toute la conversation. Pas de guillemets, pas de point final, pas d emoji.\" --output-format text") {
+                    UseShellExecute = false, CreateNoWindow = true, RedirectStandardInput = true, RedirectStandardOutput = true, RedirectStandardError = true,
+                    StandardOutputEncoding = Encoding.UTF8, WorkingDirectory = Path.GetTempPath() };
+                psi.EnvironmentVariables["CAVEMAN_DEFAULT_MODE"] = "off";
+                using (var p = Process.Start(psi)) {
+                    var bytes = Encoding.UTF8.GetBytes(excerpt);
+                    p.StandardInput.BaseStream.Write(bytes, 0, bytes.Length); p.StandardInput.Close();
+                    p.ErrorDataReceived += (s, e) => { }; p.BeginErrorReadLine();
+                    string o = p.StandardOutput.ReadToEnd(); p.WaitForExit(30000);
+                    o = (o ?? "").Trim().Split('\n')[0].Trim().Trim('"', '«', '»', '*', '#', '.', ' ');
+                    if (o.Length > 1 && o.Length <= 90 && p.ExitCode == 0) Post("title\n" + id + "\n" + o);
+                }
+            } catch (Exception ex) { Program.Log("Titre", ex.Message); }
+        }) { IsBackground = true, Name = "titre" }.Start();
+    }
+
     public const int ChatW = 460;
     // ---- déplacer la fenêtre par son en-tête ; elle reprend sa place à la fermeture, sauf si elle est épinglée ----
     [DllImport("user32.dll")] static extern bool ReleaseCapture();
@@ -2691,6 +2715,10 @@ class ChatPanel : Form {
             case "terminal": owner.OpenTerminal(true); break;
             case "settings": owner.ShowSettings(); break;
             case "hide": Hide(); break;
+            case "title": {                                                    // title\n<id conversation>\n<extrait>
+                int i1 = m.IndexOf('\n'), i2 = i1 < 0 ? -1 : m.IndexOf('\n', i1 + 1);
+                if (i2 > 0) MakeTitle(m.Substring(i1 + 1, i2 - i1 - 1), m.Substring(i2 + 1));
+                break; }
             case "copy": { string txt = m.Length > 5 ? m.Substring(5) : ""; if (txt.Length > 0) try { Clipboard.SetText(txt); } catch (Exception ex) { Program.Log("Copie", ex.Message); } break; }
             case "drag": DragWindow(); break;
             case "quotaprobe": ProbeQuota(false); break;

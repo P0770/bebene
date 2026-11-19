@@ -90,13 +90,17 @@ Clic sur le chat, **Alt + Espace** ou **Ctrl + Alt + C** : la discussion s'ouvre
 - **Mode autonome** : désactivé, Claude modifie les fichiers mais **te demande avant chaque commande** ; activé, il agit sans demander.
 - **Quota restant** : ce qu'il te reste sur ta limite de **5 heures** et sur la **semaine**, avec le compte à rebours jusqu'à la recharge (`↻ 2h44`, `↻ 4 j`). La barre passe du vert au jaune puis au rouge. Les chiffres viennent directement de Claude Code (événement `rate_limit_event`), mesurés à l'ouverture, toutes les 15 minutes et à chaque réponse.
 
+**Écrire des listes** : commence une ligne par `1.` ou `*` (ou `-`) suivi d'un espace : **Entrée** passe à l'élément suivant (`2.`, `3.`… ou `•`), Entrée sur un élément vide termine la liste. **Ctrl + Entrée** envoie à tout moment, **Maj + Entrée** fait un simple retour à la ligne.
+
+**Titres résumés** : le titre de chaque conversation dans l'historique est rédigé par Claude (modèle Haiku, quelques tokens) pour résumer ce qui s'y est dit ; il est revu au fil de la conversation.
+
 **Copier** : chaque bloc de code a une barre avec son langage et un bouton **Copier** ; survole n'importe quel message (le tien ou celui de Bébène) pour faire apparaître un petit bouton qui le copie en entier, au format d'origine (Markdown).
 
 <p align="center"><img src="docs/images/discussion-copier.png" width="300" alt="Copier du code ou un message"></p>
 
 **Glisser-déposer** : dépose un ou plusieurs fichiers sur la discussion *ou directement sur le chat* : leurs chemins sont ajoutés à ton message.
 
-**Quand tu fermes la discussion pendant que Claude réfléchit**, Bébène garde son animation de réflexion (petites bulles, queue qui s'agite). Quand la réponse est prête, il devient **content** : yeux plissés, bulle « ! », petits sauts avec un cœur, et il attend comme ça jusqu'à ce que tu rouvres la discussion.
+**Quand tu fermes la discussion pendant que Claude réfléchit**, Bébène garde son animation de réflexion (petites bulles, queue qui s'agite). Quand la réponse est prête, il devient **content** : yeux plissés, bulle « ! », petits sauts avec un cœur, et il attend comme ça jusqu'à ce que tu rouvres la discussion, même si tu le prends par la peau du cou entre-temps.
 
 <p align="center"><img src="docs/images/reponse-prete.png" width="480" alt="Bébène attend qu'on lise sa réponse"></p>
 
