@@ -35,8 +35,11 @@ if ($LASTEXITCODE -ne 0) { throw "Envoi refusé par GitHub (connexion ? lance  g
 # 3. release
 Write-Host "`n[3/3] Version téléchargeable…" -ForegroundColor Yellow
 $tag = "v$version"
-& $gh release view $tag *> $null
-if ($LASTEXITCODE -eq 0) {
+$ErrorActionPreference = 'Continue'                   # « release not found » arrive sur stderr : ce n'est pas une erreur ici
+& $gh release view $tag 2>&1 | Out-Null
+$exists = $LASTEXITCODE -eq 0
+$ErrorActionPreference = 'Stop'
+if ($exists) {
     Write-Host "La version $version existe déjà sur GitHub : seul le code a été mis à jour." -ForegroundColor DarkYellow
     Write-Host "Pour une nouvelle version téléchargeable, augmente le numéro dans Companion.cs (Version + AssemblyVersion)." -ForegroundColor DarkYellow
     exit 0
