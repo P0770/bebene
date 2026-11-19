@@ -19,10 +19,10 @@ using Microsoft.Web.WebView2.WinForms;
 
 [assembly: System.Reflection.AssemblyTitle("Bébène")]
 [assembly: System.Reflection.AssemblyProduct("Bébène")]
-[assembly: System.Reflection.AssemblyVersion("1.31.0.0")]
+[assembly: System.Reflection.AssemblyVersion("1.32.0.0")]
 
 static class Program {
-    public const string Version = "1.31";
+    public const string Version = "1.32";
     public static bool OpenSetup;   // --setup : ouvrir directement l'assistant d'installation
 
     // ---- Diagnostic : journal + détection des blocages de l'interface ----
@@ -2691,6 +2691,7 @@ class ChatPanel : Form {
             case "terminal": owner.OpenTerminal(true); break;
             case "settings": owner.ShowSettings(); break;
             case "hide": Hide(); break;
+            case "copy": { string txt = m.Length > 5 ? m.Substring(5) : ""; if (txt.Length > 0) try { Clipboard.SetText(txt); } catch (Exception ex) { Program.Log("Copie", ex.Message); } break; }
             case "drag": DragWindow(); break;
             case "quotaprobe": ProbeQuota(false); break;
             case "folder": PickFolder(); break;

@@ -84,6 +84,7 @@ Des **messages texte** via `chrome.webview.postMessage` : un mot-clé, un saut d
 | `sid\n<id>`, `forget\n<id>` | session courante, effacement d'une conversation flash |
 | `pin\n0/1`, `hide`, `drag`, `settings`, `terminal` | fenêtre et navigation |
 | `quotaprobe` | redemander le quota (fenêtre de 5 h écoulée) |
+| `copy\n<texte>` | copier dans le presse-papiers Windows (la page est en `file://`, où l'API du navigateur n'est pas fiable) |
 | `files` | glisser-déposer (chemins des fichiers) |
 
 | C# → page | Effet |

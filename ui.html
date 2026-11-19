@@ -312,6 +312,23 @@ textarea { min-height: 28px; }
 .q em { min-width: 0; }
 .q small { font-size: 10.5px; color: var(--muted); white-space: nowrap; font-variant-numeric: tabular-nums; }
 .mitem .cnt { font-size: 11px; color: var(--muted); background: rgba(255,255,255,.06); border-radius: 999px; padding: 0 7px; flex: none; }
+/* boutons Copier */
+.msg { position: relative; }
+.cpy { display: flex; align-items: center; gap: 5px; border: 0; cursor: pointer; font: inherit; font-size: 11.5px; transition: opacity .15s, background .15s, color .15s; }
+.cpy.msgc { position: absolute; bottom: -4px; width: 26px; height: 26px; justify-content: center; border-radius: 50%; padding: 0;
+  background: rgba(30,30,36,.95); color: var(--muted); border: 1px solid rgba(255,255,255,.09); opacity: 0; box-shadow: 0 4px 12px rgba(0,0,0,.3); }
+.msg.bot .cpy.msgc { right: -8px; }
+.msg.user .cpy.msgc { left: -32px; bottom: 4px; }
+.msg:hover > .cpy.msgc, .cpy.ok { opacity: 1; }
+.cpy.msgc:hover { color: var(--accent-2); border-color: rgba(235,154,120,.4); }
+.cw { margin: .5em 0; border: 1px solid rgba(255,255,255,.07); border-radius: 14px; overflow: hidden; background: rgba(0,0,0,.35); }
+.cw pre { margin: 0; border: 0; border-radius: 0; background: none; }
+.cwh { display: flex; align-items: center; justify-content: space-between; padding: 4px 6px 4px 12px; font-size: 11px; color: var(--muted);
+  background: rgba(255,255,255,.04); border-bottom: 1px solid rgba(255,255,255,.06); }
+.cpy.code { padding: 3px 8px; border-radius: 8px; background: none; color: var(--muted); }
+.cpy.code:hover { background: rgba(235,154,120,.16); color: var(--accent-2); }
+.cpy.ok { color: #7bc67e !important; }
+.msg.bot { margin-bottom: 6px; }
 </style>
 </head>
 <body>
@@ -452,6 +469,7 @@ auto.checked = store.get('auto', '0') === '1';
 log.innerHTML = conv ? conv.hist || '' : '';
 log.querySelectorAll('.approve .ab').forEach(b => b.outerHTML = '<div style="color:var(--muted)">Demande expirée.</div>');
 refresh();
+setTimeout(() => decorate(), 0);
 // Le stockage local est limité (~5 Mo) : on garde au plus 40 conversations, on raccourcit les vieilles,
 // et si c'est plein on retire les plus anciennes au lieu de perdre l'enregistrement sans rien dire.
 function persist() {
@@ -517,13 +535,47 @@ function el(cls, html, parent) {
 function addToCur(cls, html) {
   const typing = cur.querySelector('.typing');
   const d = document.createElement('div'); d.className = cls; d.innerHTML = html;
-  cur.insertBefore(d, typing); scroll();
+  cur.insertBefore(d, typing); scroll(); return d;
 }
+// ---- copier : un bouton sur chaque bloc de code et sur chaque message ----
+const ICO_COPY = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="12" height="12" rx="2.5"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>';
+const ICO_OK = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12l5 5L20 7"/></svg>';
+function decorate() {
+  log.querySelectorAll('.msg.bot .md pre').forEach(p => {             // barre au-dessus du bloc : langage + Copier
+    if (p.parentElement.classList.contains('cw')) return;
+    const w = document.createElement('div'); w.className = 'cw';
+    const code = p.querySelector('code'), lang = code && (code.className.match(/language-([\w+#-]+)/) || [])[1];
+    w.innerHTML = '<div class="cwh"><span>' + esc(lang || 'code') + '</span><button class="cpy code" title="Copier le code">' + ICO_COPY + '<span>Copier</span></button></div>';
+    p.parentNode.insertBefore(w, p); w.appendChild(p);
+  });
+  log.querySelectorAll('.msg.user, .msg.bot').forEach(m => {
+    if (m.querySelector(':scope > .cpy') || m.querySelector('.typing') || (m.classList.contains('bot') && !m.querySelector('.md'))) return;
+    const b = document.createElement('button'); b.className = 'cpy msgc'; b.title = 'Copier le message'; b.innerHTML = ICO_COPY; m.appendChild(b);
+  });
+}
+function textOf(m) {
+  if (m.classList.contains('user')) { const c = m.cloneNode(true); c.querySelectorAll('.cpy').forEach(x => x.remove()); return c.textContent.trim(); }
+  return [...m.querySelectorAll('.md')].map(d => {
+    if (d.dataset.raw) return d.dataset.raw.trim();                       // le texte d'origine (Markdown), tel que Claude l'a écrit
+    const c = d.cloneNode(true); c.querySelectorAll('.cpy').forEach(x => x.remove()); return c.innerText.trim();
+  }).filter(Boolean).join('\n\n');
+}
+log.addEventListener('click', e => {
+  const b = e.target.closest('.cpy'); if (!b) return;
+  e.stopPropagation();
+  let t;
+  if (b.classList.contains('code')) t = b.closest('.cw').querySelector('pre').textContent.replace(/\n$/, '');
+  else t = textOf(b.parentElement);
+  if (!t) return;
+  post('copy\n' + t);
+  const old = b.innerHTML; b.classList.add('ok'); b.innerHTML = ICO_OK + (b.classList.contains('code') ? '<span>Copié</span>' : '');
+  setTimeout(() => { b.classList.remove('ok'); b.innerHTML = old; }, 1300);
+});
 
 function submit(text, allowed, silent) {
   text = (text || input.value).trim();
   if (busy || !text) return;
-  if (!silent) { input.value = ''; autosize(); el('msg user', esc(text)); }
+  if (!silent) { input.value = ''; autosize(); el('msg user', esc(text)); decorate(); }
   cur = el('msg bot', '<div class="typing"><span></span><span></span><span></span></div>');
   busy = true; gotResult = false; denials = []; refresh(); scroll();
   post('send\n' + (auto.checked ? 1 : 0) + '\n' + sid + '\n' + (allowed || [...granted].join(',')) + '\n' + text);
@@ -563,7 +615,7 @@ function onLine(l) {
   if (o.type === "rate_limit_event" && o.rate_limit_info) { store.set("quota", JSON.stringify(o.rate_limit_info)); setQuota(o.rate_limit_info); }
   if (o.type === 'assistant' && o.message && o.message.content) {
     for (const c of o.message.content) {
-      if (c.type === 'text' && c.text.trim()) addToCur('md', md(c.text));
+      if (c.type === 'text' && c.text.trim()) addToCur('md', md(c.text)).dataset.raw = c.text;
       if (c.type === 'tool_use') {
         const i = c.input || {};
         const what = i.command || i.file_path || i.pattern || i.url || i.query || i.description || '';
@@ -589,7 +641,7 @@ function finish(code, err) {
   }
   cur = null; busy = false; refresh();
   if (denials.length) askApproval(denials);
-  denials = []; scroll(); save();
+  denials = []; decorate(); scroll(); save();
 }
 
 // opts : { flash, project } ; ouvre une conversation vide
@@ -609,7 +661,7 @@ function openConv(c) {
   flash = false; conv = c; sid = c.sid || ''; project = c.project || ''; granted = new Set(c.granted || []);
   store.set('cur', c.id); post('sid\n' + sid);
   log.innerHTML = c.hist || ''; log.querySelectorAll('.approve .ab').forEach(b => b.outerHTML = '<div style="color:var(--muted)">Demande expirée.</div>');
-  applyMode(); refresh(); scroll(); closeMenu();
+  decorate(); applyMode(); refresh(); scroll(); closeMenu();
 }
 function applyMode() {
   post('mode\n' + (flash ? 1 : 0) + '\n' + project);
