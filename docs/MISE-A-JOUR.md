@@ -56,6 +56,7 @@ Compile dans `%USERPROFILE%\ClaudeCompanion` et relance Bébène. Des modes de t
 | `ClaudeCompanion.exe --spelltest` / `--spelldemo "texte"` | correcteur d'orthographe |
 | `ClaudeCompanion.exe --setuptest out.txt` | état des étapes de l'assistant d'installation |
 | `ClaudeCompanion.exe --guardtest out.txt` | préparation du verrou de sécurité |
+| `ClaudeCompanion.exe --updtest out.txt` | dernière Release GitHub + téléchargement et décompression (sans installer) |
 
 ### 4. Changer le numéro de version (seulement pour une nouvelle Release)
 
@@ -111,12 +112,22 @@ Ou demande-le simplement à Claude Code : *« publie la nouvelle version de Béb
 
 ## Mettre à jour Bébène sur un PC
 
+**Automatiquement (recommandé)** : dès qu'une Release plus récente est publiée, une **pastille orange** apparaît sur l'avatar de Bébène (en haut à gauche de la discussion). Clic → nouveautés → **Mettre à jour** : Bébène télécharge la version, se ferme, remplace son programme et redémarre ; la pastille devient **verte**. Réglages, conversations, calendriers et mails sont conservés.
+
+**À la main** :
+
 1. Sur GitHub → **Releases** → télécharge le dernier zip.
 2. Quitte Bébène : clic droit sur son icône → **Quitter**.
 3. Dézippe par-dessus l'ancienne installation (ou ailleurs, puis lance `ClaudeCompanion.exe` : l'assistant propose d'installer).
 4. Relance. Réglages, conversations et calendriers sont conservés (registre et stockage local).
 
 ---
+
+## Protéger les versions officielles
+
+- Seul le propriétaire (`P0770`) peut écrire sur le dépôt et créer des Releases : c'est garanti par GitHub.
+- `publier-version.ps1` vérifie en plus que le compte connecté est le propriétaire **et** que le dossier pointe vers `P0770/bebene` ; sinon il s'arrête sans rien envoyer.
+- Les autres proposent leurs changements par **fork + pull request** (voir [CONTRIBUTING.md](../CONTRIBUTING.md)) ; rien n'entre dans le dépôt sans ton accord.
 
 ## Ce qui n'est jamais envoyé sur GitHub
 

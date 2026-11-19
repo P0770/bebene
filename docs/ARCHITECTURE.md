@@ -44,6 +44,7 @@ Tout le programme tient dans **`Companion.cs`** (≈ 3 000 lignes). Il est compi
 | `Reminders`, `Manual` | rappels, événements ajoutés ou masqués à la main |
 | `Speller`, `SpellAssist`, `SpellMark` | correcteur d'orthographe global |
 | `Setup` | assistant d'installation : `Check()` (état de chaque étape) et `Do()` (action) |
+| `Updater` | mises à jour : dernière Release GitHub, comparaison de version, téléchargement et remplacement du programme |
 
 ---
 
@@ -84,6 +85,9 @@ Des **messages texte** via `chrome.webview.postMessage` : un mot-clé, un saut d
 | `sid\n<id>`, `forget\n<id>` | session courante, effacement d'une conversation flash |
 | `pin\n0/1`, `hide`, `drag`, `settings`, `terminal` | fenêtre et navigation |
 | `quotaprobe` | redemander le quota (fenêtre de 5 h écoulée) |
+| `title\n<id>\n<extrait>` | faire résumer la conversation en titre (Haiku) |
+| `compact\n<session>` | compacter la conversation (`/compact`, Haiku) |
+| `updcheck`, `updinstall`, `updopen`, `updseen` | mises à jour : vérifier, installer, ouvrir la Release, masquer la pastille verte |
 | `copy\n<texte>` | copier dans le presse-papiers Windows (la page est en `file://`, où l'API du navigateur n'est pas fiable) |
 | `files` | glisser-déposer (chemins des fichiers) |
 
@@ -92,6 +96,9 @@ Des **messages texte** via `chrome.webview.postMessage` : un mot-clé, un saut d
 | `line\n<json>` | une ligne du flux `stream-json` de Claude Code |
 | `done\n<code>\n<erreurs>` | fin de la réponse |
 | `quota\n<json>` | infos de limite (`unifiedWindows.five_hour` / `seven_day` : `utilization`, `resetsAt`) |
+| `title\n<id>\n<titre>` | titre résumé d'une conversation |
+| `compacted\n<ok>\n<avant>\n<après>` | fin du compactage (tokens avant / après) |
+| `upd\n<json>`, `updstatus\n<état>\n<message>` | état des mises à jour (pastille, fenêtre) |
 | `cal\n<json>`, `projects\n<json>`, `name`, `dir`, `pinned`, `paths`, `focus`, `new` | données et commandes d'interface |
 
 ### Lancement de Claude Code
@@ -120,6 +127,22 @@ Stockées dans le `localStorage` de la WebView (au plus 40, les anciennes raccou
 - Verre acrylique Windows 11 + fond HTML à 90 % d'opacité, coins arrondis natifs (8 px), contour DWM orange discret.
 - Clic ailleurs = fermeture (sauf épinglée ou si la fenêtre active appartient à Bébène).
 - **Déplacement** : `mousedown` sur l'en-tête → message `drag` → `ReleaseCapture` + `WM_NCLBUTTONDOWN(HTCAPTION)`. Un drapeau `Moved` empêche le recalage sur le chat ; il est remis à zéro à la fermeture sauf si la fenêtre est épinglée. Même principe pour les volets (`Layered.Moved`).
+
+### Titres et compactage
+- **Titres** : après les échanges 1, 2, 3 puis tous les 3, un extrait de la conversation (≤ 4 000 caractères) est envoyé à `claude -p --model haiku` sans outils ni session, qui renvoie un titre de 3 à 7 mots.
+- **Compactage** : la page suit la taille du contexte (champ `usage` des messages de l'assistant : `input_tokens + cache_read_input_tokens + cache_creation_input_tokens`). Au premier échange elle mémorise la taille de départ (instructions, outils, mémoire) ; quand le contexte a grossi de **40 000 tokens**, elle demande `/compact` sur la session (`claude -p --model haiku --resume <session>`). La session garde le même identifiant et la suite de la conversation repart du résumé. L'envoi est bloqué le temps du compactage.
+
+---
+
+## Les mises à jour (`Updater`)
+
+1. **Vérification** 15 s après le démarrage, toutes les 6 h et à l'ouverture de la discussion (au plus une fois par heure) : `GET https://api.github.com/repos/P0770/bebene/releases/latest`. Si le dépôt est privé (404), repli sur `gh api …` (GitHub CLI connecté). Si rien ne répond (hors ligne, pas de `gh`), aucune pastille : pas d'erreur visible.
+2. **Comparaison** numérique des versions (`1.35` > `1.34.2`), entre `tag_name` de la Release et `Program.Version`. Une mise à jour n'est proposée que si la Release est **plus récente** ; une copie modifiée avec un numéro plus grand n'est jamais « rétrogradée ».
+3. **Installation** (seulement si l'utilisateur clique) : téléchargement du zip de la Release dans `%TEMP%\bebene-maj-<version>`, décompression, puis un script PowerShell caché attend la fermeture de Bébène, copie **uniquement** `*.exe, *.dll, *.html, *.json, *.ico` dans le dossier de l'app (10 essais si un fichier est encore verrouillé) et relance Bébène.
+4. **Ce qui est conservé** : réglages (registre), conversations et stockage de la page (profil WebView2 dans `%LOCALAPPDATA%\ClaudeCompanion`), calendriers, mails, rappels, journal, mémoire ClaudeHub. Le modèle `hub-modele` du zip n'est pas copié.
+5. **Pastille verte** : au démarrage, `Updater.Init()` compare la version avec `LastVersion` (registre) ; si elle a augmenté, `UpdatedShown` est posé jusqu'à ce que l'utilisateur clique sur « OK ».
+
+Test sans rien installer : `ClaudeCompanion.exe --updtest out.txt` (dernière Release, téléchargement et décompression).
 
 ---
 

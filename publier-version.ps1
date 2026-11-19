@@ -13,6 +13,19 @@ $gh = (Get-Command gh -ErrorAction SilentlyContinue)
 $gh = if ($gh) { $gh.Source } else { Join-Path $env:ProgramFiles 'GitHub CLI\gh.exe' }
 if (-not (Test-Path $gh)) { throw "GitHub CLI introuvable : installe-le avec  winget install GitHub.cli  puis  gh auth login" }
 
+# Seul le propriétaire du dépôt officiel publie. Quelqu'un qui a copié (fork / clone) le projet ne peut pas
+# toucher aux versions officielles : GitHub refuse de toute façon, ce contrôle donne juste un message clair.
+$owner = 'P0770'
+$ErrorActionPreference = 'Continue'
+$me = (& $gh api user --jq .login 2>$null)
+$origin = (git remote get-url origin 2>$null)
+$ErrorActionPreference = 'Stop'
+if ($me -ne $owner -or $origin -notmatch "github\.com[/:]$owner/bebene") {
+    Write-Host "Publication réservée au propriétaire du dépôt officiel ($owner/bebene)." -ForegroundColor Yellow
+    Write-Host "Pour proposer tes modifications : fork sur GitHub puis « pull request » (voir CONTRIBUTING.md)." -ForegroundColor Yellow
+    exit 1
+}
+
 $version = (Select-String -Path "$src\Companion.cs" -Pattern 'public const string Version = "([^"]+)"').Matches[0].Groups[1].Value
 Write-Host "Bébène $version" -ForegroundColor Cyan
 

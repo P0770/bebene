@@ -333,6 +333,36 @@ textarea { min-height: 28px; }
 #lhint.on { display: block; animation: rise .15s ease; }
 #lhint b { color: var(--accent-2); font-weight: 600; }
 #lhint kbd { font-size: 10.5px; }
+/* ---- mises à jour : pastille sur l avatar (orange = nouvelle version, vert = mise à jour réussie) ---- */
+#chat { position: relative; }
+header { z-index: 7; }
+.orbw { position: relative; flex: none; background: none; border: 0; padding: 0; border-radius: 50%; cursor: default; color: inherit; }
+.orbw.has { cursor: pointer; }
+.updot { position: absolute; top: -1px; right: -1px; width: 12px; height: 12px; border-radius: 50%; border: 2px solid #17171c; display: none; }
+.orbw.new .updot { display: block; background: #f0a050; animation: updp 1.8s ease-in-out infinite; }
+.orbw.ok .updot { display: block; background: #6fcf7a; box-shadow: 0 0 8px rgba(111,207,122,.75); }
+@keyframes updp { 0%, 100% { box-shadow: 0 0 4px rgba(240,160,80,.6); } 50% { box-shadow: 0 0 0 4px rgba(240,160,80,.18), 0 0 12px rgba(240,160,80,.95); } }
+.orbw.has:hover::after { content: attr(data-tip); position: absolute; left: -4px; top: calc(100% + 8px); white-space: nowrap; font-size: 12px; color: var(--text);
+  background: rgba(30,30,36,.97); border: 1px solid rgba(255,255,255,.12); border-radius: 10px; padding: 6px 11px; z-index: 50; pointer-events: none; box-shadow: 0 8px 20px rgba(0,0,0,.45); }
+.orbw.new:hover::after { border-color: rgba(240,160,80,.55); } .orbw.ok:hover::after { border-color: rgba(111,207,122,.55); }
+.updpop { position: absolute; top: 66px; left: 14px; width: 340px; z-index: 45; display: none; padding: 14px 14px 12px; border-radius: 16px; font-size: 13px;
+  background: linear-gradient(170deg, rgba(38,30,32,.99), rgba(25,23,27,.99)); border: 1px solid rgba(240,160,80,.3); box-shadow: 0 18px 40px rgba(0,0,0,.5); }
+.updpop.ok { border-color: rgba(111,207,122,.35); }
+.updpop.open { display: block; animation: rise .16s ease; }
+.updpop h4 { font-size: 14.5px; font-weight: 600; margin-bottom: 3px; }
+.updpop .sub { color: var(--muted); font-size: 12px; margin-bottom: 9px; }
+.updpop .notes { max-height: 190px; overflow-y: auto; font-size: 12.5px; padding: 8px 11px; border-radius: 10px; background: rgba(0,0,0,.25); margin-bottom: 10px; user-select: text; }
+.updpop .notes h3 { font-size: 12.5px; margin: .5em 0 .2em; } .updpop .notes ul { padding-left: 1.1em; margin: .2em 0; } .updpop .notes p { margin: .3em 0; }
+.updpop .st { font-size: 12px; color: var(--accent-2); margin-bottom: 9px; }
+.updpop .st.err { color: #f08a85; }
+.updpop .row { display: flex; gap: 8px; justify-content: flex-end; }
+.updpop button { font: inherit; font-size: 12.5px; border-radius: 10px; padding: 6px 13px; cursor: pointer; border: 1px solid rgba(255,255,255,.1); background: rgba(255,255,255,.06); color: var(--text); }
+.updpop button.pri { background: linear-gradient(135deg, #e8906d, #c75f3e); border-color: transparent; color: #fff; }
+.updpop.ok button.pri { background: linear-gradient(135deg, #6fcf7a, #3f9a4c); }
+.updpop button:disabled { opacity: .5; cursor: default; }
+/* note de compactage dans la conversation */
+.note { align-self: center; font-size: 11.5px; color: var(--muted); background: rgba(255,255,255,.04); border: 1px solid rgba(255,255,255,.07); border-radius: 999px; padding: 4px 13px; text-align: center; max-width: 92%; }
+.note.run { color: var(--accent-2); }
 </style>
 </head>
 <body>
@@ -353,7 +383,7 @@ textarea { min-height: 28px; }
 </aside>
 <div id="chat">
 <header>
-  <div class="orb" id="orb"></div>
+  <button class="orbw" id="orbw" data-tip=""><div class="orb" id="orb"></div><span class="updot"></span></button>
   <div class="who"><b id="name">Bébène</b><span id="sub">Prêt à t'aider</span></div>
   <span class="dir" id="dir" hidden>…</span>
   <div class="hbtns">
@@ -371,6 +401,8 @@ textarea { min-height: 28px; }
     </button>
   </div>
 </header>
+
+<div class="updpop" id="updpop"></div>
 
 <!-- barre de choix : mode (toggle) + menus dépliants Projet et Historique -->
 <div class="modebar">
@@ -469,6 +501,7 @@ if (!convs.length && store.get('hist', '')) {                       // reprise d
 let conv = convs.find(c => c.id === store.get('cur', '')) || null;
 let flash = false, project = conv ? conv.project || '' : store.get('project', ''), projects = [];
 let granted = new Set(conv && conv.granted ? conv.granted : []);   // actions autorisées pour la conversation en cours
+let lastCtx = 0, compacting = false, compactNote = null;              // compactage (déclaré avant le premier refresh())
 let sid = conv ? conv.sid || '' : '', busy = false, cur = null, gotResult = false, denials = [];
 auto.checked = store.get('auto', '0') === '1';
 log.innerHTML = conv ? conv.hist || '' : '';
@@ -525,7 +558,7 @@ function askApproval(list) {
 
 function refresh() {
   $('#empty').style.display = log.children.length ? 'none' : 'flex';
-  send.disabled = !busy && !input.value.trim();
+  send.disabled = compacting || (!busy && !input.value.trim());
   send.classList.toggle('stop', busy);
   $('#ico-send').style.display = busy ? 'none' : '';
   $('#ico-stop').style.display = busy ? '' : 'none';
@@ -577,9 +610,30 @@ log.addEventListener('click', e => {
   setTimeout(() => { b.classList.remove('ok'); b.innerHTML = old; }, 1300);
 });
 
+// ---- compactage automatique : quand la conversation a grossi de ~40 000 tokens depuis son début (ou le dernier compactage),
+// Bébène en résume le début (modèle Haiku) : chaque message suivant renvoie beaucoup moins de tokens à Claude.
+const COMPACT_GROWTH = 40000;
+function maybeCompact(code) {
+  if (code !== '0' || !sid || compacting || !lastCtx) return;
+  const holder = conv || (window.__flashBase = window.__flashBase || {});
+  if (!holder.base) { holder.base = lastCtx; return; }               // 1er échange : taille de départ (instructions, outils, mémoire)
+  if (lastCtx - holder.base < COMPACT_GROWTH) return;
+  compacting = true; refresh();
+  compactNote = el('note run', '♻ Je résume le début de la conversation pour économiser des tokens…'); scroll();
+  post('compact\n' + sid);
+}
+function compacted(ok, pre, post_) {
+  compacting = false;
+  const holder = conv || window.__flashBase || {}; holder.base = 0;    // nouvelle taille de départ mesurée au prochain échange
+  if (compactNote) {
+    if (ok) { compactNote.className = 'note'; compactNote.textContent = '♻ Conversation compactée' + (pre && post_ ? ' : ' + Math.round(pre / 1000) + 'k → ' + Math.round(post_ / 1000) + 'k tokens' : '') + ' · Bébène garde l\'essentiel en mémoire'; }
+    else compactNote.remove();
+  }
+  compactNote = null; lastCtx = 0; refresh(); save();
+}
 function submit(text, allowed, silent) {
   text = (text || input.value).trim();
-  if (busy || !text) return;
+  if (busy || compacting || !text) return;
   if (!silent) { input.value = ''; autosize(); el('msg user', esc(text)); decorate(); }
   cur = el('msg bot', '<div class="typing"><span></span><span></span><span></span></div>');
   busy = true; gotResult = false; denials = []; refresh(); scroll();
@@ -618,6 +672,7 @@ function onLine(l) {
   let o; try { o = JSON.parse(l); } catch { return; }
   if (o.session_id && o.session_id !== sid) setSid(o.session_id);
   if (o.type === "rate_limit_event" && o.rate_limit_info) { store.set("quota", JSON.stringify(o.rate_limit_info)); setQuota(o.rate_limit_info); }
+  if (o.type === 'assistant' && o.message && o.message.usage) { const u = o.message.usage; lastCtx = (u.input_tokens || 0) + (u.cache_read_input_tokens || 0) + (u.cache_creation_input_tokens || 0); }
   if (o.type === 'assistant' && o.message && o.message.content) {
     for (const c of o.message.content) {
       if (c.type === 'text' && c.text.trim()) addToCur('md', md(c.text)).dataset.raw = c.text;
@@ -646,12 +701,12 @@ function finish(code, err) {
   }
   cur = null; busy = false; refresh();
   if (denials.length) askApproval(denials);
-  denials = []; decorate(); scroll(); save(); askTitle(code);
+  denials = []; decorate(); scroll(); save(); askTitle(code); maybeCompact(code);
 }
 
 // opts : { flash, project } ; ouvre une conversation vide
 function newChat(opts) {
-  if (busy) return;
+  if (busy || compacting) return;
   opts = opts || {};
   if (flash && sid) post('forget\n' + sid);                         // on efface la trace de la conversation flash
   flash = !!opts.flash; granted = new Set();
@@ -661,7 +716,7 @@ function newChat(opts) {
   sid = ''; post('sid\n'); log.innerHTML = ''; applyMode(); refresh(); input.focus(); closeMenu();
 }
 function openConv(c) {
-  if (busy) return;
+  if (busy || compacting) return;
   if (flash && sid) post('forget\n' + sid);
   flash = false; conv = c; sid = c.sid || ''; project = c.project || ''; granted = new Set(c.granted || []);
   store.set('cur', c.id); post('sid\n' + sid);
@@ -713,6 +768,34 @@ function renderMenu() {
     const c = convs.find(x => x.id === el.dataset.c); if (c) openConv(c);
   });
 }
+// ---- mises à jour (pastille sur l'avatar, en haut à gauche) ----
+let UPD = null, updStatus = '', updErr = false;
+function renderUpd() {
+  const w = $('#orbw'); w.classList.remove('new', 'ok', 'has');
+  if (UPD && UPD.available) { w.classList.add('new', 'has'); w.dataset.tip = '⬆ Nouvelle mise à jour : Bébène ' + UPD.latest + ' (tu as la ' + UPD.current + ')'; }
+  else if (UPD && UPD.ok) { w.classList.add('ok', 'has'); w.dataset.tip = '✓ Mise à jour réussie : Bébène ' + UPD.current; }
+  else { w.dataset.tip = ''; $('#updpop').classList.remove('open'); }
+  if ($('#updpop').classList.contains('open')) fillPop();
+}
+function fillPop() {
+  const p = $('#updpop'), u = UPD; if (!u) return;
+  const notes = u.notes ? '<div class="notes">' + md(u.notes) + '</div>' : '';
+  p.classList.toggle('ok', !u.available);
+  if (u.available) {
+    const running = updStatus && !updErr;
+    p.innerHTML = '<h4>⬆ Bébène ' + esc(u.latest) + ' est disponible</h4><div class="sub">Tu as la version ' + esc(u.current) + '. Tes réglages, conversations, calendriers et mails sont conservés.</div>' + notes
+      + (updStatus ? '<div class="st' + (updErr ? ' err' : '') + '">' + esc(updStatus) + '</div>' : '')
+      + '<div class="row"><button id="updGit">Voir sur GitHub</button><button class="pri" id="updGo"' + (running ? ' disabled' : '') + '>' + (running ? 'Mise à jour…' : 'Mettre à jour') + '</button></div>';
+  } else {
+    p.innerHTML = '<h4>✓ Bébène est à jour</h4><div class="sub">La version ' + esc(u.current) + ' a bien été installée.</div>' + notes
+      + '<div class="row"><button id="updGit">Voir sur GitHub</button><button class="pri" id="updOk">OK</button></div>';
+  }
+  const g = $('#updGit'); if (g) g.onclick = () => post('updopen');
+  const go = $('#updGo'); if (go) go.onclick = () => { updErr = false; updStatus = 'Préparation…'; fillPop(); post('updinstall'); };
+  const ok = $('#updOk'); if (ok) ok.onclick = () => { post('updseen'); UPD.ok = false; p.classList.remove('open'); renderUpd(); };
+}
+$('#orbw').onclick = e => { e.stopPropagation(); if (!$('#orbw').classList.contains('has')) return; const p = $('#updpop'); p.classList.toggle('open'); if (p.classList.contains('open')) fillPop(); };
+document.addEventListener('click', e => { if (!e.target.closest('#updpop') && !e.target.closest('#orbw')) $('#updpop').classList.remove('open'); });
 function closeMenu() { document.querySelectorAll('.dd.open').forEach(d => d.classList.remove('open')); }
 function toggleDd(id) { const d = $(id), was = d.classList.contains('open'); closeMenu(); if (!was) { d.classList.add('open'); post('projects'); renderMenu(); } }
 $('#ddProj').onclick = e => { e.stopPropagation(); toggleDd('#ddP'); };
@@ -745,6 +828,11 @@ window.chrome.webview.addEventListener('message', e => {
   else if (k === 'name') { $('#name').textContent = v; document.title = v; applyMode(); }
   else if (k === 'projects') { try { projects = JSON.parse(v); } catch { projects = []; } renderMenu(); }
   else if (k === 'project') { newChat({ project: v }); }
+  else if (k === 'compacted') { const p = v.split('\n'); compacted(p[0] === '1', +p[1], +p[2]); }
+  else if (k === 'upd') { try { UPD = JSON.parse(v); } catch { UPD = null; } renderUpd(); }
+  else if (k === 'updstatus') { const j = v.indexOf('\n'), st = j < 0 ? v : v.slice(0, j), msg = j < 0 ? '' : v.slice(j + 1);
+    updErr = st === 'err'; updStatus = st === 'err' ? 'Échec : ' + msg : st === 'restart' ? 'Installation… Bébène redémarre dans un instant.' : msg;
+    if (UPD) { $('#updpop').classList.add('open'); fillPop(); } }
   else if (k === 'title') { const j = v.indexOf('\n'), c = convs.find(x => x.id === v.slice(0, j)); if (c) { c.title = v.slice(j + 1).trim(); persist(); renderMenu(); setSub(); } }
   else if (k === 'paths') {
     const add = v.split('\n').filter(Boolean).map(p => '"' + p + '"').join(' ');

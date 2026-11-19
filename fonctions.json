@@ -95,6 +95,12 @@
   { "cat": "Réglages", "titre": "Verrou de sécurité", "depuis": "1.28",
     "desc": "Bébène ne peut pas modifier son propre programme, ses réglages ou ses données depuis ses conversations, même en mode autonome. Son évolution se fait avec Claude Code dans le terminal.",
     "ex": "« Modifie ton code pour… » → Bébène explique qu'il faut passer par Claude Code" },
+  { "cat": "Réglages", "titre": "Mises à jour", "depuis": "1.35",
+    "desc": "Une pastille sur l'avatar de Bébène (en haut à gauche de la discussion) : orange quand une nouvelle version est publiée sur GitHub, verte après une mise à jour réussie. Survole-la pour le détail, clique pour voir les nouveautés et mettre à jour en un clic : seul le programme est remplacé, tes réglages, conversations, calendriers et mails sont conservés.",
+    "ex": "Pastille orange → Mettre à jour → Bébène redémarre → pastille verte" },
+  { "cat": "Discuter", "titre": "Compactage automatique", "depuis": "1.35",
+    "desc": "Quand une conversation devient longue, Bébène en résume le début (avec le modèle Haiku) : chaque message suivant coûte beaucoup moins de tokens, sans perdre l'essentiel.",
+    "ex": "« ♻ Conversation compactée : 68k → 12k tokens »" },
   { "cat": "Réglages", "titre": "Personnaliser", "depuis": "1.1",
     "desc": "Nom, taille, modèle Claude, mode économe (Caveman), instructions personnalisées, démarrage avec Windows.",
     "ex": "Modèle → Haiku pour les petites questions (moins de tokens)" }

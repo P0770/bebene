@@ -19,10 +19,10 @@ using Microsoft.Web.WebView2.WinForms;
 
 [assembly: System.Reflection.AssemblyTitle("Bébène")]
 [assembly: System.Reflection.AssemblyProduct("Bébène")]
-[assembly: System.Reflection.AssemblyVersion("1.34.0.0")]
+[assembly: System.Reflection.AssemblyVersion("1.35.0.0")]
 
 static class Program {
-    public const string Version = "1.34";
+    public const string Version = "1.35";
     public static bool OpenSetup;
     public static readonly uint Pid = (uint)Process.GetCurrentProcess().Id;   // identifiant de Bébène (lu une seule fois)   // --setup : ouvrir directement l'assistant d'installation
 
@@ -163,6 +163,13 @@ static class Program {
             d.Shown += (s, e) => { t1.Start(); t2.Start(); };
             Application.Run(d); return;
         }
+        if (args.Length == 2 && args[0] == "--updtest") {   // test : dernière version sur GitHub + téléchargement (sans installer)
+            var sb = new StringBuilder();
+            try { Updater.Check(); sb.AppendLine("local=" + Version + " github=" + Updater.Latest + " dispo=" + Updater.Available + " via_gh=" + Updater.ViaGh + " zip=" + Updater.Asset);
+                  string x = Updater.Install(true); sb.AppendLine("décompressé : " + string.Join(", ", Array.ConvertAll(Directory.GetFiles(x), Path.GetFileName))); }
+            catch (Exception ex) { sb.AppendLine("ERREUR " + ex.Message); }
+            File.WriteAllText(args[1], sb.ToString(), Encoding.UTF8); return;
+        }
         if (args.Length == 2 && args[0] == "--readytest") { new Companion(false).ReadyPreview(args[1]); return; }
         if (args.Length == 2 && args[0] == "--preview") { new Companion(false).Preview(args[1]); return; } // planche des poses
         bool first;
@@ -177,6 +184,7 @@ static class Program {
             AppDomain.CurrentDomain.UnhandledException += (s, e) => Log("Exception fatale", Convert.ToString(e.ExceptionObject));
             Log("Démarrage", "v" + Version);
             OpenSetup = Array.IndexOf(args, "--setup") >= 0;
+            Updater.Init();     // version qui vient d être installée ? (pastille verte)
             Util.FreshPath();   // programmes installés après l ouverture de session (RTK, Node…) : visibles par Bébène et par Claude
             var c = new Companion(Array.IndexOf(args, "--background") < 0);
             StartWatchdog(c);
@@ -270,7 +278,11 @@ static class Util {
             cw.NavigationStarting += (s, e) => { if (!e.Uri.StartsWith("file:")) { e.Cancel = true; OpenExternal(e.Uri); } };
             cw.Navigate(new Uri(Path.Combine(Path.GetDirectoryName(Application.ExecutablePath), page)).AbsoluteUri);
         } catch (Exception ex) {
-            MessageBox.Show("WebView2 n'a pas pu démarrer :\n" + ex.Message, "Bébène");
+            Program.Log("WebView2", ex.ToString());
+            // PC sans le composant WebView2 (rare, Windows 10 ancien) : sans lui, ni la discussion ni l'assistant ne s'affichent
+            if (MessageBox.Show("Le composant d'affichage WebView2 n'a pas pu démarrer :\n" + ex.Message + "\n\nL'installer maintenant ? (gratuit, Microsoft)", "Bébène",
+                    MessageBoxButtons.YesNo, MessageBoxIcon.Warning) == DialogResult.Yes)
+                try { Process.Start("https://go.microsoft.com/fwlink/p/?LinkId=2124703"); } catch { }
         }
     }
     static void OpenExternal(string uri) { if (uri.StartsWith("http")) try { Process.Start(uri); } catch { } }
@@ -2393,7 +2405,7 @@ static class Setup {
         }
     }
     public static bool InstalledHere { get { return string.Equals(Path.GetFullPath(AppDir).TrimEnd('\\'), Path.GetFullPath(InstallDir).TrimEnd('\\'), StringComparison.OrdinalIgnoreCase); } }
-    static string Run(string file, string args, int ms) {
+    public static string Run(string file, string args, int ms) {
         Util.FreshPath();
         try {
             var psi = new ProcessStartInfo(file, args) { UseShellExecute = false, CreateNoWindow = true, RedirectStandardOutput = true, RedirectStandardError = true, StandardOutputEncoding = Encoding.UTF8 };
@@ -2515,6 +2527,87 @@ static class Setup {
 
 }
 
+// ---------- Mises à jour : compare avec la dernière version publiée sur GitHub (Releases) ----------
+// Dépôt public : API GitHub sans compte. Dépôt privé : passe par GitHub CLI (gh) connecté sur ce PC.
+// L'installation remplace seulement le programme (exe, dll, pages) : réglages (registre), conversations
+// (stockage WebView2), calendriers, mails et journal sont dans d'autres dossiers et ne sont pas touchés.
+static class Updater {
+    public const string Repo = "P0770/bebene";
+    public static string Latest = "", Url = "", Notes = "", Asset = "";
+    public static bool Available, ViaGh;
+    public static int Cmp(string a, string b) {
+        var x = (a ?? "").Split('.'); var y = (b ?? "").Split('.');
+        for (int i = 0; i < Math.Max(x.Length, y.Length); i++) {
+            int p = 0, q = 0; if (i < x.Length) int.TryParse(x[i], out p); if (i < y.Length) int.TryParse(y[i], out q);
+            if (p != q) return p.CompareTo(q);
+        }
+        return 0;
+    }
+    // au démarrage : si la version a augmenté depuis la dernière fois, on affichera « mise à jour réussie » (vert)
+    public static void Init() {
+        string lv = Settings.Str("LastVersion", "");
+        if (lv.Length > 0 && Cmp(Program.Version, lv) > 0) Settings.Set("UpdatedShown", Program.Version);
+        Settings.Set("LastVersion", Program.Version);
+    }
+    public static bool ShowOk { get { return Settings.Str("UpdatedShown", "") == Program.Version; } }
+    static string Gh() { string p = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles), @"GitHub CLI\gh.exe"); return File.Exists(p) ? p : "gh"; }
+
+    public static void Check() {
+        string json = null; ViaGh = false;
+        try {
+            ServicePointManager.SecurityProtocol |= (SecurityProtocolType)3072;
+            using (var wc = new WebClient()) {
+                wc.Encoding = Encoding.UTF8; wc.Headers["User-Agent"] = "Bebene/" + Program.Version; wc.Headers["Accept"] = "application/vnd.github+json";
+                json = wc.DownloadString("https://api.github.com/repos/" + Repo + "/releases/latest");
+            }
+        } catch {
+            json = Setup.Run(Gh(), "api repos/" + Repo + "/releases/latest", 25000); ViaGh = json != null;   // dépôt privé
+        }
+        if (json == null) return;
+        var d = new JavaScriptSerializer { MaxJsonLength = int.MaxValue }.Deserialize<Dictionary<string, object>>(json);
+        Latest = Convert.ToString(d.ContainsKey("tag_name") ? d["tag_name"] : "").TrimStart('v', 'V');
+        Url = Convert.ToString(d.ContainsKey("html_url") ? d["html_url"] : "");
+        Notes = Convert.ToString(d.ContainsKey("body") ? d["body"] : ""); if (Notes.Length > 3000) Notes = Notes.Substring(0, 3000);
+        Asset = "";
+        var assets = d.ContainsKey("assets") ? d["assets"] as ArrayList : null;
+        if (assets != null) foreach (var o in assets) {
+            var a = o as Dictionary<string, object>; if (a == null) continue;
+            if (Convert.ToString(a["name"]).EndsWith(".zip", StringComparison.OrdinalIgnoreCase)) { Asset = Convert.ToString(a["browser_download_url"]); break; }
+        }
+        Available = Latest.Length > 0 && Asset.Length > 0 && Cmp(Latest, Program.Version) > 0;
+    }
+
+    // télécharge le zip, le décompresse, puis un petit script remplace le programme une fois Bébène fermé et le relance
+    public static void Install() { Install(false); }
+    public static string Install(bool dry) {
+        if (!Available && !dry) throw new Exception("aucune nouvelle version");
+        string dir = Path.Combine(Path.GetTempPath(), "bebene-maj-" + Latest);
+        if (Directory.Exists(dir)) Directory.Delete(dir, true);
+        Directory.CreateDirectory(dir);
+        if (!ViaGh) {
+            using (var wc = new WebClient()) { wc.Headers["User-Agent"] = "Bebene/" + Program.Version; wc.DownloadFile(Asset, Path.Combine(dir, "bebene.zip")); }
+        } else if (Setup.Run(Gh(), "release download v" + Latest + " -R " + Repo + " -p \"*.zip\" -D \"" + dir + "\" --clobber", 300000) == null)
+            throw new Exception("téléchargement impossible (GitHub CLI)");
+        var zips = Directory.GetFiles(dir, "*.zip"); if (zips.Length == 0) throw new Exception("le zip de la version est introuvable");
+        string x = Path.Combine(dir, "x");
+        System.IO.Compression.ZipFile.ExtractToDirectory(zips[0], x);
+        if (!File.Exists(Path.Combine(x, "ClaudeCompanion.exe"))) throw new Exception("le zip ne contient pas Bébène");
+        if (dry) return x;                                         // test : téléchargé et décompressé, rien d installé
+        string app = Setup.AppDir, ps1 = Path.Combine(dir, "maj.ps1");
+        Func<string, string> q = s => "'" + s.Replace("'", "''") + "'";
+        string script =
+            "# Mise à jour de Bébène : attend sa fermeture, remplace le programme (rien d autre), puis le relance\r\n" +
+            "try { Wait-Process -Id " + Program.Pid + " -Timeout 40 -ErrorAction Stop } catch { }\r\n" +
+            "Start-Sleep -Milliseconds 600\r\n" +
+            "$files = Get-ChildItem " + q(x) + " -File | Where-Object { $_.Extension -in '.exe', '.dll', '.html', '.json', '.ico' }\r\n" +
+            "foreach ($f in $files) { for ($i = 0; $i -lt 10; $i++) { try { Copy-Item $f.FullName -Destination " + q(app) + " -Force -ErrorAction Stop; break } catch { Start-Sleep -Milliseconds 500 } } }\r\n" +
+            "Start-Process " + q(Path.Combine(app, "ClaudeCompanion.exe")) + "\r\n";
+        File.WriteAllText(ps1, script, new UTF8Encoding(true));
+        Process.Start(new ProcessStartInfo("powershell.exe", "-NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File \"" + ps1 + "\"") { UseShellExecute = false, CreateNoWindow = true });
+        return x;
+    }
+}
+
 // ---------- La fenêtre de discussion ----------
 class ChatPanel : Form {
     public static bool NoActivate;   // tests : afficher sans prendre le clavier
@@ -2534,6 +2627,10 @@ class ChatPanel : Form {
         calTimer.Tick += (s, e) => RefreshCalendars();                 // rafraîchit les calendriers toutes les 30 min
         calTimer.Start();
         InitSide();
+        updTimer.Tick += (s, e) => CheckUpdate(); updTimer.Start();
+        var firstUpd = new System.Windows.Forms.Timer { Interval = 15000 };
+        firstUpd.Tick += (s, e) => { firstUpd.Stop(); firstUpd.Dispose(); CheckUpdate(); }; firstUpd.Start();
+        VisibleChanged += (s, e) => { if (Visible && (DateTime.Now - lastUpd).TotalHours > 1) CheckUpdate(); };
         VisibleChanged += (s, e) => { if (Visible) { ProbeQuota(false); if (owner.State == "ready") owner.SetState("happy"); } };    // quota à jour à chaque ouverture
         quotaTimer.Tick += (s, e) => { if (Visible) ProbeQuota(true); }; quotaTimer.Start();
         Mailbox.LoadCache();                                         // derniers résultats tout de suite, nouvelle analyse en fond
@@ -2657,6 +2754,50 @@ class ChatPanel : Form {
         }) { IsBackground = true, Name = "titre" }.Start();
     }
 
+    // ---- mises à jour ----
+    readonly System.Windows.Forms.Timer updTimer = new System.Windows.Forms.Timer { Interval = 6 * 3600 * 1000 };
+    DateTime lastUpd = DateTime.MinValue; volatile bool updChecking;
+    string UpdJson() {
+        return new JavaScriptSerializer().Serialize(new Dictionary<string, object> { { "current", Program.Version }, { "latest", Updater.Latest },
+            { "available", Updater.Available }, { "ok", Updater.ShowOk }, { "url", Updater.Url }, { "notes", Updater.Notes } });
+    }
+    void CheckUpdate() {
+        if (updChecking) return; updChecking = true; lastUpd = DateTime.Now;
+        new Thread(() => {
+            try { Updater.Check(); } catch (Exception ex) { Program.Log("Mise à jour", ex.Message); }
+            updChecking = false; Post("upd\n" + UpdJson());
+        }) { IsBackground = true, Name = "maj-verif" }.Start();
+    }
+
+    // ---- compactage : résume le début d une longue conversation (Haiku) pour que chaque message coûte moins de tokens ----
+    Process compactProc;
+    void Compact(string sid) {
+        if (proc != null || compactProc != null || !Regex.IsMatch(sid ?? "", "^[0-9a-fA-F-]{36}$")) { Post("compacted\n0\n0\n0"); return; }
+        var psi = new ProcessStartInfo("claude", "-p --model haiku --resume " + sid + " --output-format stream-json --verbose --settings " + Util.Quote(GuardSettings())) {
+            UseShellExecute = false, CreateNoWindow = true, RedirectStandardInput = true, RedirectStandardOutput = true, RedirectStandardError = true,
+            StandardOutputEncoding = Encoding.UTF8, WorkingDirectory = CurrentDir() };
+        psi.EnvironmentVariables["CAVEMAN_DEFAULT_MODE"] = "off";
+        new Thread(() => {
+            long pre = 0, post = 0; bool ok = false;
+            try {
+                using (var p = Process.Start(psi)) {
+                    compactProc = p; KillAfter(p, 240000);
+                    p.StandardInput.Write("/compact"); p.StandardInput.Close();
+                    p.ErrorDataReceived += (s, e) => { }; p.BeginErrorReadLine();
+                    string line;
+                    while ((line = p.StandardOutput.ReadLine()) != null) {
+                        if (line.Contains("\"compact_result\":\"success\"")) ok = true;
+                        var a = Regex.Match(line, "\"pre_tokens\":(\\d+)"); if (a.Success) long.TryParse(a.Groups[1].Value, out pre);
+                        var b = Regex.Match(line, "\"post_tokens\":(\\d+)"); if (b.Success) long.TryParse(b.Groups[1].Value, out post);
+                    }
+                    p.WaitForExit(10000);
+                }
+            } catch (Exception ex) { Program.Log("Compactage", ex.Message); }
+            compactProc = null;
+            Post("compacted\n" + (ok ? 1 : 0) + "\n" + pre + "\n" + post);
+        }) { IsBackground = true, Name = "compact" }.Start();
+    }
+
     static void KillAfter(Process p, int ms) {
         new Thread(() => { try { if (!p.WaitForExit(ms)) p.Kill(); } catch { } }) { IsBackground = true, Name = "délai" }.Start();
     }
@@ -2734,7 +2875,7 @@ class ChatPanel : Form {
             case "ready":
                 Post("pinned\n" + (Pinned ? 1 : 0));
                 Post("dir\n" + WorkDir); Post("name\n" + Settings.Name);
-                PostCalendars(); ProbeQuota(true); break;               // la page est prête : on lit le quota tout de suite
+                PostCalendars(); ProbeQuota(true); Post("upd\n" + UpdJson()); break;               // la page est prête : on lit le quota tout de suite
             case "calrefresh": RefreshCalendars(); break;
             case "pin": Pinned = parts.Length > 1 && parts[1] == "1"; Settings.Set("Pinned", Pinned); break;
             case "sid": owner.SessionId = parts.Length > 1 ? parts[1] : ""; break;
@@ -2747,6 +2888,20 @@ class ChatPanel : Form {
                 break; }
             case "copy": { string txt = m.Length > 5 ? m.Substring(5) : ""; if (txt.Length > 0) try { Clipboard.SetText(txt); } catch (Exception ex) { Program.Log("Copie", ex.Message); } break; }
             case "drag": DragWindow(); break;
+            case "compact": Compact(parts.Length > 1 ? parts[1] : ""); break;
+            case "updcheck": CheckUpdate(); break;
+            case "updseen": Settings.Set("UpdatedShown", ""); break;
+            case "updopen": try { Process.Start(Updater.Url.Length > 0 ? Updater.Url : "https://github.com/" + Updater.Repo + "/releases"); } catch { } break;
+            case "updinstall":
+                Post("updstatus\nbusy\nTéléchargement de Bébène " + Updater.Latest + "…");
+                new Thread(() => {
+                    string err = null;
+                    try { Updater.Install(); } catch (Exception ex) { err = ex.Message; Program.Log("Mise à jour", ex.ToString()); }
+                    if (err != null) { Post("updstatus\nerr\n" + err); return; }
+                    Post("updstatus\nrestart\n");
+                    try { BeginInvoke((Action)(() => owner.Quit())); } catch { }
+                }) { IsBackground = true, Name = "maj" }.Start();
+                break;
             case "quotaprobe": ProbeQuota(false); break;
             case "folder": PickFolder(); break;
             case "projects": Post("projects\n" + new JavaScriptSerializer().Serialize(ListProjects())); break;
@@ -2811,7 +2966,7 @@ class ChatPanel : Form {
     }
 
     void Send(string text, bool autonomous, string sessionId, string allowed) {
-        if (proc != null) { Post("done\n-1\nClaude est encore en train de répondre : attends la fin ou clique sur Arrêter."); return; }
+        if (proc != null || compactProc != null) { Post("done\n-1\n" + (proc != null ? "Claude est encore en train de répondre : attends la fin ou clique sur Arrêter." : "Je termine de compacter la conversation : réessaie dans un instant.")); return; }
         // Le contexte qui change (fenêtre active) va dans le MESSAGE, pas dans le prompt système :
         // un prompt système stable garde l'historique en cache → beaucoup moins de tokens à chaque échange.
         if (Companion.LastWindow.Length > 0) text = "[Fenêtre active : " + Companion.LastWindow + "]\n" + text;
@@ -2825,7 +2980,7 @@ class ChatPanel : Form {
         if (Regex.IsMatch(sessionId, "^[0-9a-fA-F-]{36}$")) args += " --resume " + sessionId;
         string persona = "Tu es " + Settings.Name + ", un petit chat noir qui vit sur le bureau Windows de l'utilisateur et l'aide au quotidien "
             + "(questions, petites modifications de fichiers, recommandations). Réponds en français, de façon claire et concise. "
-            + "Tu partages la mémoire centrale ClaudeHub (~/OneDrive/ClaudeHub) avec Claude Code : tu peux y chercher (skill memoire), "
+            + "Tu partages la mémoire centrale ClaudeHub (" + Setup.Hub + ") avec Claude Code : tu peux y chercher (skill memoire), "
             + "retenir des choses, créer et gérer les projets (projets/<nom>/NOTES.md) et retrouver les conversations archivées, en suivant les règles du noyau de mémoire. "
             + "Quand l'utilisateur dit travailler sur un projet, écris la ligne « 📁 Projet : <nom> » pour que la conversation y soit sauvegardée. "
             + (Flash ? "CONVERSATION FLASH : l'utilisateur ne veut rien enregistrer. N'écris rien dans la mémoire ClaudeHub, ne crée pas de projet et n'écris jamais la ligne « 📁 Projet ». "

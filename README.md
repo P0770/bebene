@@ -33,7 +33,7 @@
 7. [Structure du dépôt](#structure-du-dépôt)
 8. [Questions fréquentes](#questions-fréquentes)
 
-Documentation détaillée : [Architecture technique](docs/ARCHITECTURE.md) · [Publier une mise à jour](docs/MISE-A-JOUR.md)
+Documentation détaillée : [Architecture technique](docs/ARCHITECTURE.md) · [Publier une mise à jour](docs/MISE-A-JOUR.md) · [Modifier ou contribuer](CONTRIBUTING.md)
 
 ---
 
@@ -92,7 +92,11 @@ Clic sur le chat, **Alt + Espace** ou **Ctrl + Alt + C** : la discussion s'ouvre
 
 **Écrire des listes** : commence une ligne par `1.` ou `*` (ou `-`) suivi d'un espace : **Entrée** passe à l'élément suivant (`2.`, `3.`… ou `•`), Entrée sur un élément vide termine la liste. **Ctrl + Entrée** envoie à tout moment, **Maj + Entrée** fait un simple retour à la ligne.
 
+<p align="center"><img src="docs/images/discussion-liste.png" width="300" alt="Écrire une liste"></p>
+
 **Titres résumés** : le titre de chaque conversation dans l'historique est rédigé par Claude (modèle Haiku, quelques tokens) pour résumer ce qui s'y est dit ; il est revu au fil de la conversation.
+
+**Compactage automatique** : quand une conversation devient longue (environ 40 000 tokens de plus qu'au début), Bébène en résume le début avec le modèle Haiku. Chaque message suivant renvoie alors beaucoup moins de tokens à Claude ; une petite note « ♻ Conversation compactée : 68k → 12k tokens » l'indique dans la conversation.
 
 **Copier** : chaque bloc de code a une barre avec son langage et un bouton **Copier** ; survole n'importe quel message (le tien ou celui de Bébène) pour faire apparaître un petit bouton qui le copie en entier, au format d'origine (Markdown).
 
@@ -185,6 +189,27 @@ Les sections, de la plus utilisée à la moins utilisée :
 
 ---
 
+## Mises à jour
+
+Une **pastille sur l'avatar** de Bébène, en haut à gauche de la discussion, indique l'état :
+
+| Pastille | Signification |
+|---|---|
+| 🟠 orange, qui pulse | une version plus récente est publiée dans les [Releases](../../releases) |
+| 🟢 verte | la dernière mise à jour s'est bien installée |
+
+<p align="center">
+  <img src="docs/images/maj-disponible.png" width="300" alt="Nouvelle version disponible">
+  &nbsp;
+  <img src="docs/images/maj-reussie.png" width="300" alt="Mise à jour réussie">
+</p>
+
+Survole-la pour le détail, clique pour voir les nouveautés et **Mettre à jour**. Bébène télécharge le zip de la Release, se ferme, remplace **uniquement son programme** (exe, DLL, pages) et redémarre. Les réglages (registre), les conversations, les calendriers, les mails et le journal sont ailleurs et ne sont pas touchés.
+
+La vérification se fait 15 secondes après le démarrage, puis toutes les 6 heures et à l'ouverture de la discussion. Elle compare le numéro de version installé avec celui de la dernière Release GitHub. Tant que le dépôt est privé, elle passe par GitHub CLI (`gh`) connecté sur le PC.
+
+---
+
 ## Installation
 
 ### Depuis une version publiée (recommandé)
@@ -262,7 +287,8 @@ bebene/
 ├── fonctions.json               catalogue des fonctions (affiché dans les réglages + notes de version)
 ├── build.ps1                    compilation, icône, installation
 ├── creer-paquet.ps1             crée le zip à partager           ← « Créer le paquet Bébène.cmd »
-├── publier-version.ps1          publie sur GitHub (code + release) ← « Publier sur GitHub.cmd »
+├── publier-version.ps1          publie sur GitHub (code + release) ← « Publier sur GitHub.cmd » (propriétaire uniquement)
+├── CONTRIBUTING.md              utiliser, modifier, proposer des changements
 ├── assets/
 │   ├── icone-bebene.png         icône source (pixel art 32×32)
 │   └── make-icon.ps1            générateur de l'icône
@@ -272,6 +298,12 @@ bebene/
 │   └── images/                  captures du README (générées par les modes de test)
 └── NOTES.md                     journal de développement, version par version
 ```
+
+---
+
+## Modifier Bébène ou proposer des changements
+
+Tout le monde peut télécharger Bébène, copier le code (fork) et le modifier chez soi. **Seul le propriétaire publie les versions officielles** : GitHub refuse toute écriture d'une autre personne, et le script de publication le vérifie aussi. Les propositions passent par une *pull request*. Détails : [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ---
 
@@ -288,6 +320,15 @@ Le *nouvel* Outlook ne permet pas aux autres programmes de lire les mails. Ouvre
 
 **Le chat a disparu ?**
 Clic droit sur l'icône → *Afficher le chat sur le bureau*.
+
+**Une mise à jour efface-t-elle mes réglages ou mes conversations ?**
+Non. Elle ne remplace que le programme (exe, DLL, pages). Réglages, conversations, calendriers, mails et mémoire sont rangés ailleurs.
+
+**La pastille de mise à jour n'apparaît jamais ?**
+Il faut une connexion internet et une Release plus récente que ta version. Si le dépôt est privé, il faut aussi GitHub CLI (`gh`) connecté à un compte qui y a accès.
+
+**Le PC n'a pas WebView2 ?**
+Bébène le détecte au démarrage et propose de l'installer (gratuit, Microsoft). Il est déjà présent sur Windows 11 et la plupart des Windows 10.
 
 **Où regarder si quelque chose plante ?**
 `%LOCALAPPDATA%\ClaudeCompanion\bebene.log`. Un chien de garde y écrit aussi la pile d'appels si l'interface se fige plus de 3 secondes.
