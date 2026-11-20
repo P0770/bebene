@@ -55,7 +55,7 @@ textarea { width: 100%; min-height: 84px; resize: vertical; }
 
 .switch { position: relative; flex: none; cursor: pointer; }
 .switch input { display: none; }
-.switch .track { display: block; width: 40px; height: 22px; border-radius: 12px; background: #3b3b42; transition: background .15s; position: relative; }
+.switch .track { display: block; width: 40px; height: 22px; border-radius: 12px; background: var(--track); transition: background .15s; position: relative; }
 .switch .track::after { content: ""; position: absolute; left: 3px; top: 3px; width: 16px; height: 16px; border-radius: 50%; background: #fff; transition: transform .18s; }
 .switch input:checked + .track { background: var(--accent); }
 .switch input:checked + .track::after { transform: translateX(18px); }
@@ -74,7 +74,7 @@ kbd { font: 12px "Segoe UI", sans-serif; background: var(--raised); border: 1px 
 .orb img, .avatar img { width: 88%; image-rendering: pixelated; }
 .fcat { font-size: 11px; font-weight: 600; letter-spacing: .6px; text-transform: uppercase; color: var(--accent-2); padding: 12px 16px 2px; }
 .feat .lbl b { display: flex; align-items: center; gap: 6px; }
-.fex { display: block; margin-top: 4px; font-size: 12px !important; color: #c9c9d2 !important; background: rgba(255,255,255,.04); border-radius: 8px; padding: 4px 8px; white-space: normal !important; }
+.fex { display: block; margin-top: 4px; font-size: 12px !important; color: #c9c9d2 !important; background: rgba(var(--ov),.04); border-radius: 8px; padding: 4px 8px; white-space: normal !important; }
 .new { font-size: 10px; font-weight: 600; color: #fff; background: var(--accent); border-radius: 999px; padding: 1px 7px; }
 .tagk { font-size: 10.5px; font-weight: 600; border-radius: 6px; padding: 2px 7px; flex: none; }
 .tagk.exam { background: rgba(232,80,74,.16); color: #f08a85; }
@@ -83,7 +83,7 @@ kbd { font: 12px "Segoe UI", sans-serif; background: var(--raised); border: 1px 
 details.sec { margin-top: 10px; background: var(--surface); border: 1px solid var(--line); border-radius: 14px; overflow: hidden; }
 details.sec > summary { list-style: none; display: flex; align-items: center; gap: 12px; padding: 14px 16px; cursor: pointer; transition: background .15s; }
 details.sec > summary::-webkit-details-marker { display: none; }
-details.sec > summary:hover { background: rgba(255,255,255,.03); }
+details.sec > summary:hover { background: rgba(var(--ov),.03); }
 details.sec .st { flex: 1; min-width: 0; }
 details.sec .st b { display: block; font-weight: 600; font-size: 14px; }
 details.sec .st span { display: block; font-size: 12px; color: var(--muted); }
@@ -134,6 +134,11 @@ details.sec .sb > .card + .card { margin-top: 10px; }
 @keyframes hkp { 50% { box-shadow: 0 0 0 3px rgba(217,119,87,.25); } }
 .hkx { background: none; border: 0; color: var(--muted); font-size: 16px; cursor: pointer; padding: 2px 4px; }
 .hkx:hover { color: var(--danger); }
+/* mode clair */
+:root { --ov: 255,255,255; --track: #3b3b42; }
+html.light { --bg: #f6f3f0; --surface: #ffffff; --raised: #ece7e3; --line: #e0d9d3; --text: #23202a; --muted: #6e6873;
+  --accent: #c8623f; --accent-2: #b4542f; --danger: #c84b4e; --ov: 40,30,35; --track: #cdc6c0; }
+html.light .hk:hover { border-color: #bdb5ae; }
 </style>
 </head>
 <body>
@@ -274,6 +279,10 @@ details.sec .sb > .card + .card { margin-top: 10px; }
   <div class="row">
     <div class="lbl"><b>Nom</b><span>Comment ton chat s'appelle.</span></div>
     <input type="text" id="name" maxlength="30">
+  </div>
+  <div class="row">
+    <div class="lbl"><b>Mode clair</b><span>Discussion et réglages en clair au lieu de sombre.</span></div>
+    <label class="switch"><input type="checkbox" id="light"><span class="track"></span></label>
   </div>
   <div class="row">
     <div class="lbl"><b>Afficher sur le bureau</b><span>Sinon, il reste dans la zone de notification.</span></div>
@@ -464,6 +473,7 @@ function renderFeatures() {
 $('#fSearch').oninput = renderFeatures;
 
 function render(s) {
+  document.documentElement.classList.toggle('light', !!s.light); $('#light').checked = !!s.light;
   FEAT = s.features || []; VERSION = s.version || ''; renderFeatures();
   renderManual(s);
   const aa = (s.autoAllow || '').split(',');
@@ -522,6 +532,7 @@ $('#mAdd').onclick = () => {
 };
 
 document.querySelectorAll('[data-act]').forEach(b => b.onclick = () => post(b.dataset.act));
+$('#light').onchange = e => { document.documentElement.classList.toggle('light', e.target.checked); set({ light: e.target.checked }); };
 ['showCat', 'topMost', 'autoStart', 'caveman', 'stream', 'chrome', 'postits', 'prepare', 'spell'].forEach(id => $('#' + id).onchange = e => set({ [id]: e.target.checked }));
 $('#model').onchange = e => set({ model: e.target.value });
 $('#name').onchange = e => set({ name: e.target.value });

@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Collections;
 using System.Net;
@@ -22,7 +22,7 @@ using Microsoft.Web.WebView2.WinForms;
 [assembly: System.Reflection.AssemblyVersion("1.43.0.0")]
 
 static class Program {
-    public const string Version = "1.44";
+    public const string Version = "1.45";
     public static bool OpenSetup;
     public static readonly uint Pid = (uint)Process.GetCurrentProcess().Id;   // identifiant de Bébène (lu une seule fois)   // --setup : ouvrir directement l'assistant d'installation
 
@@ -1109,7 +1109,7 @@ class Companion : Form {
         var d = new Dictionary<string, object> {
             { "name", Settings.Name }, { "model", Settings.Str("Model", "") }, { "scale", scalePct },
             { "showCat", Settings.Bool("ShowCat", true) }, { "topMost", TopMost }, { "autoStart", Settings.AutoStart },
-            { "prompt", Settings.Str("Prompt", "") }, { "hotkey1", Settings.Str("Hotkey1", HotkeyDefaults[0]) }, { "hotkey2", Settings.Str("Hotkey2", HotkeyDefaults[1]) }, { "hotkeyOk", HotkeyOk }, { "stream", Settings.Bool("Stream", true) }, { "caveman", Settings.Bool("Caveman", true) }, { "chrome", Settings.Bool("Chrome", true) }, { "postits", Settings.Bool("PostIts", true) }, { "prepare", Settings.Bool("Prepare", true) }, { "spell", Settings.Bool("SpellCheck", false) }, { "autoAllow", Settings.Str("AutoAllow", "") }, { "remindExam", Settings.Bool("RemindExam", true) }, { "remindRdv", Settings.Bool("RemindRdv", true) }, { "remindWhen", Settings.Str("RemindWhen", "both") }, { "features", Features() }, { "manual", Manual.Raw() }, { "hidden", new List<string>(Manual.Hidden()) }, { "calendars", Calendars.Config() }, { "locFilter", Settings.Str("LocFilter", "") }, { "gmailUser", Mailbox.GmailUser }, { "gmailSet", Mailbox.GmailReady }, { "outlookOn", Mailbox.OutlookOn }, { "mailStatus", Mailbox.Status }, { "mailRunning", Mailbox.Running },{ "workDir", Panel.WorkDir }, { "hasSession", SessionId.Length > 0 },
+            { "prompt", Settings.Str("Prompt", "") }, { "hotkey1", Settings.Str("Hotkey1", HotkeyDefaults[0]) }, { "hotkey2", Settings.Str("Hotkey2", HotkeyDefaults[1]) }, { "hotkeyOk", HotkeyOk }, { "stream", Settings.Bool("Stream", true) }, { "light", Settings.Bool("Light", false) },{ "caveman", Settings.Bool("Caveman", true) }, { "chrome", Settings.Bool("Chrome", true) }, { "postits", Settings.Bool("PostIts", true) }, { "prepare", Settings.Bool("Prepare", true) }, { "spell", Settings.Bool("SpellCheck", false) }, { "autoAllow", Settings.Str("AutoAllow", "") }, { "remindExam", Settings.Bool("RemindExam", true) }, { "remindRdv", Settings.Bool("RemindRdv", true) }, { "remindWhen", Settings.Str("RemindWhen", "both") }, { "features", Features() }, { "manual", Manual.Raw() }, { "hidden", new List<string>(Manual.Hidden()) }, { "calendars", Calendars.Config() }, { "locFilter", Settings.Str("LocFilter", "") }, { "gmailUser", Mailbox.GmailUser }, { "gmailSet", Mailbox.GmailReady }, { "outlookOn", Mailbox.OutlookOn }, { "mailStatus", Mailbox.Status }, { "mailRunning", Mailbox.Running },{ "workDir", Panel.WorkDir }, { "hasSession", SessionId.Length > 0 },
             { "version", Program.Version }
         };
         return new JavaScriptSerializer().Serialize(d);
@@ -1137,6 +1137,7 @@ class Companion : Form {
                 case "topMost": TopMost = Convert.ToBoolean(kv.Value); Settings.Set("TopMost", TopMost); break;
                 case "caveman": Settings.Set("Caveman", Convert.ToBoolean(kv.Value)); break;
                 case "stream": Settings.Set("Stream", Convert.ToBoolean(kv.Value)); break;
+                case "light": Settings.Set("Light", Convert.ToBoolean(kv.Value)); Panel.PostTheme(); break;
                 case "hotkey1": case "hotkey2": {
                     string hk = Convert.ToString(kv.Value).Trim(); uint hm, hv;
                     if (hk == "" || ParseHotkey(hk, out hm, out hv)) Settings.Set(kv.Key == "hotkey1" ? "Hotkey1" : "Hotkey2", hk);
@@ -2708,7 +2709,7 @@ static class Templates {
 class Note {
     public string Id, Text = "", Color = "jaune", Created = "";
     public int X = -1, Y = -1, W = 240, H = 220;
-    public bool Pinned, Shown = true;
+    public bool Pinned, Shown = true, Folded;     // Folded = réduit à sa barre de titre
     public string Title { get { foreach (var l in Text.Split('\n')) { string t = l.Trim().TrimStart('☐', '☑', '•', '-', ' '); if (t.Length > 0) return t.Length > 48 ? t.Substring(0, 48) + "…" : t; } return "(vide)"; } }
 }
 
@@ -2767,6 +2768,7 @@ static class Notes {
                         case "h": if (int.TryParse(v, out iv)) n.H = Math.Max(120, Math.Min(900, iv)); break;
                         case "epingle": case "épinglé": case "epinglé": n.Pinned = yes; break;
                         case "visible": n.Shown = yes; break;
+                        case "reduit": case "réduit": n.Folded = yes; break;
                         case "cree": case "créé": n.Created = v; break;
                     }
                 }
@@ -2779,7 +2781,7 @@ static class Notes {
     }
     static string Serialize(Note n) {
         return "---\ncouleur: " + n.Color + "\nx: " + n.X + "\ny: " + n.Y + "\nw: " + n.W + "\nh: " + n.H
-            + "\nepingle: " + (n.Pinned ? "oui" : "non") + "\nvisible: " + (n.Shown ? "oui" : "non") + "\ncree: " + n.Created + "\n---\n" + n.Text + "\n";
+            + "\nepingle: " + (n.Pinned ? "oui" : "non") + "\nvisible: " + (n.Shown ? "oui" : "non") + (n.Folded ? "\nreduit: oui" : "") + "\ncree: " + n.Created + "\n---\n" + n.Text + "\n";
     }
     static void Load() {
         var seen = new HashSet<string>();
@@ -2883,7 +2885,7 @@ class NoteWindow : Form {
     public NoteWindow(Note note) {
         n = note;
         FormBorderStyle = FormBorderStyle.None; ShowInTaskbar = false; StartPosition = FormStartPosition.Manual; TopMost = true;
-        DoubleBuffered = true; MinimumSize = new Size(160, 120); KeyPreview = true;
+        DoubleBuffered = true; MinimumSize = new Size(160, 120); KeyPreview = true; MaximizeBox = false; MinimizeBox = false;
         Text = "Post-it";
         box = new RichTextBox { BorderStyle = BorderStyle.None, Font = new Font("Segoe UI", 10.5f), ForeColor = Color.FromArgb(48, 40, 30),
             ScrollBars = RichTextBoxScrollBars.Vertical, DetectUrls = true, ShortcutsEnabled = true, AcceptsTab = false };
@@ -2913,11 +2915,20 @@ class NoteWindow : Form {
         n = note;
         BackColor = Notes.Back(n.Color); box.BackColor = BackColor; ask.BackColor = BackColor;
         if (box.Text.Replace("\r", "") != n.Text) { applying = true; int sel = box.SelectionStart; box.Text = n.Text; box.SelectionStart = Math.Min(sel, box.TextLength); applying = false; }
+        FoldLayout();
+        Invalidate();
+    }
+    // ---- réduire à la barre de titre (bouton –, double-clic sur la barre, ou clic droit) ----
+    void ToggleFold() { n.Folded = !n.Folded; Notes.Save(n); FoldLayout(); }
+    void FoldLayout() {
+        if (n.Folded) { ask.Visible = false; box.Visible = false; MinimumSize = new Size(160, HeadH); Height = HeadH; }
+        else { MinimumSize = new Size(160, 120); if (Height < 120) Height = n.H; box.Visible = true; }
         Invalidate();
     }
     void Place() {
         var wa = Screen.PrimaryScreen.WorkingArea;
-        Size = new Size(n.W, n.H);
+        MinimumSize = new Size(160, n.Folded ? HeadH : 120);
+        Size = new Size(n.W, n.Folded ? HeadH : n.H);
         int x = n.X, y = n.Y;
         var vs = SystemInformation.VirtualScreen;
         if (x < vs.Left || y < vs.Top || x > vs.Right - 60 || y > vs.Bottom - 40) {                 // jamais placée, ou écran d un autre PC
@@ -2935,9 +2946,9 @@ class NoteWindow : Form {
         LayoutAsk();
     }
 
-    // ---- en-tête dessiné : + à gauche ; couleur, épingle, × à droite ----
+    // ---- en-tête dessiné : + à gauche ; couleur, épingle, – (réduire) à droite ----
     Rectangle BtnNew { get { return new Rectangle(6, 3, 22, 22); } }
-    Rectangle BtnClose { get { return new Rectangle(ClientSize.Width - 28, 3, 22, 22); } }
+    Rectangle BtnFold { get { return new Rectangle(ClientSize.Width - 28, 3, 22, 22); } }
     Rectangle BtnPin { get { return new Rectangle(ClientSize.Width - 52, 3, 22, 22); } }
     Rectangle BtnColor { get { return new Rectangle(ClientSize.Width - 76, 3, 22, 22); } }
     Point hover = new Point(-1, -1);
@@ -2945,13 +2956,14 @@ class NoteWindow : Form {
         var g = e.Graphics; g.SmoothingMode = SmoothingMode.AntiAlias;
         using (var hb = new SolidBrush(Notes.Head(n.Color))) g.FillRectangle(hb, 0, 0, ClientSize.Width, HeadH);
         var ink = Color.FromArgb(150, 60, 45, 30);
-        foreach (var r in new[] { BtnNew, BtnClose, BtnPin, BtnColor })
+        foreach (var r in new[] { BtnNew, BtnFold, BtnPin, BtnColor })
             if (r.Contains(hover)) using (var b = new SolidBrush(Color.FromArgb(40, 0, 0, 0))) g.FillEllipse(b, r);
         using (var p = new Pen(ink, 1.8f)) {
             var r = BtnNew; int cx = r.X + 11, cy = r.Y + 11;
             g.DrawLine(p, cx - 5, cy, cx + 5, cy); g.DrawLine(p, cx, cy - 5, cx, cy + 5);
-            r = BtnClose; cx = r.X + 11; cy = r.Y + 11;
-            g.DrawLine(p, cx - 4, cy - 4, cx + 4, cy + 4); g.DrawLine(p, cx + 4, cy - 4, cx - 4, cy + 4);
+            r = BtnFold; cx = r.X + 11; cy = r.Y + 11;
+            if (n.Folded) g.DrawRectangle(p, cx - 5, cy - 4, 10, 8);                   // ▢ = rouvrir
+            else g.DrawLine(p, cx - 5, cy + 1, cx + 5, cy + 1);                         // – = réduire
             r = BtnPin; cx = r.X + 11; cy = r.Y + 11;                                // punaise : tête ronde + pointe
             if (n.Pinned) using (var b = new SolidBrush(Color.FromArgb(217, 119, 87))) g.FillEllipse(b, cx - 5, cy - 7, 10, 10);
             else g.DrawEllipse(p, cx - 4, cy - 6, 8, 8);
@@ -2961,7 +2973,13 @@ class NoteWindow : Form {
         var rc = BtnColor;
         using (var b = new SolidBrush(Notes.Back(next))) g.FillEllipse(b, rc.X + 5, rc.Y + 5, 12, 12);
         using (var p = new Pen(Color.FromArgb(110, 60, 45, 30), 1.2f)) g.DrawEllipse(p, rc.X + 5, rc.Y + 5, 12, 12);
-        if (box.TextLength == 0 && ClientSize.Width > 200)                  // aide dans l en-tête tant que la note est vide
+        if (n.Folded) {                                                      // réduit : le titre (1re ligne) dans la barre
+            var tr = new RectangleF(32, 6, Math.Max(10, BtnColor.X - 36), 18);
+            using (var b = new SolidBrush(Color.FromArgb(200, 50, 38, 26))) using (var f = new Font("Segoe UI", 9f, FontStyle.Bold))
+            using (var sf = new StringFormat { Trimming = StringTrimming.EllipsisCharacter, FormatFlags = StringFormatFlags.NoWrap })
+                g.DrawString(n.Title, f, b, tr, sf);
+        }
+        else if (box.TextLength == 0 && ClientSize.Width > 200)             // aide dans l en-tête tant que la note est vide
             using (var b = new SolidBrush(Color.FromArgb(130, 60, 45, 30))) using (var f = new Font("Segoe UI", 8.5f))
                 g.DrawString("« - » liste · « [] » case", f, b, 32, 7);
     }
@@ -2971,7 +2989,7 @@ class NoteWindow : Form {
         base.OnMouseUp(e);
         if (e.Button != MouseButtons.Left) return;
         if (BtnNew.Contains(e.Location)) Notes.New();
-        else if (BtnClose.Contains(e.Location)) { ask.Visible = !ask.Visible; ask.BringToFront(); Invalidate(); }
+        else if (BtnFold.Contains(e.Location)) ToggleFold();
         else if (BtnPin.Contains(e.Location)) { n.Pinned = !n.Pinned; Notes.Save(n); Invalidate(); Notes.Refresh(); }
         else if (BtnColor.Contains(e.Location)) { n.Color = Notes.Colors[(Array.IndexOf(Notes.Colors, n.Color) + 1) % Notes.Colors.Length]; Notes.Save(n); Apply(n); }
     }
@@ -2981,17 +2999,27 @@ class NoteWindow : Form {
         if (m.Msg == 0x84) {                                                 // WM_NCHITTEST
             var p = PointToClient(new Point((short)(m.LParam.ToInt64() & 0xFFFF), (short)((m.LParam.ToInt64() >> 16) & 0xFFFF)));
             int w = ClientSize.Width, h = ClientSize.Height, b = 7;
-            bool l = p.X < b, r = p.X >= w - b, t = p.Y < 4, bo = p.Y >= h - b;
+            bool l = p.X < b, r = p.X >= w - b, t = p.Y < 4 && !n.Folded, bo = p.Y >= h - b && !n.Folded;   // réduit : largeur seulement
             if (bo && r) { m.Result = (IntPtr)17; return; } if (bo && l) { m.Result = (IntPtr)16; return; }
             if (t && r) { m.Result = (IntPtr)14; return; } if (t && l) { m.Result = (IntPtr)13; return; }
             if (r) { m.Result = (IntPtr)11; return; } if (l) { m.Result = (IntPtr)10; return; }
             if (bo) { m.Result = (IntPtr)15; return; } if (t) { m.Result = (IntPtr)12; return; }
-            if (p.Y < HeadH && !BtnNew.Contains(p) && !BtnClose.Contains(p) && !BtnPin.Contains(p) && !BtnColor.Contains(p)) { m.Result = (IntPtr)2; return; }   // HTCAPTION
+            if (p.Y < HeadH && !BtnNew.Contains(p) && !BtnFold.Contains(p) && !BtnPin.Contains(p) && !BtnColor.Contains(p)) { m.Result = (IntPtr)2; return; }   // HTCAPTION
         }
-        if (m.Msg == 0x0232) { n.X = Left; n.Y = Top; n.W = Width; n.H = Height; Notes.Save(n); }   // WM_EXITSIZEMOVE
+        if (m.Msg == 0xA3) { ToggleFold(); return; }                         // double-clic sur la barre : réduire / rouvrir
+        if (m.Msg == 0xA5) { ShowMenu(); return; }                           // clic droit sur la barre : menu
+        if (m.Msg == 0x0232) { n.X = Left; n.Y = Top; n.W = Width; if (!n.Folded) n.H = Height; Notes.Save(n); }   // WM_EXITSIZEMOVE
         base.WndProc(ref m);
     }
 
+    // ---- clic droit sur la barre : réduire, fermer (masquer / supprimer) ----
+    void ShowMenu() {
+        var cm = new ContextMenuStrip();
+        cm.Items.Add(n.Folded ? "Rouvrir" : "Réduire", null, (s, e) => ToggleFold());
+        cm.Items.Add("Fermer / supprimer…", null, (s, e) => { if (n.Folded) ToggleFold(); ask.Visible = true; ask.BringToFront(); Invalidate(); });
+        cm.Closed += (s, e) => BeginInvoke((Action)cm.Dispose);
+        cm.Show(Cursor.Position);
+    }
     // ---- fermer : masquer (gardé en mémoire) ou supprimer ----
     Label askL; Button bHide, bDel, bCancel;
     void BuildAsk() {
@@ -3285,7 +3313,7 @@ class ChatPanel : Form {
         ShowInTaskbar = false;
         TopMost = true;
         StartPosition = FormStartPosition.Manual;
-        Size = new Size(ChatW, 660);
+        Size = SavedSize(); MinimumSize = new Size(ChatW, ChatH);
         calTimer.Tick += (s, e) => RefreshCalendars();                 // rafraîchit les calendriers toutes les 30 min
         calTimer.Start();
         InitSide();
@@ -3495,7 +3523,38 @@ class ChatPanel : Form {
         new Thread(() => { try { if (!p.WaitForExit(ms)) p.Kill(); } catch { } }) { IsBackground = true, Name = "délai" }.Start();
     }
 
-    public const int ChatW = 460;
+    // ---- agrandir / réduire par les bords : on suit la souris tant que le bouton gauche est enfoncé ----
+    System.Windows.Forms.Timer rszT;
+    static Size SavedSize() {
+        var p = Settings.Str("ChatSize", "").Split(',');
+        int w, h;
+        if (p.Length == 2 && int.TryParse(p[0], out w) && int.TryParse(p[1], out h)) return new Size(Math.Max(ChatW, w), Math.Max(ChatH, h));
+        return new Size(ChatW, ChatH);
+    }
+    void StartResize(string dir) {
+        if (rszT != null) return;
+        ReleaseCapture();
+        var start = Cursor.Position; var b0 = Bounds; var wa = Screen.FromControl(this).WorkingArea;
+        Moved = true;                                                     // pendant le geste, la fenêtre ne se recale pas sur le chat
+        rszT = new System.Windows.Forms.Timer { Interval = 15 };
+        rszT.Tick += (s, e) => {
+            if ((Control.MouseButtons & MouseButtons.Left) == 0) {
+                rszT.Stop(); rszT.Dispose(); rszT = null;
+                Settings.Set("ChatSize", Width + "," + Height); LayoutSide(); return;
+            }
+            var c = Cursor.Position; int dx = c.X - start.X, dy = c.Y - start.Y;
+            int l = b0.Left, t = b0.Top, r = b0.Right, btm = b0.Bottom;
+            if (dir.Contains("w")) l = Math.Max(wa.Left, Math.Min(r - ChatW, b0.Left + dx));
+            if (dir.Contains("e")) r = Math.Min(wa.Right, Math.Max(l + ChatW, b0.Right + dx));
+            if (dir.Contains("n")) t = Math.Max(wa.Top, Math.Min(btm - ChatH, b0.Top + dy));
+            if (dir.Contains("s")) btm = Math.Min(wa.Bottom, Math.Max(t + ChatH, b0.Bottom + dy));
+            var nb = Rectangle.FromLTRB(l, t, r, btm);
+            if (nb != Bounds) Bounds = nb;
+        };
+        rszT.Start();
+    }
+    public void PostTheme() { Post("theme\n" + (Settings.Bool("Light", false) ? "light" : "dark")); }
+    public const int ChatW = 460, ChatH = 660;          // taille minimale (et par défaut) de la discussion
     // ---- déplacer la fenêtre par son en-tête ; elle reprend sa place à la fermeture, sauf si elle est épinglée ----
     [DllImport("user32.dll")] static extern bool ReleaseCapture();
     [DllImport("user32.dll")] static extern IntPtr SendMessage(IntPtr h, int msg, IntPtr w, IntPtr l);
@@ -3569,7 +3628,7 @@ class ChatPanel : Form {
                 if (paths.Count > 0) Post("paths\n" + string.Join("\n", paths.ToArray()));
                 break;
             case "ready":
-                Post("pinned\n" + (Pinned ? 1 : 0));
+                Post("pinned\n" + (Pinned ? 1 : 0)); PostTheme();
                 Post("dir\n" + WorkDir); Post("name\n" + Settings.Name);
                 PostCalendars(); ProbeQuota(true); Post("upd\n" + UpdJson()); break;               // la page est prête : on lit le quota tout de suite
             case "calrefresh": RefreshCalendars(); break;
@@ -3584,6 +3643,7 @@ class ChatPanel : Form {
                 break; }
             case "copy": { string txt = m.Length > 5 ? m.Substring(5) : ""; if (txt.Length > 0) try { Clipboard.SetText(txt); } catch (Exception ex) { Program.Log("Copie", ex.Message); } break; }
             case "drag": DragWindow(); break;
+            case "resize": StartResize(parts.Length > 1 ? parts[1] : "se"); break;
             case "compact": Compact(parts.Length > 1 ? parts[1] : ""); break;
             case "updcheck": CheckUpdate(); break;
             case "updseen": Settings.Set("UpdatedShown", ""); break;
