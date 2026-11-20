@@ -22,7 +22,7 @@ using Microsoft.Web.WebView2.WinForms;
 [assembly: System.Reflection.AssemblyVersion("1.43.0.0")]
 
 static class Program {
-    public const string Version = "1.43";
+    public const string Version = "1.44";
     public static bool OpenSetup;
     public static readonly uint Pid = (uint)Process.GetCurrentProcess().Id;   // identifiant de Bébène (lu une seule fois)   // --setup : ouvrir directement l'assistant d'installation
 
@@ -2119,6 +2119,7 @@ static class Mailbox {
         catch { return ""; }
     }
     public static bool OutlookOn { get { return Settings.Bool("OutlookMail", false); } }
+    public static bool DoneToday { get { return Settings.Str("MailScanDay", "") == DateTime.Today.ToString("yyyy-MM-dd"); } }
 
     public static void LoadCache() {
         try {
@@ -2143,6 +2144,7 @@ static class Mailbox {
 
     public static void Scan(Action done) {
         lock (L) { if (running) return; running = true; status = "Analyse des mails en cours…"; }
+        Settings.Set("MailScanDay", DateTime.Today.ToString("yyyy-MM-dd"));   // noté dès le départ : un échec ne relance pas d'analyse auto le même jour
         new Thread(() => {
             var found = new List<CalEvent>(); var st = new List<string>(); DateTime since = DateTime.Today.AddMonths(-6);
             if (GmailReady) {
@@ -3294,10 +3296,11 @@ class ChatPanel : Form {
         VisibleChanged += (s, e) => Util.WebMemory(web, Visible);
         VisibleChanged += (s, e) => { if (Visible) { ProbeQuota(false); if (owner.State == "ready") owner.SetState("happy"); } };    // quota à jour à chaque ouverture
         quotaTimer.Tick += (s, e) => { if (Visible) ProbeQuota(true); }; quotaTimer.Start();
-        Mailbox.LoadCache();                                         // derniers résultats tout de suite, nouvelle analyse en fond
-        mailTimer.Tick += (s, e) => ScanMail(); mailTimer.Start();
+        Mailbox.LoadCache();                                         // derniers résultats tout de suite
+        // analyse auto : 1 fois par jour au maximum (premier démarrage ou première ouverture du jour) ; sinon seulement via le bouton
+        VisibleChanged += (s, e) => { if (Visible) DailyMailScan(); };
         var first = new System.Windows.Forms.Timer { Interval = 20000 };
-        first.Tick += (s, e) => { first.Stop(); first.Dispose(); if (Mailbox.GmailReady || Mailbox.OutlookOn) ScanMail(); };
+        first.Tick += (s, e) => { first.Stop(); first.Dispose(); DailyMailScan(); };
         first.Start();
         RefreshCalendars();
         BackColor = Color.Black;                                     // noir = zone où Windows dessine le verre dépoli
@@ -3533,7 +3536,10 @@ class ChatPanel : Form {
         Mailbox.Scan(() => { try { BeginInvoke((Action)(() => { PostCalendars(); owner.RefreshSettings(); })); } catch { } });
         LayoutSide(); owner.RefreshSettings();
     }
-    readonly System.Windows.Forms.Timer mailTimer = new System.Windows.Forms.Timer { Interval = 3 * 3600 * 1000 };
+    void DailyMailScan() {
+        if (!(Mailbox.GmailReady || Mailbox.OutlookOn) || Mailbox.DoneToday) return;
+        ScanMail();
+    }
 
     public void PostCalendars() {
         if (InvokeRequired) { try { BeginInvoke((Action)PostCalendars); } catch { } return; }
