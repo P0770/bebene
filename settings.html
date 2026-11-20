@@ -156,7 +156,7 @@ details.sec .sb > .card + .card { margin-top: 10px; }
 </div>
 <button class="setupcard" id="openTpl">
   <span class="sic">📚</span>
-  <span class="st"><b>Mes modèles de référence</b><span id="tplSub">Rapport, présentation, Word, code : Bébène reprend leur format et ton style</span></span>
+  <span class="st"><b>Mes modèles de référence</b><span id="tplSub">Rapport, présentation, Word, Excel, code : Bébène reprend leur format et ton style</span></span>
   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6l6 6-6 6"/></svg>
 </button>
 
@@ -261,6 +261,10 @@ details.sec .sb > .card + .card { margin-top: 10px; }
   <div class="row">
     <div class="lbl"><b>Afficher sur le bureau</b><span>Sinon, il reste dans la zone de notification.</span></div>
     <label class="switch"><input type="checkbox" id="showCat"><span class="track"></span></label>
+  </div>
+  <div class="row">
+    <div class="lbl"><b>Post-it</b><span>Petites notes à déplacer sur l'écran, gardées dans ta mémoire ClaudeHub. Bouton dans la discussion, ou clic droit sur l'icône › Nouveau post-it.</span></div>
+    <label class="switch"><input type="checkbox" id="postits"><span class="track"></span></label>
   </div>
   <div class="row">
     <div class="lbl"><b>Toujours au premier plan</b><span>Le chat reste visible au-dessus des fenêtres.</span></div>
@@ -456,7 +460,7 @@ function render(s) {
   $('#hname').textContent = s.name;
   if (document.activeElement !== $('#name')) $('#name').value = s.name;
   if (document.activeElement !== $('#prompt')) $('#prompt').value = s.prompt;
-  $('#showCat').checked = s.showCat; $('#topMost').checked = s.topMost; $('#autoStart').checked = s.autoStart; $('#caveman').checked = s.caveman; $('#chrome').checked = s.chrome; $('#spell').checked = s.spell;
+  $('#showCat').checked = s.showCat; $('#topMost').checked = s.topMost; $('#autoStart').checked = s.autoStart; $('#caveman').checked = s.caveman; $('#chrome').checked = s.chrome; $('#postits').checked = s.postits; $('#spell').checked = s.spell;
   $('#model').value = s.model;
   $('#workDir').textContent = s.workDir; $('#workDir').title = s.workDir;
   $('#version').textContent = 'Version ' + s.version;
@@ -496,7 +500,7 @@ $('#mAdd').onclick = () => {
 };
 
 document.querySelectorAll('[data-act]').forEach(b => b.onclick = () => post(b.dataset.act));
-['showCat', 'topMost', 'autoStart', 'caveman', 'chrome', 'spell'].forEach(id => $('#' + id).onchange = e => set({ [id]: e.target.checked }));
+['showCat', 'topMost', 'autoStart', 'caveman', 'chrome', 'postits', 'spell'].forEach(id => $('#' + id).onchange = e => set({ [id]: e.target.checked }));
 $('#model').onchange = e => set({ model: e.target.value });
 $('#name').onchange = e => set({ name: e.target.value });
 $('#name').onkeydown = e => { if (e.key === 'Enter') e.target.blur(); };
@@ -555,6 +559,7 @@ const TPL = [
   { id: 'rapport', ic: '📄', t: 'Rapport (LaTeX)', d: 'Un rapport complet : le dossier entier avec le .tex, les images et la bibliographie. Bébène reprend la mise en page, le préambule, le plan et le ton.', main: 'folder' },
   { id: 'presentation', ic: '📊', t: 'Présentation', d: 'Un PowerPoint (ou Beamer / PDF). Bébène part du même masque : couleurs, polices, dispositions, densité de texte.', main: 'files' },
   { id: 'word', ic: '📝', t: 'Document Word', d: 'Un .docx bien mis en forme. Bébène garde ses styles, sa page de garde, ses en-têtes et son plan.', main: 'files' },
+  { id: 'excel', ic: '📗', t: 'Classeur Excel', d: 'Un .xlsx type : feuilles, tableaux, formules, mise en forme, graphiques. Bébène construit les nouveaux classeurs sur le même modèle.', main: 'files' },
   { id: 'code', ic: '💻', t: 'Mon code', d: 'Quelques fichiers ou un projet que tu as écrit toi-même. Bébène code dans ton style et à ton niveau, pour que tu comprennes tout.', main: 'folder' }
 ];
 let TPLS = null, tplArm = '';
@@ -562,9 +567,9 @@ function renderTpl() {
   if (!TPLS) return;
   const by = {}; TPLS.kinds.forEach(k => by[k.id] = k);
   const have = TPL.filter(t => by[t.id] && by[t.id].files > 0).length;
-  $('#tplSub').textContent = have ? have + ' / 4 fournis · Bébène reprend leur format et ton style' : 'Aucun fourni · donne tes exemples de rapport, présentation, Word, code';
-  $('#tFill').style.width = have / 4 * 100 + '%';
-  $('#tText').textContent = have + ' / 4 modèles fournis' + (have === 4 ? ' · complet 🎉' : '');
+  $('#tplSub').textContent = have ? have + ' / ' + TPL.length + ' fournis · Bébène reprend leur format et ton style' : 'Aucun fourni · donne tes exemples de rapport, présentation, Word, Excel, code';
+  $('#tFill').style.width = have / TPL.length * 100 + '%';
+  $('#tText').textContent = have + ' / ' + TPL.length + ' modèles fournis' + (have === TPL.length ? ' · complet 🎉' : '');
   $('#tplDir').textContent = 'Dossier : ' + TPLS.dir;
   const next = TPL.find(t => !(by[t.id] && by[t.id].files > 0));
   $('#tpls').innerHTML = TPL.map(t => {

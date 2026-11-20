@@ -19,10 +19,10 @@ using Microsoft.Web.WebView2.WinForms;
 
 [assembly: System.Reflection.AssemblyTitle("Bébène")]
 [assembly: System.Reflection.AssemblyProduct("Bébène")]
-[assembly: System.Reflection.AssemblyVersion("1.38.0.0")]
+[assembly: System.Reflection.AssemblyVersion("1.39.0.0")]
 
 static class Program {
-    public const string Version = "1.38";
+    public const string Version = "1.39";
     public static bool OpenSetup;
     public static readonly uint Pid = (uint)Process.GetCurrentProcess().Id;   // identifiant de Bébène (lu une seule fois)   // --setup : ouvrir directement l'assistant d'installation
 
@@ -393,6 +393,14 @@ class Companion : Form {
 
         Panel = new ChatPanel(this);
         Spell = new SpellAssist(this);
+        var notesT = new System.Windows.Forms.Timer { Interval = 1500 };                    // post-it : chargés juste après le démarrage
+        notesT.Tick += (s, e) => {
+            notesT.Stop(); notesT.Dispose();
+            Notes.Changed += () => Panel.Post("notes\n" + Notes.Json());
+            Notes.Init(this);
+            Panel.VisibleChanged += (s2, e2) => Notes.Refresh();
+        };
+        notesT.Start();
         remindTimer.Tick += (s, e) => CheckReminders(); remindTimer.Start();
         spellItem = new ToolStripMenuItem("Correcteur d'orthographe") { Checked = Settings.Bool("SpellCheck", false) };
         spellItem.Click += (s, e) => SetSpell(!spellItem.Checked);
@@ -403,6 +411,7 @@ class Companion : Form {
         m.Items.Add(new ToolStripMenuItem("Ouvrir la discussion", null, (s, e) => ShowPanel()) { ShortcutKeyDisplayString = "Alt+Espace" });
         m.Items.Add(new ToolStripMenuItem("Nouvelle conversation", null, (s, e) => { ShowPanel(); Panel.Post("new"); }));
         m.Items.Add(new ToolStripMenuItem("Ouvrir Claude Code ici", null, (s, e) => OpenTerminal(false)));
+        m.Items.Add(new ToolStripMenuItem("Nouveau post-it", null, (s, e) => Notes.New()));
         m.Items.Add(new ToolStripSeparator());
         m.Items.Add(showItem);
         m.Items.Add(spellItem);
@@ -1015,7 +1024,7 @@ class Companion : Form {
         var d = new Dictionary<string, object> {
             { "name", Settings.Name }, { "model", Settings.Str("Model", "") }, { "scale", scalePct },
             { "showCat", Settings.Bool("ShowCat", true) }, { "topMost", TopMost }, { "autoStart", Settings.AutoStart },
-            { "prompt", Settings.Str("Prompt", "") }, { "caveman", Settings.Bool("Caveman", true) }, { "chrome", Settings.Bool("Chrome", true) }, { "spell", Settings.Bool("SpellCheck", false) }, { "autoAllow", Settings.Str("AutoAllow", "") }, { "remindExam", Settings.Bool("RemindExam", true) }, { "remindRdv", Settings.Bool("RemindRdv", true) }, { "remindWhen", Settings.Str("RemindWhen", "both") }, { "features", Features() }, { "manual", Manual.Raw() }, { "hidden", new List<string>(Manual.Hidden()) }, { "calendars", Calendars.Config() }, { "locFilter", Settings.Str("LocFilter", "") }, { "gmailUser", Mailbox.GmailUser }, { "gmailSet", Mailbox.GmailReady }, { "outlookOn", Mailbox.OutlookOn }, { "mailStatus", Mailbox.Status }, { "mailRunning", Mailbox.Running },{ "workDir", Panel.WorkDir }, { "hasSession", SessionId.Length > 0 },
+            { "prompt", Settings.Str("Prompt", "") }, { "caveman", Settings.Bool("Caveman", true) }, { "chrome", Settings.Bool("Chrome", true) }, { "postits", Settings.Bool("PostIts", true) }, { "spell", Settings.Bool("SpellCheck", false) }, { "autoAllow", Settings.Str("AutoAllow", "") }, { "remindExam", Settings.Bool("RemindExam", true) }, { "remindRdv", Settings.Bool("RemindRdv", true) }, { "remindWhen", Settings.Str("RemindWhen", "both") }, { "features", Features() }, { "manual", Manual.Raw() }, { "hidden", new List<string>(Manual.Hidden()) }, { "calendars", Calendars.Config() }, { "locFilter", Settings.Str("LocFilter", "") }, { "gmailUser", Mailbox.GmailUser }, { "gmailSet", Mailbox.GmailReady }, { "outlookOn", Mailbox.OutlookOn }, { "mailStatus", Mailbox.Status }, { "mailRunning", Mailbox.Running },{ "workDir", Panel.WorkDir }, { "hasSession", SessionId.Length > 0 },
             { "version", Program.Version }
         };
         return new JavaScriptSerializer().Serialize(d);
@@ -1043,6 +1052,7 @@ class Companion : Form {
                 case "topMost": TopMost = Convert.ToBoolean(kv.Value); Settings.Set("TopMost", TopMost); break;
                 case "caveman": Settings.Set("Caveman", Convert.ToBoolean(kv.Value)); break;
                 case "chrome": Settings.Set("Chrome", Convert.ToBoolean(kv.Value)); break;
+                case "postits": Settings.Set("PostIts", Convert.ToBoolean(kv.Value)); Notes.Refresh(); Panel.Post("notes\n" + Notes.Json()); break;
                 case "spell": SetSpell(Convert.ToBoolean(kv.Value)); break;
                 case "autoAllow": { var ok = new List<string>(); foreach (var a in Convert.ToString(kv.Value).Split(',')) if (Regex.IsMatch(a, "^[A-Za-z]+$")) ok.Add(a); Settings.Set("AutoAllow", string.Join(",", ok.ToArray())); } break;
                 case "remindExam": Settings.Set("RemindExam", Convert.ToBoolean(kv.Value)); break;
@@ -2422,7 +2432,7 @@ static class Manual {
 // Rangés dans ClaudeHub/modeles/<type>/ (synchronisés par OneDrive). Une analyse unique (Claude) écrit PROFIL.md :
 // le patron résumé (format, structure, style), pour ne pas relire tout le modèle à chaque demande.
 static class Templates {
-    public static readonly string[] Kinds = { "rapport", "presentation", "word", "code" };
+    public static readonly string[] Kinds = { "rapport", "presentation", "word", "excel", "code" };
     public const string Profile = "PROFIL.md";
     public static string Dir { get { return Path.Combine(Setup.Hub, "modeles"); } }
     public static string KindDir(string k) { return Path.Combine(Dir, k); }
@@ -2442,7 +2452,7 @@ static class Templates {
         } catch (Exception ex) { Program.Log("Modèles", ex.Message); }
         return r;
     }
-    public static bool Has(string k) {                                 // rapide : appelÃ© Ã  chaque message
+    public static bool Has(string k) {                                 // rapide : appelé à chaque message
         string d = KindDir(k); if (!Directory.Exists(d)) return false;
         foreach (var e in Directory.EnumerateFileSystemEntries(d)) { string n = Path.GetFileName(e); if (n != Profile && !n.StartsWith("~$")) return true; }
         return false;
@@ -2527,6 +2537,9 @@ static class Templates {
                 + "densité de texte par diapo, place des images et schémas, numérotation, diapo de titre et de fin. Indique quel fichier copier pour partir du même masque.";
             case "word": return "un DOCUMENT WORD. Décris : styles (titres, corps, légendes, citations), polices et tailles, marges, en-tête et pied de page, page de garde, table des matières, "
                 + "numérotation, plan type, ton. Indique quel fichier copier pour garder les styles.";
+            case "excel": return "un CLASSEUR EXCEL. Décris : feuilles et leur rôle ; disposition des tableaux (en-têtes, zones de saisie / de calcul / de résultats) ; "
+                + "formules typiques et fonctions utilisées ; tableaux structurés, noms définis, validations ; mise en forme (couleurs, polices, formats de nombres, mise en forme conditionnelle) ; "
+                + "graphiques (type, style) ; macros éventuelles. Pour lire les formules, regarde xl/worksheets/*.xml (balises <f>) et xl/sharedStrings.xml. Indique quel fichier copier pour garder la mise en forme.";
             default: return "du CODE écrit par l'utilisateur. Le but : que le code produit lui ressemble et qu'il le comprenne. Décris : langages ; NIVEAU de l'auteur "
                 + "(constructions qu'il utilise, et celles qu'il n'utilise jamais : à éviter) ; nommage ; langue et densité des commentaires ; découpage en fichiers et fonctions ; "
                 + "gestion des erreurs ; bibliothèques habituelles ; formatage. Termine par « Règles pour écrire comme l'auteur » : liste courte et concrète, avec un petit exemple représentatif.";
@@ -2583,13 +2596,360 @@ static class Templates {
         foreach (var k in Kinds) if (Has(k)) have.Add(k);
         if (have.Count == 0) return "";
         return "MODÈLES DE RÉFÉRENCE de l'utilisateur dans " + Dir + " (sous-dossiers : " + string.Join(", ", have.ToArray()) + "). "
-            + "Avant de produire un rapport, une présentation, un document Word ou du code, lis <type>/" + Profile + " (s'il manque, parcours le dossier), puis seulement les fichiers utiles du modèle. "
+            + "Avant de produire un rapport, une présentation, un document Word, un classeur Excel ou du code, lis <type>/" + Profile + " (s'il manque, parcours le dossier), puis seulement les fichiers utiles du modèle. "
             + "Reprends son FORMAT (structure, mise en page, préambule, styles, ton, longueur), pas son contenu, et n'en prends que ce qui sert au nouveau sujet. "
-            + "Word / PowerPoint : pars d'une COPIE du fichier modèle et remplaces-en le contenu (styles et masque gardés). LaTeX : reprends le préambule, la page de titre et l'organisation des fichiers. "
+            + "Word / PowerPoint / Excel : pars d'une COPIE du fichier modèle et remplaces-en le contenu (styles, masque et mise en forme gardés). LaTeX : reprends le préambule, la page de titre et l'organisation des fichiers. "
             + "Code : écris dans le style et au niveau de l'utilisateur décrits dans code/" + Profile + " (pas de constructions qu'il n'utilise pas), pour qu'il le reconnaisse et le comprenne. "
             + "Le nouveau travail va dans le dossier de travail, jamais dans modeles/ (ne modifie jamais les modèles). "
             + "L'utilisateur peut te demander de ranger un fichier comme modèle : copie-le dans le bon sous-dossier et dis-lui de relancer l'analyse dans Réglages > Mes modèles. ";
     }
+}
+
+// ---------- Post-it : petites notes sur le bureau ----------
+// Une note = un fichier ClaudeHub/postits/<id>.md (en-tête --- clé: valeur --- puis le texte) : suivie en mémoire,
+// synchronisée par OneDrive, et Claude peut la lire, l'écrire ou en créer une (le dossier est surveillé).
+// Visible si « visible: oui » ET (épinglée OU discussion ouverte). Fermer = masquer (gardée) ou supprimer (Corbeille).
+class Note {
+    public string Id, Text = "", Color = "jaune", Created = "";
+    public int X = -1, Y = -1, W = 240, H = 220;
+    public bool Pinned, Shown = true;
+    public string Title { get { foreach (var l in Text.Split('\n')) { string t = l.Trim().TrimStart('☐', '☑', '•', '-', ' '); if (t.Length > 0) return t.Length > 48 ? t.Substring(0, 48) + "…" : t; } return "(vide)"; } }
+}
+
+static class Notes {
+    public static readonly string[] Colors = { "jaune", "rose", "vert", "bleu", "orange" };
+    public static Color Back(string c) {
+        switch (c) {
+            case "rose": return Color.FromArgb(255, 199, 214); case "vert": return Color.FromArgb(200, 238, 186);
+            case "bleu": return Color.FromArgb(189, 222, 252); case "orange": return Color.FromArgb(255, 205, 168);
+            default: return Color.FromArgb(255, 238, 158);
+        }
+    }
+    public static Color Head(string c) { var b = Back(c); return Color.FromArgb(b.R * 88 / 100, b.G * 88 / 100, b.B * 88 / 100); }
+    public static string Dir { get { return Path.Combine(Setup.Hub, "postits"); } }
+    public static bool Enabled { get { return Settings.Bool("PostIts", true); } }
+    static readonly Dictionary<string, Note> all = new Dictionary<string, Note>();
+    static readonly Dictionary<string, NoteWindow> wins = new Dictionary<string, NoteWindow>();
+    static readonly Dictionary<string, string> written = new Dictionary<string, string>();   // ce que Bébène a écrit : le surveillant l'ignore
+    static Companion owner;
+    static FileSystemWatcher watcher;
+    static System.Windows.Forms.Timer reloadT;
+    public static event Action Changed;                                  // la liste a changé (menu de la discussion)
+
+    public static void Init(Companion c) {
+        owner = c;
+        Load();
+        reloadT = new System.Windows.Forms.Timer { Interval = 600 };
+        reloadT.Tick += (s, e) => { reloadT.Stop(); Load(); Refresh(); };
+        try {
+            Directory.CreateDirectory(Dir);
+            watcher = new FileSystemWatcher(Dir, "*.md") { NotifyFilter = NotifyFilters.LastWrite | NotifyFilters.FileName, IncludeSubdirectories = false };
+            FileSystemEventHandler h = (s, e) => { try { owner.BeginInvoke((Action)(() => { reloadT.Stop(); reloadT.Start(); })); } catch { } };
+            watcher.Changed += h; watcher.Created += h; watcher.Deleted += h;
+            watcher.Renamed += (s, e) => h(s, e);
+            watcher.EnableRaisingEvents = true;
+        } catch (Exception ex) { Program.Log("Post-it", ex.Message); }
+        Refresh();
+    }
+
+    static string FileOf(string id) { return Path.Combine(Dir, id + ".md"); }
+    static Note Parse(string id, string raw) {
+        var n = new Note { Id = id };
+        raw = raw.Replace("\r\n", "\n");
+        if (raw.StartsWith("---\n")) {
+            int end = raw.IndexOf("\n---", 4);
+            if (end > 0) {
+                foreach (var l in raw.Substring(4, end - 4).Split('\n')) {
+                    int c = l.IndexOf(':'); if (c < 0) continue;
+                    string k = l.Substring(0, c).Trim().ToLower(), v = l.Substring(c + 1).Trim();
+                    int iv; bool yes = v == "oui" || v == "true" || v == "1";
+                    switch (k) {
+                        case "couleur": if (Array.IndexOf(Colors, v) >= 0) n.Color = v; break;
+                        case "x": if (int.TryParse(v, out iv)) n.X = iv; break;
+                        case "y": if (int.TryParse(v, out iv)) n.Y = iv; break;
+                        case "w": if (int.TryParse(v, out iv)) n.W = Math.Max(160, Math.Min(900, iv)); break;
+                        case "h": if (int.TryParse(v, out iv)) n.H = Math.Max(120, Math.Min(900, iv)); break;
+                        case "epingle": case "épinglé": case "epinglé": n.Pinned = yes; break;
+                        case "visible": n.Shown = yes; break;
+                        case "cree": case "créé": n.Created = v; break;
+                    }
+                }
+                int body = raw.IndexOf('\n', end + 1);
+                raw = body < 0 ? "" : raw.Substring(body + 1);
+            }
+        }
+        n.Text = raw.TrimEnd('\n');
+        return n;
+    }
+    static string Serialize(Note n) {
+        return "---\ncouleur: " + n.Color + "\nx: " + n.X + "\ny: " + n.Y + "\nw: " + n.W + "\nh: " + n.H
+            + "\nepingle: " + (n.Pinned ? "oui" : "non") + "\nvisible: " + (n.Shown ? "oui" : "non") + "\ncree: " + n.Created + "\n---\n" + n.Text + "\n";
+    }
+    static void Load() {
+        var seen = new HashSet<string>();
+        try {
+            if (Directory.Exists(Dir))
+                foreach (var f in Directory.GetFiles(Dir, "*.md")) {
+                    string id = Path.GetFileNameWithoutExtension(f);
+                    if (!Regex.IsMatch(id, "^[A-Za-z0-9_-]{1,60}$")) continue;
+                    string raw; try { raw = File.ReadAllText(f, Encoding.UTF8); } catch { continue; }   // en cours d'écriture : relu au prochain signal
+                    seen.Add(id);
+                    string mine; lock (written) written.TryGetValue(id, out mine);
+                    if (mine != null && mine == raw && all.ContainsKey(id)) continue;          // c'est notre propre écriture
+                    var n = Parse(id, raw);
+                    Note old;
+                    if (all.TryGetValue(id, out old)) {                                       // modifiée ailleurs (Claude, autre PC)
+                        NoteWindow w;
+                        if (wins.TryGetValue(id, out w) && w.Editing) n.Text = old.Text;        // on ne coupe pas la frappe en cours
+                    }
+                    all[id] = n;
+                    NoteWindow win; if (wins.TryGetValue(id, out win)) win.Apply(n);
+                }
+        } catch (Exception ex) { Program.Log("Post-it", ex.Message); }
+        foreach (var id in new List<string>(all.Keys)) if (!seen.Contains(id)) { all.Remove(id); CloseWin(id); }
+        if (Changed != null) Changed();
+    }
+    public static void Save(Note n) {
+        try {
+            Directory.CreateDirectory(Dir);
+            string raw = Serialize(n);
+            lock (written) written[n.Id] = raw;
+            File.WriteAllText(FileOf(n.Id), raw, new UTF8Encoding(false));
+        } catch (Exception ex) { Program.Log("Post-it", ex.Message); }
+        if (Changed != null) Changed();
+    }
+
+    // afficher / cacher les fenêtres selon l'état de chaque note et de la discussion
+    public static void Refresh() {
+        if (owner == null) return;
+        bool chat = owner.Panel != null && owner.Panel.Visible;
+        foreach (var n in all.Values) {
+            bool show = Enabled && n.Shown && (n.Pinned || chat);
+            NoteWindow w; wins.TryGetValue(n.Id, out w);
+            if (show) {
+                if (w == null || w.IsDisposed) { w = new NoteWindow(n); wins[n.Id] = w; }
+                if (!w.Visible) w.ShowQuiet();
+            } else if (w != null && !w.IsDisposed && w.Visible) w.Hide();
+        }
+    }
+    static void CloseWin(string id) { NoteWindow w; if (wins.TryGetValue(id, out w)) { wins.Remove(id); if (!w.IsDisposed) w.Close(); } }
+
+    public static void New() {
+        var n = new Note { Id = DateTime.Now.ToString("yyyyMMdd-HHmmss-fff"), Created = DateTime.Now.ToString("yyyy-MM-dd HH:mm"),
+            Color = Colors[all.Count % Colors.Length], Pinned = owner.Panel == null || !owner.Panel.Visible };   // créée sans la discussion : épinglée, sinon elle disparaîtrait
+        all[n.Id] = n; Save(n);
+        Settings.Set("PostIts", true);
+        Refresh();
+        NoteWindow w; if (wins.TryGetValue(n.Id, out w)) { w.Activate(); w.FocusText(); }
+    }
+    public static void Show(string id) {
+        Note n; if (!all.TryGetValue(id, out n)) return;
+        n.Shown = true;
+        if (owner.Panel == null || !owner.Panel.Visible) n.Pinned = true;
+        Save(n); Refresh();
+        NoteWindow w; if (wins.TryGetValue(id, out w) && w.Visible) w.Activate();
+    }
+    public static void Hide(string id) { Note n; if (!all.TryGetValue(id, out n)) return; n.Shown = false; Save(n); Refresh(); }
+    public static void Delete(string id) {
+        Note n; if (!all.TryGetValue(id, out n)) return;
+        all.Remove(id); CloseWin(id);
+        try { Microsoft.VisualBasic.FileIO.FileSystem.DeleteFile(FileOf(id), Microsoft.VisualBasic.FileIO.UIOption.OnlyErrorDialogs, Microsoft.VisualBasic.FileIO.RecycleOption.SendToRecycleBin); }
+        catch (Exception ex) { Program.Log("Post-it", ex.Message); }
+        if (Changed != null) Changed();
+    }
+    public static string Json() {
+        var list = new List<Dictionary<string, object>>();
+        foreach (var n in all.Values)
+            list.Add(new Dictionary<string, object> { { "id", n.Id }, { "title", n.Title }, { "color", n.Color }, { "shown", n.Shown }, { "pinned", n.Pinned }, { "created", n.Created } });
+        list.Sort((a, b) => string.Compare((string)b["id"], (string)a["id"], StringComparison.Ordinal));
+        return new JavaScriptSerializer().Serialize(new Dictionary<string, object> { { "enabled", Enabled }, { "notes", list } });
+    }
+    public static string PersonaLine() {
+        if (!Enabled) return "";
+        return "POST-IT de l'utilisateur : fichiers " + Dir + "\\<id>.md (en-tête entre --- avec couleur: jaune|rose|vert|bleu|orange, epingle: oui|non, visible: oui|non, puis le texte). "
+            + "Quand il demande de noter quelque chose sur un post-it (liste, rappel, info), crée un fichier <AAAAMMJJ-HHMMSS>.md avec l'en-tête « ---\\ncouleur: jaune\\nepingle: oui\\nvisible: oui\\n--- » puis le texte "
+            + "(listes : « • » ou cases « ☐ » / « ☑ »). Pour en modifier un, change seulement le texte sous l'en-tête. Il s'affiche tout seul sur son écran. ";
+    }
+}
+
+// la fenêtre d'un post-it : en-tête glissable (+ nouveau, couleur, épingle, fermer), texte éditable, coin pour redimensionner
+class NoteWindow : Form {
+    Note n;
+    readonly RichTextBox box;
+    readonly Panel ask;
+    readonly System.Windows.Forms.Timer saveT = new System.Windows.Forms.Timer { Interval = 700 };
+    const int HeadH = 28, Pad = 10;
+    bool applying;
+    public bool Editing { get { return box.Focused || saveT.Enabled; } }
+    [DllImport("dwmapi.dll")] static extern int DwmSetWindowAttribute(IntPtr h, int attr, ref int v, int size);
+
+    public NoteWindow(Note note) {
+        n = note;
+        FormBorderStyle = FormBorderStyle.None; ShowInTaskbar = false; StartPosition = FormStartPosition.Manual; TopMost = true;
+        DoubleBuffered = true; MinimumSize = new Size(160, 120); KeyPreview = true;
+        Text = "Post-it";
+        box = new RichTextBox { BorderStyle = BorderStyle.None, Font = new Font("Segoe UI", 10.5f), ForeColor = Color.FromArgb(48, 40, 30),
+            ScrollBars = RichTextBoxScrollBars.Vertical, DetectUrls = true, ShortcutsEnabled = true, AcceptsTab = false };
+        Controls.Add(box);
+        ask = new Panel { Visible = false };
+        Controls.Add(ask); ask.BringToFront();
+        BuildAsk();
+        box.TextChanged += (s, e) => { Invalidate(new Rectangle(0, 0, ClientSize.Width, HeadH)); if (applying) return; saveT.Stop(); saveT.Start(); };
+        box.KeyDown += OnKey;
+        box.MouseUp += (s, e) => ToggleBox(e.Location);
+        box.LinkClicked += (s, e) => { try { Process.Start(e.LinkText); } catch { } };
+        saveT.Tick += (s, e) => { saveT.Stop(); n.Text = box.Text.Replace("\r", ""); Notes.Save(n); };
+        Apply(n);
+        Place();
+    }
+    protected override CreateParams CreateParams { get { var cp = base.CreateParams; cp.ClassStyle |= 0x20000; cp.ExStyle |= 0x80; return cp; } }   // ombre ; pas dans Alt+Tab
+    protected override void OnHandleCreated(EventArgs e) {
+        base.OnHandleCreated(e);
+        try { int v = 2; DwmSetWindowAttribute(Handle, 33, ref v, 4); } catch { }   // coins arrondis Windows 11
+    }
+    public void ShowQuiet() { Place(); Show(); }
+    public void FocusText() { box.Focus(); box.SelectionStart = box.TextLength; }
+
+    public void Apply(Note note) {
+        n = note;
+        BackColor = Notes.Back(n.Color); box.BackColor = BackColor; ask.BackColor = BackColor;
+        if (box.Text.Replace("\r", "") != n.Text) { applying = true; int sel = box.SelectionStart; box.Text = n.Text; box.SelectionStart = Math.Min(sel, box.TextLength); applying = false; }
+        Invalidate();
+    }
+    void Place() {
+        var wa = Screen.PrimaryScreen.WorkingArea;
+        Size = new Size(n.W, n.H);
+        int x = n.X, y = n.Y;
+        var vs = SystemInformation.VirtualScreen;
+        if (x < vs.Left || y < vs.Top || x > vs.Right - 60 || y > vs.Bottom - 40) {                 // jamais placée, ou écran d un autre PC
+            int k = Math.Abs(n.Id.GetHashCode()) % 6;
+            x = wa.Right - n.W - 520 - k * 26; y = wa.Top + 80 + k * 26;
+        }
+        Location = new Point(x, y);
+        Layout2();
+    }
+    protected override void OnResize(EventArgs e) { base.OnResize(e); Layout2(); Invalidate(); }
+    void Layout2() {
+        if (box == null) return;
+        box.SetBounds(Pad, HeadH + 4, Math.Max(10, ClientSize.Width - 2 * Pad), Math.Max(10, ClientSize.Height - HeadH - 4 - Pad - 4));
+        ask.SetBounds(0, HeadH, ClientSize.Width, ClientSize.Height - HeadH);
+        LayoutAsk();
+    }
+
+    // ---- en-tête dessiné : + à gauche ; couleur, épingle, × à droite ----
+    Rectangle BtnNew { get { return new Rectangle(6, 3, 22, 22); } }
+    Rectangle BtnClose { get { return new Rectangle(ClientSize.Width - 28, 3, 22, 22); } }
+    Rectangle BtnPin { get { return new Rectangle(ClientSize.Width - 52, 3, 22, 22); } }
+    Rectangle BtnColor { get { return new Rectangle(ClientSize.Width - 76, 3, 22, 22); } }
+    Point hover = new Point(-1, -1);
+    protected override void OnPaint(PaintEventArgs e) {
+        var g = e.Graphics; g.SmoothingMode = SmoothingMode.AntiAlias;
+        using (var hb = new SolidBrush(Notes.Head(n.Color))) g.FillRectangle(hb, 0, 0, ClientSize.Width, HeadH);
+        var ink = Color.FromArgb(150, 60, 45, 30);
+        foreach (var r in new[] { BtnNew, BtnClose, BtnPin, BtnColor })
+            if (r.Contains(hover)) using (var b = new SolidBrush(Color.FromArgb(40, 0, 0, 0))) g.FillEllipse(b, r);
+        using (var p = new Pen(ink, 1.8f)) {
+            var r = BtnNew; int cx = r.X + 11, cy = r.Y + 11;
+            g.DrawLine(p, cx - 5, cy, cx + 5, cy); g.DrawLine(p, cx, cy - 5, cx, cy + 5);
+            r = BtnClose; cx = r.X + 11; cy = r.Y + 11;
+            g.DrawLine(p, cx - 4, cy - 4, cx + 4, cy + 4); g.DrawLine(p, cx + 4, cy - 4, cx - 4, cy + 4);
+            r = BtnPin; cx = r.X + 11; cy = r.Y + 11;                                // punaise : tête ronde + pointe
+            if (n.Pinned) using (var b = new SolidBrush(Color.FromArgb(217, 119, 87))) g.FillEllipse(b, cx - 5, cy - 7, 10, 10);
+            else g.DrawEllipse(p, cx - 4, cy - 6, 8, 8);
+            g.DrawLine(p, cx, cy + 2, cx, cy + 8);
+        }
+        string next = Notes.Colors[(Array.IndexOf(Notes.Colors, n.Color) + 1) % Notes.Colors.Length];
+        var rc = BtnColor;
+        using (var b = new SolidBrush(Notes.Back(next))) g.FillEllipse(b, rc.X + 5, rc.Y + 5, 12, 12);
+        using (var p = new Pen(Color.FromArgb(110, 60, 45, 30), 1.2f)) g.DrawEllipse(p, rc.X + 5, rc.Y + 5, 12, 12);
+        if (box.TextLength == 0 && ClientSize.Width > 200)                  // aide dans l en-tête tant que la note est vide
+            using (var b = new SolidBrush(Color.FromArgb(130, 60, 45, 30))) using (var f = new Font("Segoe UI", 8.5f))
+                g.DrawString("« - » liste · « [] » case", f, b, 32, 7);
+    }
+    protected override void OnMouseMove(MouseEventArgs e) { base.OnMouseMove(e); hover = e.Location; Invalidate(new Rectangle(0, 0, ClientSize.Width, HeadH)); }
+    protected override void OnMouseLeave(EventArgs e) { base.OnMouseLeave(e); hover = new Point(-1, -1); Invalidate(new Rectangle(0, 0, ClientSize.Width, HeadH)); }
+    protected override void OnMouseUp(MouseEventArgs e) {
+        base.OnMouseUp(e);
+        if (e.Button != MouseButtons.Left) return;
+        if (BtnNew.Contains(e.Location)) Notes.New();
+        else if (BtnClose.Contains(e.Location)) { ask.Visible = !ask.Visible; ask.BringToFront(); Invalidate(); }
+        else if (BtnPin.Contains(e.Location)) { n.Pinned = !n.Pinned; Notes.Save(n); Invalidate(); Notes.Refresh(); }
+        else if (BtnColor.Contains(e.Location)) { n.Color = Notes.Colors[(Array.IndexOf(Notes.Colors, n.Color) + 1) % Notes.Colors.Length]; Notes.Save(n); Apply(n); }
+    }
+
+    // glisser par l'en-tête, redimensionner par les bords ; position enregistrée à la fin
+    protected override void WndProc(ref Message m) {
+        if (m.Msg == 0x84) {                                                 // WM_NCHITTEST
+            var p = PointToClient(new Point((short)(m.LParam.ToInt64() & 0xFFFF), (short)((m.LParam.ToInt64() >> 16) & 0xFFFF)));
+            int w = ClientSize.Width, h = ClientSize.Height, b = 7;
+            bool l = p.X < b, r = p.X >= w - b, t = p.Y < 4, bo = p.Y >= h - b;
+            if (bo && r) { m.Result = (IntPtr)17; return; } if (bo && l) { m.Result = (IntPtr)16; return; }
+            if (t && r) { m.Result = (IntPtr)14; return; } if (t && l) { m.Result = (IntPtr)13; return; }
+            if (r) { m.Result = (IntPtr)11; return; } if (l) { m.Result = (IntPtr)10; return; }
+            if (bo) { m.Result = (IntPtr)15; return; } if (t) { m.Result = (IntPtr)12; return; }
+            if (p.Y < HeadH && !BtnNew.Contains(p) && !BtnClose.Contains(p) && !BtnPin.Contains(p) && !BtnColor.Contains(p)) { m.Result = (IntPtr)2; return; }   // HTCAPTION
+        }
+        if (m.Msg == 0x0232) { n.X = Left; n.Y = Top; n.W = Width; n.H = Height; Notes.Save(n); }   // WM_EXITSIZEMOVE
+        base.WndProc(ref m);
+    }
+
+    // ---- fermer : masquer (gardé en mémoire) ou supprimer ----
+    Label askL; Button bHide, bDel, bCancel;
+    void BuildAsk() {
+        askL = new Label { Text = "Fermer ce post-it ?", Font = new Font("Segoe UI", 10f, FontStyle.Bold), ForeColor = Color.FromArgb(60, 45, 30), AutoSize = false, TextAlign = ContentAlignment.MiddleCenter };
+        bHide = Btn("Masquer (gardé)", Color.FromArgb(217, 119, 87), Color.White);
+        bDel = Btn("Supprimer", Color.FromArgb(255, 255, 255), Color.FromArgb(190, 50, 40));
+        bCancel = Btn("Annuler", Color.FromArgb(255, 255, 255), Color.FromArgb(70, 60, 50));
+        bHide.Click += (s, e) => { ask.Visible = false; Notes.Hide(n.Id); };
+        bDel.Click += (s, e) => {
+            if (bDel.Text == "Supprimer") { bDel.Text = "Sûr ? Supprimer"; return; }     // 2e clic : supprimé (vers la Corbeille)
+            Notes.Delete(n.Id);
+        };
+        bCancel.Click += (s, e) => { ask.Visible = false; bDel.Text = "Supprimer"; Invalidate(); };
+        ask.Controls.AddRange(new Control[] { askL, bHide, bDel, bCancel });
+    }
+    Button Btn(string t, Color back, Color fore) {
+        var b = new Button { Text = t, FlatStyle = FlatStyle.Flat, BackColor = back, ForeColor = fore, Font = new Font("Segoe UI", 9.5f), Cursor = Cursors.Hand };
+        b.FlatAppearance.BorderColor = Color.FromArgb(200, 180, 150); b.FlatAppearance.BorderSize = 1;
+        return b;
+    }
+    void LayoutAsk() {
+        if (askL == null) return;
+        int w = Math.Max(120, ask.Width - 24), y = Math.Max(6, (ask.Height - 128) / 2);
+        askL.SetBounds(12, y, w, 24);
+        bHide.SetBounds(12, y + 30, w, 28); bDel.SetBounds(12, y + 62, w, 28); bCancel.SetBounds(12, y + 94, w, 28);
+    }
+
+    // ---- listes : « - » / « • » et cases « ☐ » continuent à la ligne suivante ; « [] » devient une case ; clic sur une case = cochée ----
+    void OnKey(object s, KeyEventArgs e) {
+        if (e.KeyCode == Keys.V && e.Control) {                              // coller sans mise en forme
+            e.SuppressKeyPress = true;
+            if (Clipboard.ContainsText()) box.SelectedText = Clipboard.GetText().Replace("\r\n", "\n");
+            return;
+        }
+        if (e.KeyCode == Keys.Escape) { ActiveControl = null; return; }
+        int line = box.GetLineFromCharIndex(box.SelectionStart), start = box.GetFirstCharIndexFromLine(line);
+        string cur = line < box.Lines.Length ? box.Lines[line] : "";
+        if (e.KeyCode == Keys.Space && box.SelectionStart - start == 2 && cur.StartsWith("[]")) {
+            e.SuppressKeyPress = true; box.Select(start, 2); box.SelectedText = "☐ "; return;
+        }
+        if (e.KeyCode == Keys.Enter && !e.Shift) {
+            string pre = cur.StartsWith("☐ ") || cur.StartsWith("☑ ") ? "☐ " : cur.StartsWith("• ") ? "• " : cur.StartsWith("- ") ? "- " : null;
+            if (pre == null) return;
+            e.SuppressKeyPress = true;
+            if (cur.Trim().Length <= 1) { box.Select(start, cur.Length); box.SelectedText = ""; return; }   // élément vide : fin de la liste
+            box.SelectedText = "\n" + pre;
+        }
+    }
+    void ToggleBox(Point p) {
+        int i = box.GetCharIndexFromPosition(p);
+        if (i < 0 || i >= box.TextLength) return;
+        char c = box.Text[i];
+        if (c != '☐' && c != '☑') return;
+        int ss = box.SelectionStart;
+        box.Select(i, 1); box.SelectedText = c == '☐' ? "☑" : "☐"; box.SelectionStart = ss;
+    }
+    protected override void OnDeactivate(EventArgs e) { base.OnDeactivate(e); if (saveT.Enabled) { saveT.Stop(); n.Text = box.Text.Replace("\r", ""); Notes.Save(n); } Invalidate(); }
 }
 
 // ---------- Assistant d'installation : vérifie chaque étape, la fait à ta place, et prépare le paquet pour un autre PC ----------
@@ -3126,6 +3486,11 @@ class ChatPanel : Form {
                 break;
             }
             case "forget": Forget(parts.Length > 1 ? parts[1] : ""); break;
+            case "notes": Post("notes\n" + Notes.Json()); break;
+            case "notenew": Notes.New(); break;
+            case "noteshow": Notes.Show(parts.Length > 1 ? parts[1] : ""); break;
+            case "notehide": Notes.Hide(parts.Length > 1 ? parts[1] : ""); break;
+            case "notedel": Notes.Delete(parts.Length > 1 ? parts[1] : ""); break;
             case "stop": KillTree(); break;
             case "calm": if (owner.State == "question") owner.SetState("idle"); break;   // question abandonnée (nouvelle conversation…)
             case "send": if (parts.Length == 5) Send(parts[4], parts[1] == "1", parts[2], parts[3]); break;
@@ -3266,7 +3631,7 @@ class ChatPanel : Form {
             + "Une question à la fois : tu recevras la réponse dans le message suivant, puis tu continues (ou tu poses la suivante). "
             + "Jamais pour les détails mineurs ni pour demander une autorisation : pour ceux-là, choisis un défaut raisonnable et dis-le. "
             + "Tu ne peux PAS modifier ton propre programme (code, installation, réglages, données de Bébène) : c'est verrouillé. Si on te le demande, explique que l'évolution de Bébène se fait avec Claude Code dans le terminal. "
-            + Templates.PersonaLine()
+            + Templates.PersonaLine() + Notes.PersonaLine()
             + Settings.Str("Prompt", "");
         args += " --append-system-prompt " + Util.Quote(persona.Replace("\r", " ").Replace("\n", " "));
         args += " --settings " + Util.Quote(GuardSettings());                // gardien : pas de modification de Bébène par lui-même
