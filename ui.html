@@ -204,6 +204,10 @@ header .icon-btn { flex: none; }
 .mitem .del { opacity: 0; background: none; border: 0; color: var(--muted); font-size: 16px; cursor: pointer; border-radius: 6px; width: 22px; height: 22px; }
 .mitem:hover .del { opacity: 1; }
 .mitem .del:hover { color: #f08a85; background: rgba(240,100,100,.1); }
+.mitem .mv { opacity: 0; background: none; border: 0; color: var(--muted); font-size: 13px; cursor: pointer; border-radius: 6px; width: 22px; height: 22px; flex: none; }
+.mitem:hover .mv { opacity: 1; }
+.mitem .mv:hover { color: var(--accent-2); background: rgba(235,154,120,.12); }
+.mitem select.mvsel { flex: 1; min-width: 0; font: inherit; font-size: 12.5px; padding: 4px 6px; border-radius: 8px; border: 1px solid var(--accent); background: var(--raised); color: var(--text); }
 .mnone { font-size: 12px; color: var(--muted); padding: 4px 8px; }
 .mnewp { display: flex; gap: 4px; padding: 2px 4px; }
 .mnewp input { flex: 1; min-width: 0; font: inherit; font-size: 12.5px; color: var(--text); background: rgba(255,255,255,.04); border: 1px solid rgba(255,255,255,.06); border-radius: 8px; padding: 5px 9px; outline: none; user-select: text; }
@@ -537,6 +541,21 @@ document.querySelectorAll('.orb').forEach(o => o.innerHTML = '<img src="avatar.p
 
 // ---- conversations enregistrées, projets, mode flash ----
 let convs = []; try { convs = JSON.parse(store.get('convs', '[]')) || []; } catch { convs = []; }
+// ---- projet annoncé par Claude (« 📁 Projet : <nom> », celui qui déclenche l'archivage) ----
+function projName(s) {
+  return String(s || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^a-z0-9._-]+/g, '-').replace(/^[-.]+|[-.]+$/g, '');
+}
+function projectIn(text) {
+  const m = [...String(text || '').matchAll(/📁\s*Projet\s*:\s*[`*]*([A-Za-z0-9À-ÿ][A-Za-z0-9À-ÿ._-]*)/g)].pop();
+  const n = m ? projName(m[1]) : '';
+  return n && n !== 'claude-companion' && n !== 'nom' ? n : '';
+}
+// une seule fois : les anciennes conversations archivées dans un projet mais restées « sans projet » dans l'historique
+(function () {
+  let fixed = 0;
+  convs.forEach(c => { if (!c.project && c.hist) { const n = projectIn(c.hist.replace(/<[^>]+>/g, '')); if (n) { c.project = n; fixed++; } } });
+  if (fixed) try { localStorage.setItem('convs', JSON.stringify(convs)); } catch { }
+})();
 if (!convs.length && store.get('hist', '')) {                       // reprise de l'ancien historique unique
   convs.push({ id: 'c' + Date.now().toString(36), title: 'Conversation précédente', sid: store.get('sid', ''), hist: store.get('hist', ''), project: '', updated: Date.now() });
   store.set('hist', ''); store.set('sid', '');
@@ -646,6 +665,32 @@ function reviveAsks() {
     if (c === log.lastElementChild) bindAsk(c);
     else c.querySelector('.ab').outerHTML = '<div class="done">Question passée.</div>';
   });
+}
+// la conversation en cours rejoint le projet annoncé (et le projet apparaît dans le menu #)
+function attachProject(n) {
+  if (flash || !n || project === n) return;
+  project = n;
+  if (!projects.includes(n)) { projects.push(n); projects.sort(); post('ensureproject\n' + n); }
+  if (conv) conv.project = n;
+  if (cur) addToCur('tool', '<i></i><span>📁 Conversation rattachée au projet · ' + esc(n) + '</span>');
+  applyMode();
+}
+// déplacer une conversation de l'historique vers un projet (ou « aucun projet »)
+function moveConv(id, p) {
+  const c = convs.find(x => x.id === id); if (!c) return;
+  c.project = p; persist();
+  if (conv && conv.id === id && !busy) { project = p; applyMode(); }
+  renderMenu();
+}
+function askMove(el, id) {
+  const c = convs.find(x => x.id === id); if (!c) return;
+  const opts = [''].concat(projects).map(p => '<option value="' + esc(p) + '"' + ((c.project || '') === p ? ' selected' : '') + '>' + (p ? '# ' + esc(p) : '∅ Aucun projet') + '</option>').join('');
+  el.innerHTML = '<select class="mvsel" title="Déplacer vers…">' + opts + '</select>';
+  const sel = el.querySelector('select');
+  sel.onclick = e => e.stopPropagation();
+  sel.onchange = () => moveConv(id, sel.value);
+  sel.onblur = () => setTimeout(renderMenu, 150);
+  sel.focus();
 }
 function refresh() {
   $('#empty').style.display = log.children.length ? 'none' : 'flex';
@@ -767,6 +812,7 @@ function onLine(l) {
   if (o.type === 'assistant' && o.message && o.message.content) {
     for (const c of o.message.content) {
       if (c.type === 'text' && c.text.trim()) {
+        const pn = projectIn(c.text); if (pn) attachProject(pn);
         const q = takeQuestion(c.text);
         if (q.text.trim()) addToCur('md', md(q.text)).dataset.raw = q.text;
         if (q.ask) pendingAsk = q.ask;
@@ -858,12 +904,15 @@ function renderMenu() {
   $('#mConvTitle').textContent = scope ? 'Conversations · ' + scope : 'Conversations sans projet';
   $('#mConvs').innerHTML = mine.length ? mine.slice(0, 20).map(c =>
     '<div class="mitem conv' + (conv && c.id === conv.id ? ' on' : '') + '" data-c="' + c.id + '"><span class="tx">' + esc(c.title || 'Conversation')
-    + '<small>' + ago(c.updated) + '</small></span><button class="del" data-del="' + c.id + '" title="Supprimer">×</button></div>').join('')
+    + '<small>' + ago(c.updated) + '</small></span><button class="mv" data-mv="' + c.id + '" title="Déplacer vers un projet…">⇢</button><button class="del" data-del="' + c.id + '" title="Supprimer">×</button></div>').join('')
     : '<div class="mnone">' + (scope ? 'Pas encore de conversation dans ce projet.' : 'Pas encore de conversation.') + '</div>';
   $('#mConvs').querySelectorAll('[data-c]').forEach(el => el.onclick = e => {
+    if (e.target.dataset.mv) { e.stopPropagation(); askMove(el, e.target.dataset.mv); return; }
+    if (e.target.closest('select')) return;
     if (e.target.dataset.del) { e.stopPropagation(); convs = convs.filter(c => c.id !== e.target.dataset.del); if (conv && conv.id === e.target.dataset.del) conv = null; persist(); renderMenu(); return; }
     const c = convs.find(x => x.id === el.dataset.c); if (c) openConv(c);
   });
+  $('#mConvs').querySelectorAll('[data-c]').forEach(el => el.oncontextmenu = e => { e.preventDefault(); e.stopPropagation(); askMove(el, el.dataset.c); });   // clic droit = déplacer
 }
 // ---- mises à jour (pastille sur l'avatar, en haut à gauche) ----
 let UPD = null, updStatus = '', updErr = false;

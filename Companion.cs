@@ -19,10 +19,10 @@ using Microsoft.Web.WebView2.WinForms;
 
 [assembly: System.Reflection.AssemblyTitle("Bébène")]
 [assembly: System.Reflection.AssemblyProduct("Bébène")]
-[assembly: System.Reflection.AssemblyVersion("1.39.0.0")]
+[assembly: System.Reflection.AssemblyVersion("1.40.0.0")]
 
 static class Program {
-    public const string Version = "1.39";
+    public const string Version = "1.40";
     public static bool OpenSetup;
     public static readonly uint Pid = (uint)Process.GetCurrentProcess().Id;   // identifiant de Bébène (lu une seule fois)   // --setup : ouvrir directement l'assistant d'installation
 
@@ -173,6 +173,7 @@ static class Program {
         if (args.Length == 2 && args[0] == "--readytest") { new Companion(false).ReadyPreview(args[1]); return; }
         if (args.Length == 2 && args[0] == "--asktest") { new Companion(false).ReadyPreview(args[1], "question"); return; }
         if (args.Length == 2 && args[0] == "--screentest") { File.WriteAllText(args[1], ChatPanel.ScreenCommand(0) + "\n" + ChatPanel.ScreenDir(), new UTF8Encoding(false)); return; }   // test : commande de capture d écran
+        if (args.Length == 3 && args[0] == "--sessdirtest") { File.WriteAllText(args[2], ChatPanel.SessionDir(args[1]) ?? "(introuvable)", new UTF8Encoding(false)); return; }   // test : dossier d origine d une session
         if (args.Length == 3 && args[0] == "--tpltest") {                   // test : analyse d un modèle (Claude écrit PROFIL.md), puis état
             if (Templates.Has(args[1])) {
                 var ev = new ManualResetEvent(false); int n = 0;
@@ -3251,6 +3252,35 @@ class ChatPanel : Form {
         r.Sort(); return r;
     }
     // dossier où Claude travaille : le projet choisi, sinon le dossier des réglages
+    // Claude Code range une session sous le dossier ou elle a commence (~/.claude/projects/<dossier>/<id>.jsonl) :
+    // la reprendre ailleurs echoue. Le projet affiche dans l historique peut changer (rattachement, deplacement),
+    // donc on reprend toujours depuis le dossier d origine, lu dans la session (premier "cwd").
+    static readonly Dictionary<string, string> sessionDirs = new Dictionary<string, string>();
+    public static string SessionDir(string sid) {
+        if (!Regex.IsMatch(sid ?? "", "^[0-9a-fA-F-]{36}$")) return null;
+        string known; lock (sessionDirs) if (sessionDirs.TryGetValue(sid, out known)) return known;
+        string found = null;
+        try {
+            string root = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), ".claude", "projects");
+            foreach (var d in Directory.GetDirectories(root)) {
+                string fpath = Path.Combine(d, sid + ".jsonl");
+                if (!File.Exists(fpath)) continue;
+                using (var fs = new FileStream(fpath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete))
+                using (var r = new StreamReader(fs, Encoding.UTF8)) {
+                    string line; int n = 0;
+                    while ((line = r.ReadLine()) != null && n++ < 200) {
+                        var m = Regex.Match(line, "\"cwd\":\"((?:[^\"\\\\]|\\\\.)*)\"");
+                        if (m.Success) { found = Regex.Unescape(m.Groups[1].Value); break; }
+                    }
+                }
+                break;
+            }
+        } catch (Exception ex) { Program.Log("Session", ex.Message); }
+        if (found != null && !Directory.Exists(found)) found = null;
+        if (found != null) lock (sessionDirs) sessionDirs[sid] = found;
+        return found;
+    }
+    string RunDir(string sid) { return SessionDir(sid) ?? CurrentDir(); }
     string CurrentDir() {
         if (!Flash && Project.Length > 0) { string d = Path.Combine(ProjectsDir, Project); if (Directory.Exists(d)) return d; }
         return WorkDir;
@@ -3338,7 +3368,7 @@ class ChatPanel : Form {
         if (proc != null || compactProc != null || !Regex.IsMatch(sid ?? "", "^[0-9a-fA-F-]{36}$")) { Post("compacted\n0\n0\n0"); return; }
         var psi = new ProcessStartInfo("claude", "-p --model haiku --resume " + sid + " --output-format stream-json --verbose --settings " + Util.Quote(GuardSettings())) {
             UseShellExecute = false, CreateNoWindow = true, RedirectStandardInput = true, RedirectStandardOutput = true, RedirectStandardError = true,
-            StandardOutputEncoding = Encoding.UTF8, WorkingDirectory = CurrentDir() };
+            StandardOutputEncoding = Encoding.UTF8, WorkingDirectory = RunDir(sid) };
         psi.EnvironmentVariables["CAVEMAN_DEFAULT_MODE"] = "off";
         new Thread(() => {
             long pre = 0, post = 0; bool ok = false;
@@ -3485,6 +3515,13 @@ class ChatPanel : Form {
                 Post("project\n" + n);
                 break;
             }
+            case "ensureproject": {                                             // la reponse annonce un projet : il existe dans le menu #
+                string n = SafeName(parts.Length > 1 ? parts[1] : "");
+                if (n.Length == 0 || n == "claude-companion") break;
+                try { Directory.CreateDirectory(Path.Combine(ProjectsDir, n)); } catch (Exception ex) { Program.Log("Projet", ex.Message); }
+                Post("projects\n" + new JavaScriptSerializer().Serialize(ListProjects()));
+                break;
+            }
             case "forget": Forget(parts.Length > 1 ? parts[1] : ""); break;
             case "notes": Post("notes\n" + Notes.Json()); break;
             case "notenew": Notes.New(); break;
@@ -3616,7 +3653,7 @@ class ChatPanel : Form {
             + "retenir des choses, créer et gérer les projets (projets/<nom>/NOTES.md) et retrouver les conversations archivées, en suivant les règles du noyau de mémoire. "
             + "Quand l'utilisateur dit travailler sur un projet, écris la ligne « 📁 Projet : <nom> » pour que la conversation y soit sauvegardée. "
             + (Flash ? "CONVERSATION FLASH : l'utilisateur ne veut rien enregistrer. N'écris rien dans la mémoire ClaudeHub, ne crée pas de projet et n'écris jamais la ligne « 📁 Projet ». "
-                     : Project.Length > 0 ? "Cette conversation fait partie du projet « " + Project + " » (dossier de travail actuel ; elle est archivée automatiquement dans le projet). Tiens NOTES.md à jour quand ça avance. " : "")
+                     : Project.Length > 0 ? "Cette conversation fait partie du projet « " + Project + " » (dossier " + Path.Combine(ProjectsDir, Project) + " ; elle est archivée automatiquement dans le projet). Tiens NOTES.md à jour quand ça avance. " : "")
             + "Le message peut commencer par [Fenêtre active : …] : c'est la fenêtre que l'utilisateur avait devant lui (souvent « le fichier ouvert devant moi »). "
             + "VOIR : quand l'utilisateur parle de ce qu'il a devant lui (« ce champ », « cette page », « ce que je vois », « devant moi », « ici »), regarde D'ABORD l'écran "
             + "(lance la commande indiquée dans [Fenêtre active], puis lis l'image produite) AVANT de chercher dans ses dossiers. "
@@ -3637,7 +3674,7 @@ class ChatPanel : Form {
         args += " --settings " + Util.Quote(GuardSettings());                // gardien : pas de modification de Bébène par lui-même
 
         var psi = new ProcessStartInfo("claude", args) {
-            UseShellExecute = false, CreateNoWindow = true, WorkingDirectory = CurrentDir(),
+            UseShellExecute = false, CreateNoWindow = true, WorkingDirectory = RunDir(sessionId),
             RedirectStandardInput = true, RedirectStandardOutput = true, RedirectStandardError = true,
             StandardOutputEncoding = Encoding.UTF8, StandardErrorEncoding = Encoding.UTF8
         };
