@@ -19,10 +19,10 @@ using Microsoft.Web.WebView2.WinForms;
 
 [assembly: System.Reflection.AssemblyTitle("Bébène")]
 [assembly: System.Reflection.AssemblyProduct("Bébène")]
-[assembly: System.Reflection.AssemblyVersion("1.41.0.0")]
+[assembly: System.Reflection.AssemblyVersion("1.42.0.0")]
 
 static class Program {
-    public const string Version = "1.41";
+    public const string Version = "1.42";
     public static bool OpenSetup;
     public static readonly uint Pid = (uint)Process.GetCurrentProcess().Id;   // identifiant de Bébène (lu une seule fois)   // --setup : ouvrir directement l'assistant d'installation
 
@@ -276,10 +276,29 @@ static class Util {
         v = 0x001B1818; DwmSetWindowAttribute(h, 35, ref v, 4);            // couleur de la barre de titre
         if (rounded) { v = 2; DwmSetWindowAttribute(h, 33, ref v, 4); v = 0x00403A3A; DwmSetWindowAttribute(h, 34, ref v, 4); }
     }
+    // un seul environnement WebView2 pour toutes les fenêtres (un seul navigateur en arrière-plan), sans les services
+    // inutiles pour des pages locales : mises à jour de composants (DRM vidéo, listes de filtrage… ~45 Mo), synchro, traduction
+    static System.Threading.Tasks.Task<CoreWebView2Environment> webEnv;
+    static System.Threading.Tasks.Task<CoreWebView2Environment> WebEnv() {
+        if (webEnv != null) return webEnv;
+        string data = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "ClaudeCompanion");
+        foreach (var junk in new[] { "WidevineCdm", "component_crx_cache", "Subresource Filter", "OnDeviceHeadSuggestModel", "ZxcvbnData", "hyphen-data" }) {
+            string d = Path.Combine(data, "EBWebView", junk);
+            try { if (Directory.Exists(d)) Directory.Delete(d, true); } catch { }     // déjà téléchargés par une ancienne version : on fait le ménage
+        }
+        var opt = new CoreWebView2EnvironmentOptions("--disable-component-update --disable-background-networking --disable-sync "
+            + "--disable-features=Translate,msSmartScreenProtection,AutofillServerCommunication,msEdgeShoppingUI,msWebOOUI");
+        return webEnv = CoreWebView2Environment.CreateAsync(null, data, opt);
+    }
+    // fenêtre cachée : WebView2 libère ce qu'il peut (caches, mémoire du rendu) ; la page continue de recevoir les messages
+    public static void WebMemory(WebView2 web, bool visible) {
+        try { if (web != null && web.CoreWebView2 != null) web.CoreWebView2.MemoryUsageTargetLevel = visible ? CoreWebView2MemoryUsageTargetLevel.Normal : CoreWebView2MemoryUsageTargetLevel.Low; }
+        catch { }
+    }
+
     public static async void InitWeb(WebView2 web, string page, EventHandler<CoreWebView2WebMessageReceivedEventArgs> onMsg) {
         try {
-            string data = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "ClaudeCompanion");
-            var env = await CoreWebView2Environment.CreateAsync(null, data);
+            var env = await WebEnv();
             await web.EnsureCoreWebView2Async(env);
             var cw = web.CoreWebView2;
             cw.Settings.IsStatusBarEnabled = false;
@@ -432,6 +451,7 @@ class Companion : Form {
         };
 
         timer.Tick += (s, e) => { Tick(); if (Visible) Draw(); };
+        VisibleChanged += (s, e) => ForceRedraw();                         // réaffiché : on renvoie l image même si elle n a pas changé
         timer.Start();
 
         var ev = new EventWaitHandle(false, EventResetMode.AutoReset, "ClaudeCompanion_Open");
@@ -641,7 +661,29 @@ class Companion : Form {
     }
 
     // ---- Dessin ----
-    void Draw() { using (var img = BuildImage()) Push(img); }
+    // le chat est souvent immobile (assis, endormi) : une image identique a la precedente n est pas renvoyee a l ecran
+    byte[] lastFrame, curFrame;
+    public void ForceRedraw() { lastFrame = null; }
+    void Draw() {
+        using (var img = BuildImage()) {
+            var bd = img.LockBits(new Rectangle(0, 0, img.Width, img.Height), ImageLockMode.ReadOnly, PixelFormat.Format32bppArgb);
+            int n = Math.Abs(bd.Stride) * img.Height;
+            if (curFrame == null || curFrame.Length != n) curFrame = new byte[n];
+            Marshal.Copy(bd.Scan0, curFrame, 0, n);
+            img.UnlockBits(bd);
+            if (lastFrame != null && lastFrame.Length == n && SameBytes(lastFrame, curFrame)) return;
+            var tmp = lastFrame; lastFrame = curFrame; curFrame = tmp;
+            Push(img);
+        }
+    }
+    static unsafe bool SameBytes(byte[] a, byte[] b) {
+        fixed (byte* pa = a, pb = b) {
+            long* la = (long*)pa, lb = (long*)pb; int n = a.Length / 8;
+            for (int i = 0; i < n; i++) if (la[i] != lb[i]) return false;
+            for (int i = n * 8; i < a.Length; i++) if (pa[i] != pb[i]) return false;
+        }
+        return true;
+    }
     Bitmap BuildImage() {
         var p = cur.Clone();
         float br = (float)Math.Sin(t * (act == "lie" ? 1.6 : 2.4)) * 0.6f;
@@ -968,7 +1010,7 @@ class Companion : Form {
 
     // ---- App ----
     public void Quit() { Settings.Set("X", Left); Spell.Enable(false); if (Panel.Flash) ChatPanel.Forget(SessionId); tray.Visible = false; Application.Exit(); }
-    public void RefreshSettings() { if (settingsWin != null && settingsWin.Visible) settingsWin.Refresh2(); }
+    public void RefreshSettings() { if (settingsWin != null && !settingsWin.IsDisposed && settingsWin.Visible) settingsWin.Refresh2(); }
 
     public SpellAssist Spell;
     // ---- rappels d examens et de rendez-vous ----
@@ -992,7 +1034,7 @@ class Companion : Form {
 
     public void ShowSettings() { ShowSettings(null); }
     public void ShowSettings(string section) {
-        if (settingsWin == null) settingsWin = new SettingsWindow(this);
+        if (settingsWin == null || settingsWin.IsDisposed) settingsWin = new SettingsWindow(this);
         if (!settingsWin.Visible) settingsWin.Show();
         if (settingsWin.WindowState == FormWindowState.Minimized) settingsWin.WindowState = FormWindowState.Normal;
         settingsWin.Activate();
@@ -2712,6 +2754,7 @@ static class Notes {
         if (Changed != null) Changed();
     }
     public static void Save(Note n) {
+        if (!all.ContainsKey(n.Id)) return;                                      // supprime entre-temps
         try {
             Directory.CreateDirectory(Dir);
             string raw = Serialize(n);
@@ -2799,7 +2842,9 @@ class NoteWindow : Form {
         box.TextChanged += (s, e) => { Invalidate(new Rectangle(0, 0, ClientSize.Width, HeadH)); if (applying) return; saveT.Stop(); saveT.Start(); };
         box.KeyDown += OnKey;
         box.MouseUp += (s, e) => ToggleBox(e.Location);
-        box.LinkClicked += (s, e) => { try { Process.Start(e.LinkText); } catch { } };
+        box.LinkClicked += (s, e) => {                                       // seulement les liens web et mail (un post-it peut venir de Claude ou de OneDrive)
+            if (Regex.IsMatch(e.LinkText ?? "", "^(https?://|mailto:)", RegexOptions.IgnoreCase)) try { Process.Start(e.LinkText); } catch { }
+        };
         saveT.Tick += (s, e) => { saveT.Stop(); n.Text = box.Text.Replace("\r", ""); Notes.Save(n); };
         Apply(n);
         Place();
@@ -3196,6 +3241,7 @@ class ChatPanel : Form {
         var firstUpd = new System.Windows.Forms.Timer { Interval = 15000 };
         firstUpd.Tick += (s, e) => { firstUpd.Stop(); firstUpd.Dispose(); CheckUpdate(); }; firstUpd.Start();
         VisibleChanged += (s, e) => { if (Visible && (DateTime.Now - lastUpd).TotalHours > 1) CheckUpdate(); };
+        VisibleChanged += (s, e) => Util.WebMemory(web, Visible);
         VisibleChanged += (s, e) => { if (Visible) { ProbeQuota(false); if (owner.State == "ready") owner.SetState("happy"); } };    // quota à jour à chaque ouverture
         quotaTimer.Tick += (s, e) => { if (Visible) ProbeQuota(true); }; quotaTimer.Start();
         Mailbox.LoadCache();                                         // derniers résultats tout de suite, nouvelle analyse en fond
@@ -3756,8 +3802,9 @@ class SettingsWindow : Form {
     string pendingGoto;
 
     void Post(string s) {
+        if (IsDisposed || Disposing) return;                                    // fenetre fermee : une analyse ou une verification finit apres
         if (InvokeRequired) { try { BeginInvoke((Action)(() => Post(s))); } catch { } return; }   // appels depuis les vérifications en arrière-plan
-        if (web.CoreWebView2 != null) web.CoreWebView2.PostWebMessageAsString(s);
+        try { if (web.CoreWebView2 != null) web.CoreWebView2.PostWebMessageAsString(s); } catch (ObjectDisposedException) { }
     }
     // vérifications de l'assistant : en arrière-plan (certaines prennent quelques secondes)
     volatile bool checking;
@@ -3820,7 +3867,5 @@ class SettingsWindow : Form {
         catch (Exception ex) { Program.Log("Modèles", ex.ToString()); }
     }
 
-    protected override void OnFormClosing(FormClosingEventArgs e) {
-        if (e.CloseReason == CloseReason.UserClosing) { e.Cancel = true; Hide(); }
-    }
+    protected override void OnFormClosed(FormClosedEventArgs e) { base.OnFormClosed(e); try { web.Dispose(); } catch { } }   // ferme = memoire rendue
 }

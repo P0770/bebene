@@ -9,11 +9,16 @@ Get-Process ClaudeCompanion -ErrorAction SilentlyContinue | Stop-Process -Force
 Start-Sleep -Milliseconds 500
 
 # WebView2 (téléchargé une fois, gardé en local)
-$lib = "$Out\lib\webview2"
+# (cache de compilation hors du dossier installe : 52 Mo qui ne servent pas a faire tourner Bebene)
+$lib = "$env:LOCALAPPDATA\BebeneBuild\webview2-1.0.2903.40"
+if (Test-Path "$Out\lib") { Remove-Item "$Out\lib" -Recurse -Force -ErrorAction SilentlyContinue }   # ancien emplacement
+if (Test-Path "$Out\companion.ico") { Remove-Item "$Out\companion.ico" -Force -ErrorAction SilentlyContinue }   # ancienne icone
 if (-not (Test-Path "$lib\lib\net462\Microsoft.Web.WebView2.WinForms.dll")) {
     New-Item -ItemType Directory -Force $lib | Out-Null
-    Invoke-WebRequest "https://www.nuget.org/api/v2/package/Microsoft.Web.WebView2/1.0.2903.40" -OutFile "$Out\lib\webview2.zip"
-    Expand-Archive "$Out\lib\webview2.zip" $lib -Force
+    $zip = "$env:TEMP\webview2-1.0.2903.40.zip"
+    Invoke-WebRequest "https://www.nuget.org/api/v2/package/Microsoft.Web.WebView2/1.0.2903.40" -OutFile $zip
+    Expand-Archive $zip $lib -Force
+    Remove-Item $zip -Force
 }
 Copy-Item "$lib\lib\net462\Microsoft.Web.WebView2.Core.dll", "$lib\lib\net462\Microsoft.Web.WebView2.WinForms.dll", "$lib\runtimes\win-x64\native\WebView2Loader.dll" $Out -Force
 Copy-Item "$src\ui.html", "$src\settings.html", "$src\fonctions.json" $Out -Force
@@ -57,7 +62,7 @@ $w.Flush()
 
 # Compilation
 $csc = "$env:WINDIR\Microsoft.NET\Framework64\v4.0.30319\csc.exe"
-& $csc /nologo /target:winexe /platform:x64 /codepage:65001 /win32icon:"$Out\bebene.ico" /out:"$Out\ClaudeCompanion.exe" `
+& $csc /nologo /target:winexe /platform:x64 /unsafe /optimize+ /codepage:65001 /win32icon:"$Out\bebene.ico" /out:"$Out\ClaudeCompanion.exe" `
     /r:System.Windows.Forms.dll /r:System.Drawing.dll /r:System.Web.Extensions.dll /r:System.Core.dll /r:Microsoft.CSharp.dll /r:System.Security.dll /r:System.IO.Compression.dll /r:System.IO.Compression.FileSystem.dll /r:Microsoft.VisualBasic.dll `
     /lib:"$env:WINDIR\Microsoft.NET\Framework64\v4.0.30319\WPF" /r:UIAutomationClient.dll /r:UIAutomationTypes.dll /r:WindowsBase.dll `
     /r:"$Out\Microsoft.Web.WebView2.Core.dll" /r:"$Out\Microsoft.Web.WebView2.WinForms.dll" "$src\Companion.cs"
