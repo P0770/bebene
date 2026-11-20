@@ -118,6 +118,13 @@ details.sec .sb > .card + .card { margin-top: 10px; }
 .step .tag { font-size: 10.5px; font-weight: 600; border-radius: 999px; padding: 1px 8px; margin-left: 6px; vertical-align: 1px; }
 .step.next .tag { background: var(--accent); color: #fff; }
 .step .btn { flex: none; align-self: center; }
+#tplView { position: fixed; inset: 0; overflow-y: auto; background: var(--bg); z-index: 50; padding: 22px 26px 40px; }
+.step .sicn { font-size: 20px; width: 28px; text-align: center; flex: none; line-height: 28px; }
+.step .tb { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
+.step .tb .btn { align-self: auto; padding: 6px 12px; font-size: 12.5px; }
+.step.busy { border-color: #e0b84f; }
+.step .ld { display: inline-block; width: 10px; height: 10px; border: 2px solid #e0b84f; border-right-color: transparent; border-radius: 50%; animation: spin 1s linear infinite; margin-right: 6px; vertical-align: -1px; }
+@keyframes spin { to { transform: rotate(360deg); } }
 </style>
 </head>
 <body>
@@ -147,6 +154,11 @@ details.sec .sb > .card + .card { margin-top: 10px; }
     <button class="btn" data-act="folder">Changer…</button>
   </div>
 </div>
+<button class="setupcard" id="openTpl">
+  <span class="sic">📚</span>
+  <span class="st"><b>Mes modèles de référence</b><span id="tplSub">Rapport, présentation, Word, code : Bébène reprend leur format et ton style</span></span>
+  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6l6 6-6 6"/></svg>
+</button>
 
 <details class="sec" id="manual"><summary><span class="st"><b>Mes examens et rendez-vous</b><span>Ajouter, retirer, retrouver</span></span><svg class="chev" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg></summary><div class="sb">
 <div class="card">
@@ -343,6 +355,16 @@ details.sec .sb > .card + .card { margin-top: 10px; }
     <button class="btn" id="setupRefresh" style="margin-top:12px">↻ Vérifier à nouveau</button>
   </div>
 </div>
+<div id="tplView" hidden>
+  <div class="sv">
+    <button class="back" id="tplBack">‹ Réglages</button>
+    <h1 class="svt">Mes modèles de référence</h1>
+    <p class="svs">Donne à Bébène tes meilleurs exemples. Quand tu lui demandes un rapport, une présentation, un document Word ou du code, il reprend leur format et ton style, pas leur contenu, et seulement ce qui sert. Les fichiers sont copiés dans ta mémoire ClaudeHub, puis analysés une fois (quelques minutes).</p>
+    <div class="prog"><div class="pbar"><i id="tFill"></i></div><span id="tText">…</span></div>
+    <div id="tpls"></div>
+    <p class="svs" id="tplDir" style="margin-top:12px;font-size:12px"></p>
+  </div>
+</div>
 <div id="toast">Enregistré ✓</div>
 
 <script>
@@ -528,6 +550,62 @@ window.chrome.webview.addEventListener('message', e => {
   else if (k === 'goto' && v === 'setup') openSetup();
 });
 post('get');
+// ---- modèles de référence : 4 types, chacun vérifié (fourni ? analysé ? à jour ?) ----
+const TPL = [
+  { id: 'rapport', ic: '📄', t: 'Rapport (LaTeX)', d: 'Un rapport complet : le dossier entier avec le .tex, les images et la bibliographie. Bébène reprend la mise en page, le préambule, le plan et le ton.', main: 'folder' },
+  { id: 'presentation', ic: '📊', t: 'Présentation', d: 'Un PowerPoint (ou Beamer / PDF). Bébène part du même masque : couleurs, polices, dispositions, densité de texte.', main: 'files' },
+  { id: 'word', ic: '📝', t: 'Document Word', d: 'Un .docx bien mis en forme. Bébène garde ses styles, sa page de garde, ses en-têtes et son plan.', main: 'files' },
+  { id: 'code', ic: '💻', t: 'Mon code', d: 'Quelques fichiers ou un projet que tu as écrit toi-même. Bébène code dans ton style et à ton niveau, pour que tu comprennes tout.', main: 'folder' }
+];
+let TPLS = null, tplArm = '';
+function renderTpl() {
+  if (!TPLS) return;
+  const by = {}; TPLS.kinds.forEach(k => by[k.id] = k);
+  const have = TPL.filter(t => by[t.id] && by[t.id].files > 0).length;
+  $('#tplSub').textContent = have ? have + ' / 4 fournis · Bébène reprend leur format et ton style' : 'Aucun fourni · donne tes exemples de rapport, présentation, Word, code';
+  $('#tFill').style.width = have / 4 * 100 + '%';
+  $('#tText').textContent = have + ' / 4 modèles fournis' + (have === 4 ? ' · complet 🎉' : '');
+  $('#tplDir').textContent = 'Dossier : ' + TPLS.dir;
+  const next = TPL.find(t => !(by[t.id] && by[t.id].files > 0));
+  $('#tpls').innerHTML = TPL.map(t => {
+    const k = by[t.id] || { files: 0 }, has = k.files > 0, busy = k.analyzing || k.copying;
+    const st = busy ? 'busy' : !has ? 'no' : k.error || !k.profile || k.stale ? 'warn' : 'ok';
+    const icon = st === 'ok' ? '✓' : st === 'warn' ? '!' : st === 'busy' ? '…' : '○';
+    let det = '';
+    if (has) det += k.files + ' fichier' + (k.files > 1 ? 's' : '') + ' · ' + k.mb + ' Mo' + (k.top && k.top.length ? ' · ' + k.top.map(escH).join(', ') : '');
+    let info = k.copying ? '<span class="ld"></span>Copie des fichiers…'
+      : k.analyzing ? '<span class="ld"></span>Analyse en cours (quelques minutes) : Bébène lit le modèle et écrit son profil…'
+      : k.error ? '⚠ ' + escH(k.error)
+      : has && !k.profile ? 'Pas encore analysé : Bébène devra tout relire à chaque fois.'
+      : has && k.stale ? 'Le modèle a changé depuis la dernière analyse (' + k.profiled + ').'
+      : has ? 'Analysé le ' + k.profiled + ' ✓' : '';
+    const dis = busy ? ' disabled' : '';
+    const prim = c => (!has && next && next.id === t.id && t.main === c) ? ' primary' : '';
+    const btns = '<button class="btn' + prim('folder') + '" data-tadd="folder" data-k="' + t.id + '"' + dis + '>+ Dossier</button>'
+      + '<button class="btn' + prim('files') + '" data-tadd="files" data-k="' + t.id + '"' + dis + '>+ Fichiers</button>'
+      + (has ? '<button class="btn" data-topen="' + t.id + '">Ouvrir</button>'
+        + '<button class="btn' + (st === 'warn' && !k.error ? ' primary' : '') + '" data-tan="' + t.id + '"' + dis + '>' + (k.profile ? 'Réanalyser' : 'Analyser') + '</button>'
+        + '<button class="btn danger" data-tclr="' + t.id + '"' + dis + '>' + (tplArm === t.id ? 'Confirmer : vider' : 'Vider') + '</button>' : '');
+    return '<div class="step ' + st + (!has && next && next.id === t.id ? ' next' : '') + '"><span class="ico">' + icon + '</span><div class="bd"><b>' + t.ic + ' ' + t.t + '</b><p>' + t.d + '</p>'
+      + (det ? '<div class="det">' + det + '</div>' : '') + (info ? '<div class="det">' + info + '</div>' : '') + '<div class="tb">' + btns + '</div></div></div>';
+  }).join('');
+  $('#tpls').querySelectorAll('[data-tadd]').forEach(b => b.onclick = () => post('tpladd\n' + b.dataset.k + '\n' + b.dataset.tadd));
+  $('#tpls').querySelectorAll('[data-topen]').forEach(b => b.onclick = () => post('tplopen\n' + b.dataset.topen));
+  $('#tpls').querySelectorAll('[data-tan]').forEach(b => b.onclick = () => { b.disabled = true; post('tplanalyze\n' + b.dataset.tan); });
+  $('#tpls').querySelectorAll('[data-tclr]').forEach(b => b.onclick = () => {
+    if (tplArm === b.dataset.tclr) { tplArm = ''; post('tplclear\n' + b.dataset.tclr); return; }   // 2e clic : vidé (vers la Corbeille)
+    tplArm = b.dataset.tclr; renderTpl(); setTimeout(() => { if (tplArm) { tplArm = ''; renderTpl(); } }, 4000);
+  });
+}
+function openTpl() { $('#tplView').hidden = false; $('#tplView').scrollTop = 0; renderTpl(); post('tpl'); }
+$('#openTpl').onclick = openTpl;
+$('#tplBack').onclick = () => { $('#tplView').hidden = true; };
+window.chrome.webview.addEventListener('message', e => {
+  const d = String(e.data), i = d.indexOf('\n'), k = i < 0 ? d : d.slice(0, i), v = i < 0 ? '' : d.slice(i + 1);
+  if (k === 'tpl') { try { TPLS = JSON.parse(v); renderTpl(); } catch (x) { } }
+  else if (k === 'goto' && v === 'modeles') openTpl();
+});
+post('tpl');
 // ---- sections dépliables : on se souvient de celles qui sont ouvertes ----
 (function () {
   let open = null;
