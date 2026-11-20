@@ -27,6 +27,7 @@ $imgs = @(
     @('besoin de la souris', @('--handtest', "$out\hand-souris.png", 'souris')),
     @('besoin de voir un écran', @('--handtest', "$out\hand-ecran.png", 'ecran')),
     @('progression 3/5', @('--progtest', "$out\progress.png")),
+    @('bulle vers la discussion', @('--thinktest', "$out\think.png")),
     @('chat porté (pendule)', @('--swingtest', "$out\swing.png"))
 )
 foreach ($t in $imgs) {
@@ -74,6 +75,47 @@ else {
         'var bg=VIEWS[kA]&&!VIEWS[kA].busy&&VIEWS[kA].conv.attn==="hand"&&rkey===kB&&busy;' +
         'send("rdone\n"+kB+"\n0\n");openConv(VIEWS[kA].conv);var re=rkey===kA&&!!$("#log .ask.hand")&&!!$("#log .plan");' +
         'document.title="R:"+bg+re+JSON.stringify(__err)') 'R:truetrue[]'
+    # v1.50 : recherches temporaires, pause de quota, sous-groupes, clic droit .txt, titre manuel, ⚙ dans le rond
+    $sim = 'const send=m=>__h({data:m});const tu=(n,i)=>JSON.stringify({type:"assistant",message:{content:[{type:"tool_use",name:n,input:i}]}});' +
+           'const asst=t=>JSON.stringify({type:"assistant",message:{content:[{type:"text",text:t}]}});'
+    PageTest 'recherches retirées à la fin' 'ui.html' ($sim +
+        'input.value="Trouve mon CV";submit();const k=rkey;send("rline\n"+k+"\n"+tu("Grep",{pattern:"CV",path:"C:/Users/x/Documents"}));' +
+        'send("rline\n"+k+"\n"+tu("Bash",{command:"ls \"C:/Users/x/Desktop\""}));var one=document.querySelectorAll("#log .srch").length===1&&/Desktop/.test($("#log .srch").textContent);' +
+        'send("rline\n"+k+"\n"+tu("Edit",{file_path:"C:/a/cv.md",old_string:"a",new_string:"b"}));send("rline\n"+k+"\n"+asst("Voici :\n```js\nls()\n```"));send("rdone\n"+k+"\n0\n");' +
+        'var gone=!$("#log .srch")&&!/Grep|Recherche/.test($("#log").textContent)&&!!$("#log .diff summary span")&&!!$("#log .md pre");' +
+        'document.title="R:"+one+gone+JSON.stringify(__err)') 'R:truetrue[]'
+    PageTest 'pause avant la fin du quota' 'ui.html' ($sim +
+        'input.value="Refais le rapport";submit();const k=rkey;send("rline\n"+k+"\n"+tu("TodoWrite",{todos:[{content:"Lire",status:"completed"},{content:"Écrire",status:"in_progress"}]}));' +
+        'send("rline\n"+k+"\n"+tu("Write",{file_path:"C:/a/r.md",content:"x"}));' +
+        'send("rline\n"+k+"\n"+JSON.stringify({type:"rate_limit_event",rate_limit_info:{unifiedWindows:{five_hour:{utilization:0.985,resetsAt:Date.now()/1000+3600}}}}));' +
+        'var st=__posts.includes("stop\n"+k);send("rdone\n"+k+"\n1\n");var card=$("#log .pause:not(.done)");' +
+        'var sum=!!card&&/Lire/.test(card.textContent)&&/r\.md/.test(card.textContent)&&!$("#log .err");' +
+        'input.value="vas-y";submit();var blocked=!busy&&/encore bas/.test(card.textContent);' +
+        'send("quota\n"+JSON.stringify({unifiedWindows:{five_hour:{utilization:0.2}}}));submit();const p=__posts.filter(x=>x.startsWith("send\n")).pop().split("\n");' +
+        'var res=busy&&p[3]===""&&/Reprise/.test(p.slice(7).join("\n"))&&/Écrire/.test(p.slice(7).join("\n"))&&card.classList.contains("done");' +
+        'document.title="R:"+st+sum+blocked+res+JSON.stringify(__err)') 'R:truetruetruetrue[]'
+    PageTest 'sous-groupes' 'ui.html' (
+        'convs=[{id:"c1",title:"Un",updated:Date.now(),project:"",hist:"<div class=\"msg user\">x</div>"},{id:"c2",title:"Deux",updated:Date.now(),project:""}];project="";conv=null;' +
+        'const ent=i=>i.dispatchEvent(new KeyboardEvent("keydown",{key:"Enter",bubbles:true}));$("#ddHist").click();$("#mGroupAdd").click();' +
+        'var i=$("#mConvs input.gren");i.value="Cours";ent(i);var a=JSON.stringify(GROUPS[""])==="[\"Cours\"]";' +
+        'askMove($("[data-c=c1]"),"c1");var s=$("#mConvs select");s.value="g:Cours";s.onchange();var b=convs[0].group==="Cours"&&!!$(".mgrp[data-g=Cours]");' +
+        '$(".mgrp[data-g=Cours] [data-grn]").click();i=$("#mConvs input.gren");i.value="Maths";ent(i);var c=convs.find(x=>x.id==="c1").group==="Maths";' +
+        '$(".mgrp[data-g=Maths] [data-gdel]").click();$(".mgrp[data-g=Maths] [data-gdel]").click();var d=!$(".mgrp[data-g=Maths]")&&convs.length===2&&!convs[0].group&&!!convs.find(x=>x.id==="c1").hist;' +
+        'var open=$("#ddH").classList.contains("open");document.title="R:"+a+b+c+d+open+JSON.stringify(__err)') 'R:truetruetruetruetrue[]'
+    PageTest 'clic droit : télécharger en .txt' 'ui.html' (
+        'conv={id:"c9",title:"Mon rapport",updated:Date.now(),project:""};var m=el("msg bot","<div class=\"md\">Bonjour</div>");$("#log .md").dataset.raw="Bonjour **toi**";' +
+        '$("#log .md").dispatchEvent(new MouseEvent("contextmenu",{bubbles:true,cancelable:true,clientX:50,clientY:50}));var o=$("#ctxm").classList.contains("open");' +
+        '$("#ctxm [data-a=txt]").click();var p=__posts.find(x=>x.startsWith("savetxt\n"))||"";' +
+        'document.title="R:"+o+(/^savetxt\nMon rapport - \d{4}-\d\d-\d\d \d\dh\d\d\nBonjour \*\*toi\*\*$/.test(p))+!$("#ctxm").classList.contains("open")+JSON.stringify(__err)') 'R:truetruetrue[]'
+    PageTest 'titre écrit à la main gardé' 'ui.html' (
+        'convs=[{id:"c1",title:"Mon titre",titleLock:true,updated:Date.now(),project:""}];conv=convs[0];__h({data:"title\nc1\nAutre"});' +
+        'el("msg user","a");el("msg bot","<div class=\"md\">b</div>");askTitle("0");' +
+        'document.title="R:"+(convs[0].title==="Mon titre")+!__posts.some(x=>x.startsWith("title\n"))+JSON.stringify(__err)') 'R:truetrue[]'
+    PageTest 'réglages dans le rond' 'ui.html' (
+        '$("#cfg").click();var a=__posts.includes("settings")&&!!$("#orbw #cfg .gear");__h({data:"upd\n"+JSON.stringify({available:true,latest:"9.9",current:"1.50"})});' +
+        '$("#updot").click();var b=$("#updpop").classList.contains("open");$("#ddHist").click();var c=!$("#updpop").classList.contains("open")&&$("#ddH").classList.contains("open");' +
+        'document.dispatchEvent(new KeyboardEvent("keydown",{key:"Escape"}));var d=!$("#ddH").classList.contains("open")&&!__posts.includes("hide");' +
+        'document.title="R:"+a+b+c+d+JSON.stringify(__err)') 'R:truetruetruetrue[]'
 }
 
 # 4) (option) Claude réel : 2 conversations en parallèle, puis un 2e message qui réutilise la même session

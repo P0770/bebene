@@ -19,10 +19,10 @@ using Microsoft.Web.WebView2.WinForms;
 
 [assembly: System.Reflection.AssemblyTitle("Bébène")]
 [assembly: System.Reflection.AssemblyProduct("Bébène")]
-[assembly: System.Reflection.AssemblyVersion("1.49.0.0")]
+[assembly: System.Reflection.AssemblyVersion("1.50.0.0")]
 
 static class Program {
-    public const string Version = "1.49";
+    public const string Version = "1.50";
     public static bool OpenSetup;
     public static readonly uint Pid = (uint)Process.GetCurrentProcess().Id;   // identifiant de Bébène (lu une seule fois)   // --setup : ouvrir directement l'assistant d'installation
 
@@ -187,6 +187,7 @@ static class Program {
             };
             tm.Start(); Application.Run(); return;
         }
+        if (args.Length == 2 && args[0] == "--thinktest") { new Companion(false).ThinkPreview(args[1]); return; }
         if (args.Length == 2 && args[0] == "--progtest") { var pc = new Companion(false); pc.Progress(3, 5); pc.ReadyPreview(args[1], "thinking"); return; }
         if (args.Length == 2 && args[0] == "--screentest") { File.WriteAllText(args[1], ChatPanel.ScreenCommand(0) + "\n" + ChatPanel.ScreenDir(), new UTF8Encoding(false)); return; }   // test : commande de capture d écran
         if (args.Length == 3 && args[0] == "--sessdirtest") { File.WriteAllText(args[2], ChatPanel.SessionDir(args[1]) ?? "(introuvable)", new UTF8Encoding(false)); return; }   // test : dossier d origine d une session
@@ -548,12 +549,13 @@ class Companion : Form {
     float readyT, askT;
     // "hand" : une tâche a besoin de ta souris / clavier ("souris") ou de voir une fenêtre ("ecran") → il tapote de la patte, bulle avec l icône
     internal string handKind = "souris"; int progDone, progTotal;
+    internal Rectangle thinkTo = Rectangle.Empty;                          // tests : fenêtre de discussion simulée (bulle de réflexion orientée vers elle)
     public void SetHand(string kind) { handKind = kind == "ecran" ? "ecran" : "souris"; if (state != "hand") { SetState("hand"); jumpT = 0; } }
     public void Progress(int done, int total) { progDone = done; progTotal = total; }
     // notification Windows (tâche finie, question, accord, besoin de toi) ; un clic ouvre la conversation concernée
     string toastKey;
     public void Notify(string kind, string title, string key) {
-        string head = kind == "ask" ? "❓ Une question pour toi" : kind == "perm" ? "🔐 Accord demandé" : kind == "hand" ? "🐾 " + Settings.Name + " a besoin de toi" : "✅ Tâche terminée";
+        string head = kind == "ask" ? "❓ Une question pour toi" : kind == "perm" ? "🔐 Accord demandé" : kind == "hand" ? "🐾 " + Settings.Name + " a besoin de toi" : kind == "pause" ? "⏸ Tâche en pause : quota presque épuisé" : "✅ Tâche terminée";
         toastKey = key;
         try { tray.ShowBalloonTip(6000, head, string.IsNullOrEmpty(title) ? "Conversation" : (title.Length > 120 ? title.Substring(0, 120) + "…" : title), ToolTipIcon.None); } catch { }
     }
@@ -595,6 +597,22 @@ class Companion : Form {
                 using (var b = RenderSmall(pose.Clone(), i == 1 ? -1 : 1, i == 2 ? 6 : 0, true)) g.DrawImage(b, i * W, 0);
             }
             held = false;
+            sheet.Save(path, ImageFormat.Png);
+        }
+    }
+
+    // test : bulle de réflexion orientée vers la discussion (en haut à gauche, en haut à droite, juste au-dessus, discussion fermée)
+    public void ThinkPreview(string path) {
+        tray.Visible = false; state = "thinking"; act = "sit";
+        using (var sheet = new Bitmap(W * 4, H)) using (var g = Graphics.FromImage(sheet)) {
+            g.Clear(Color.FromArgb(255, 40, 44, 52));
+            var rects = new[] { new Rectangle(Left - 700, Top - 700, 460, 660), new Rectangle(Left + W + 240, Top - 700, 460, 660), new Rectangle(Left - 200, Top - 700, 460, 640), Rectangle.Empty };
+            for (int i = 0; i < 4; i++) {
+                t = 1.1f + i * 4 / 3f; thinkTo = rects[i];
+                for (int k = 0; k < tang.Length; k++) tang[k] = SIT.ta + SIT.tc * k;
+                using (var b = RenderSmall(SIT.Clone(), i == 0 ? -1 : 1, 0, true)) g.DrawImage(b, i * W, 0);
+            }
+            thinkTo = Rectangle.Empty;
             sheet.Save(path, ImageFormat.Png);
         }
     }
@@ -1010,8 +1028,21 @@ class Companion : Form {
             g.ScaleTransform(Px, Px);
             if (state == "thinking") {
                 int k = (int)(t * 3) % 4;
+                // bulle de réflexion : petits ronds qui grossissent en allant vers la discussion (Bébène réfléchit à ce qui s y passe)
+                float ux = dir * 0.8f, uy = -0.6f;
+                Rectangle to = thinkTo != Rectangle.Empty ? thinkTo : Panel.Visible ? Panel.Bounds : Rectangle.Empty;
+                if (to != Rectangle.Empty) {
+                    float sx = Left + hx * Px, sy = Top + hy * Px;               // tête, en coordonnées écran
+                    float tx = Math.Max(to.Left, Math.Min(to.Right, sx)), ty = Math.Max(to.Top, Math.Min(to.Bottom, sy));
+                    float vx = tx - sx, vy = ty - sy, n = (float)Math.Sqrt(vx * vx + vy * vy);
+                    if (n > 1) { ux = vx / n; uy = vy / n; if (uy > -0.35f) { uy = -0.35f; ux = Math.Sign(vx == 0 ? dir : vx) * 0.94f; } }   // toujours un peu vers le haut
+                }
                 using (var b = new SolidBrush(Color.FromArgb(240, 235, 235, 245)))
-                    for (int i = 0; i < Math.Min(k, 3); i++) g.FillRectangle(b, (int)(hx + dir * (8 + i * 4)), (int)Math.Max(0, hy - 12 - i * 3), 2, 2);
+                    for (int i = 0; i < Math.Min(k, 3); i++) {
+                        int sz = i + 1; float d = 7 + i * 4.5f;
+                        int x = (int)Math.Max(0, Math.Min(CW - sz, hx + ux * d - sz / 2f)), y = (int)Math.Max(0, Math.Min(CH - sz, hy - 4 + uy * d - sz / 2f));
+                        g.FillRectangle(b, x, y, sz, sz);
+                    }
                 if (progTotal > 0) {                                     // progression de la tâche : « 3/5 » au-dessus de la tête
                     string txt = Math.Min(progDone, 99) + "/" + Math.Min(progTotal, 99);
                     int w = txt.Length * 4 - 1, x0 = (int)hx - w / 2, y0 = (int)Math.Max(0, hy - 22);

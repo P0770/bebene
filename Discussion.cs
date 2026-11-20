@@ -62,6 +62,17 @@ class ChatPanel : Form {
     // ---- clic ailleurs = la discussion se ferme (sauf si elle est épinglée, ou si on clique sur Bébène / ses fenêtres) ----
     [DllImport("user32.dll")] static extern IntPtr GetForegroundWindow();
     [DllImport("user32.dll")] static extern uint GetWindowThreadProcessId(IntPtr h, out uint pid);
+    [DllImport("user32.dll")] static extern IntPtr GetAncestor(IntPtr h, uint flags);
+    [DllImport("user32.dll")] static extern IntPtr GetWindow(IntPtr h, uint cmd);
+    bool OwnedByMe(IntPtr w) {                                              // fenêtre de la discussion elle-même : dialogue, liste déroulante du WebView, menu…
+        for (int i = 0; i < 8 && w != IntPtr.Zero; i++) {
+            if (w == Handle) return true;
+            IntPtr o = GetWindow(w, 4);                                     // GW_OWNER
+            w = o != IntPtr.Zero ? o : GetAncestor(w, 1);                   // GA_PARENT
+        }
+        return false;
+    }
+    DateTime settingsAsked = DateTime.MinValue;
     public bool Pinned = Settings.Bool("Pinned", false);
     protected override void OnDeactivate(EventArgs e) {
         base.OnDeactivate(e);
@@ -71,6 +82,8 @@ class ChatPanel : Form {
             t.Stop(); t.Dispose();
             if (!Visible || Pinned || ContainsFocus) return;
             var fg = GetForegroundWindow(); uint pid; GetWindowThreadProcessId(fg, out pid);
+            if (fg == IntPtr.Zero || OwnedByMe(fg)) return;                 // rien au premier plan (transition) ou fenêtre de la discussion : on reste
+            if (fg == owner.SettingsHwnd && (DateTime.Now - settingsAsked).TotalSeconds < 3) return;   // ⚙ cliqué ici : ce n est pas « ailleurs »
             if (pid == Program.Pid && fg != owner.SettingsHwnd) return;    // le chat, un post-it, un dialogue de Bébène… (les réglages comptent comme « ailleurs »)
             Hide();
         };
@@ -173,13 +186,36 @@ class ChatPanel : Form {
         }) { IsBackground = true, Name = "quota" }.Start();
     }
 
+    // ---- réponse enregistrée en .txt dans Téléchargements (nom lisible, jamais d écrasement) ----
+    [DllImport("shell32.dll")] static extern int SHGetKnownFolderPath([MarshalAs(UnmanagedType.LPStruct)] Guid id, uint flags, IntPtr token, out IntPtr path);
+    public static string DownloadsDir() {
+        IntPtr p;
+        if (SHGetKnownFolderPath(new Guid("374DE290-123F-4565-9164-39C4925E467B"), 0, IntPtr.Zero, out p) == 0) {
+            try { string d = Marshal.PtrToStringUni(p); if (Directory.Exists(d)) return d; } finally { Marshal.FreeCoTaskMem(p); }
+        }
+        return Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), "Downloads");
+    }
+    public static string SaveTxt(string name, string text) {
+        name = Regex.Replace(name ?? "", "[\\x00-\\x1f<>:\"/\\\\|?*]+", " ");
+        name = Regex.Replace(name, "\\s+", " ").Trim().TrimEnd('.', ' ');
+        if (name.Length > 90) name = name.Substring(0, 90).TrimEnd();
+        if (name.Length == 0) name = "Réponse de " + Settings.Name;
+        string dir = DownloadsDir(); Directory.CreateDirectory(dir);
+        string f = Path.Combine(dir, name + ".txt");
+        for (int i = 2; File.Exists(f); i++) f = Path.Combine(dir, name + " (" + i + ").txt");
+        File.WriteAllText(f, (text ?? "").Replace("\r\n", "\n").Replace("\n", "\r\n"), new UTF8Encoding(true));   // BOM : accents lus partout (Bloc-notes, anciens éditeurs)
+        return f;
+    }
+
     // ---- titre de conversation résumé par Claude (Haiku, quelques tokens, en arrière-plan) ----
     void MakeTitle(string id, string excerpt) {
         new Thread(() => {
             try {
                 var psi = new ProcessStartInfo("claude", "-p --model haiku --setting-sources \"\" --strict-mcp-config --no-session-persistence --tools \"\" "
-                    + "--system-prompt \"Tu donnes un titre a une conversation entre un utilisateur et son assistant. Reponds UNIQUEMENT par le titre : 3 a 7 mots en francais, "
-                    + "precis, qui resume le sujet principal de toute la conversation. Pas de guillemets, pas de point final, pas d emoji.\" --output-format text") {
+                    + "--system-prompt \"Tu donnes un titre a une conversation entre un utilisateur et son assistant. Reponds UNIQUEMENT par le titre, en francais : "
+                    + "2 a 5 mots, 40 caracteres maximum, qui nomment le sujet concret (objet, fichier, nom propre, cours, projet) plutot que l action. "
+                    + "Commence par le mot le plus distinctif. Interdits : mots vagues (Aide, Question, Demande, Discussion, Conversation, Probleme, Assistance), guillemets, point final, emoji. "
+                    + "Si d autres titres sont donnes, le tien doit s en distinguer clairement.\" --output-format text") {
                     UseShellExecute = false, CreateNoWindow = true, RedirectStandardInput = true, RedirectStandardOutput = true, RedirectStandardError = true,
                     StandardOutputEncoding = Encoding.UTF8, WorkingDirectory = Path.GetTempPath() };
                 psi.EnvironmentVariables["CAVEMAN_DEFAULT_MODE"] = "off";
@@ -190,7 +226,8 @@ class ChatPanel : Form {
                     p.ErrorDataReceived += (s, e) => { }; p.BeginErrorReadLine();
                     string o = p.StandardOutput.ReadToEnd(); p.WaitForExit(30000);
                     o = (o ?? "").Trim().Split('\n')[0].Trim().Trim('"', '«', '»', '*', '#', '.', ' ');
-                    if (o.Length > 1 && o.Length <= 90 && p.ExitCode == 0) Post("title\n" + id + "\n" + o);
+                    if (o.Length > 60) { int sp = o.LastIndexOf(' ', 58); o = (sp > 20 ? o.Substring(0, sp) : o.Substring(0, 58)).TrimEnd(',', ';', ':', '-', ' ') + "…"; }
+                    if (o.Length > 1 && p.ExitCode == 0) Post("title\n" + id + "\n" + o);
                 }
             } catch (Exception ex) { Program.Log("Titre", ex.Message); }
         }) { IsBackground = true, Name = "titre" }.Start();
@@ -359,12 +396,17 @@ class ChatPanel : Form {
             case "pin": Pinned = parts.Length > 1 && parts[1] == "1"; Settings.Set("Pinned", Pinned); break;
             case "sid": owner.SessionId = parts.Length > 1 ? parts[1] : ""; break;
             case "terminal": owner.OpenTerminal(true); break;
-            case "settings": owner.ShowSettings(); break;
+            case "settings": settingsAsked = DateTime.Now; owner.ShowSettings(); break;   // ouverts depuis la discussion : elle reste ouverte
             case "hide": Hide(); break;
             case "title": {                                                    // title\n<id conversation>\n<extrait>
                 int i1 = m.IndexOf('\n'), i2 = i1 < 0 ? -1 : m.IndexOf('\n', i1 + 1);
                 if (i2 > 0) MakeTitle(m.Substring(i1 + 1, i2 - i1 - 1), m.Substring(i2 + 1));
                 break; }
+            case "savetxt": {                                                  // savetxt\n<nom sans extension>\n<texte>
+                var sp = m.Split(new[] { '\n' }, 3);
+                if (sp.Length == 3) try { Post("saved\n" + SaveTxt(sp[1], sp[2])); } catch (Exception ex) { Program.Log("Téléchargement", ex.Message); Post("saveerr\n" + ex.Message); }
+                break; }
+            case "reveal": { string pth = m.Length > 7 ? m.Substring(7) : ""; if (File.Exists(pth)) try { Process.Start("explorer.exe", "/select,\"" + pth + "\""); } catch { } break; }
             case "copy": { string txt = m.Length > 5 ? m.Substring(5) : ""; if (txt.Length > 0) try { Clipboard.SetText(txt); } catch (Exception ex) { Program.Log("Copie", ex.Message); } break; }
             case "drag": DragWindow(); break;
             case "resize": StartResize(parts.Length > 1 ? parts[1] : "se"); break;

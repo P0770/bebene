@@ -94,6 +94,7 @@ Des **messages texte** via `chrome.webview.postMessage` : un mot-clé, un saut d
 | `updcheck`, `updinstall`, `updopen`, `updseen` | mises à jour : vérifier, installer, ouvrir la Release, masquer la pastille verte |
 | `copy\n<texte>` | copier dans le presse-papiers Windows (la page est en `file://`, où l'API du navigateur n'est pas fiable) |
 | `files` | glisser-déposer (chemins des fichiers) |
+| `savetxt\n<nom>\n<texte>`, `reveal\n<chemin>` | enregistrer une réponse en `.txt` dans Téléchargements (jamais d'écrasement : « (2) »…), l'afficher dans l'Explorateur |
 
 | C# → page | Effet |
 |---|---|
@@ -102,6 +103,7 @@ Des **messages texte** via `chrome.webview.postMessage` : un mot-clé, un saut d
 | `quota\n<json>` | infos de limite (`unifiedWindows.five_hour` / `seven_day` : `utilization`, `resetsAt`) |
 | `title\n<id>\n<titre>` | titre résumé d'une conversation |
 | `compacted\n<ok>\n<avant>\n<après>` | fin du compactage (tokens avant / après) |
+| `saved\n<chemin>`, `saveerr\n<message>` | réponse enregistrée en `.txt` (ou échec) |
 | `upd\n<json>`, `updstatus\n<état>\n<message>` | état des mises à jour (pastille, fenêtre) |
 | `cal\n<json>`, `projects\n<json>`, `name`, `dir`, `pinned`, `paths`, `focus`, `new` | données et commandes d'interface |
 
@@ -120,13 +122,19 @@ claude -p --output-format stream-json --verbose
 
 Le texte est envoyé sur l'entrée standard, précédé de `[Fenêtre active : …]`. Chaque ligne JSON du flux est transmise à la page, qui affiche le texte (Markdown → `marked` + `DOMPurify`), les outils utilisés, les différences de fichiers et les demandes d'autorisation (`permission_denials`).
 
+**Recherches en cours** : un outil de recherche (`Read`, `Glob`, `Grep`, `WebSearch`, `WebFetch`, lecture Chrome, MCP `search/list/get/read…`, commande Bash/PowerShell qui ne fait que lister ou lire : `ls`, `dir`, `grep`, `Get-ChildItem`…, capture `ecran.ps1`) n'ajoute pas d'étiquette : une seule ligne temporaire `.srch` montre où Bébène cherche (📄 fichier, 📁 dossier, 🔎 contenu, 🌐 web, ✉️/📅/🪟 appli). Elle disparaît dès que Bébène écrit ou agit, et à la fin du tour. Une modification de fichier = une seule ligne dépliable (`details.diff`). Le texte de la réponse (et son code) n'est jamais touché.
+
 **Écriture en direct** : les événements `stream_event` / `text_delta` remplissent un aperçu (`.md.live`) révélé mot par mot à vitesse adaptative (`requestAnimationFrame`, rattrape le retard en ~7 images, Markdown re-rendu au plus toutes les 40 ms ; les blocs `bebene-*` ne s'affichent jamais, même à moitié). Le message `assistant` complet remplace ensuite l'aperçu.
+
+**Pause de quota** : à chaque `rate_limit_event` (et à chaque sonde), si la session 5 h ou la semaine passe sous **3 %** restant, la tâche est arrêtée (`stop`) et une carte `.pause` résume la demande, les étapes `TodoWrite` faites / restantes, les fichiers modifiés (`Write`/`Edit`) et le dernier message (`data-p`, gardé dans l'historique). Rien ne repart seul : « ▶ Continuer » ou un message tapé lance une **nouvelle session** (`sid` vide) qui reçoit ce résumé. Si le quota est encore bas, la carte le dit et propose « Reprendre quand même ».
+
+**Clic droit sur une réponse** : menu `#ctxm` (copier la sélection, copier la réponse, télécharger en `.txt`).
 
 ### Raccourcis clavier
 `RegisterHotKey` (ids 1 et 2) depuis les réglages `Hotkey1` / `Hotkey2` (texte `Ctrl+Alt+Shift+Win+Touche`, nom de touche .NET ; vide = désactivé). Pendant la saisie d'une combinaison dans les réglages, les raccourcis sont libérés (`hotkeyPause`) puis réenregistrés ; `HotkeyOk` signale une combinaison déjà prise.
 
 ### Conversations
-Stockées dans le `localStorage` de la WebView (au plus 40, les anciennes raccourcies). Un **projet** fait travailler Claude dans `ClaudeHub/projets/<nom>/`, ce qui déclenche l'archivage automatique de ClaudeHub. Le mode **Flash** n'enregistre rien et supprime la transcription `~/.claude/projects/**/<session>.jsonl`.
+Stockées dans le `localStorage` de la WebView (au plus 40, les anciennes raccourcies). Un **projet** fait travailler Claude dans `ClaudeHub/projets/<nom>/`, ce qui déclenche l'archivage automatique de ClaudeHub. **Sous-groupes** : `conv.group` + liste `localStorage.groups` par projet (`""` = sans projet), repliés dans `gfold`. Créer (＋ Groupe), renommer (✎), supprimer (× en 2 clics : les conversations restent, sans groupe), déplacer (⇢ ou clic droit → liste Sous-groupe / Projet). Le mode **Flash** n'enregistre rien et supprime la transcription `~/.claude/projects/**/<session>.jsonl`.
 
 ### Quota
 - Pendant une réponse : lu dans l'événement `rate_limit_event` du flux.
@@ -135,11 +143,13 @@ Stockées dans le `localStorage` de la WebView (au plus 40, les anciennes raccou
 
 ### Fenêtre
 - Verre acrylique Windows 11 + fond HTML à 90 % d'opacité, coins arrondis natifs (8 px), contour DWM orange discret.
-- Clic ailleurs = fermeture (sauf épinglée ou si la fenêtre active appartient à Bébène).
+- Clic ailleurs = fermeture (sauf épinglée, si la fenêtre active appartient à Bébène ou à la discussion elle-même : liste déroulante, dialogue — `OwnedByMe` remonte propriétaires et parents). Les réglages comptent comme « ailleurs », sauf ouverts depuis le ⚙ de la discussion.
+- **Menus de la page** : une seule fenêtre flottante ouverte à la fois (`closePops`) ; clic dehors ou Échap la ferme (Échap ne cache la discussion que si rien n'est ouvert). Un menu n'est jamais redessiné pendant un clic (`ptrDown`) ni pendant une saisie dedans (`editingIn`), et seulement si son contenu change (`setHTML`) : sinon l'élément cliqué est remplacé et le clic est perdu.
+- **Rond en haut à gauche** : avatar ; au survol, ⚙ (clic = réglages). La pastille de mise à jour est un bouton séparé sur son bord.
 - **Déplacement** : `mousedown` sur l'en-tête → message `drag` → `ReleaseCapture` + `WM_NCLBUTTONDOWN(HTCAPTION)`. Un drapeau `Moved` empêche le recalage sur le chat ; il est remis à zéro à la fermeture sauf si la fenêtre est épinglée. Même principe pour les volets (`Layered.Moved`).
 
 ### Titres et compactage
-- **Titres** : après les échanges 1, 2, 3 puis tous les 3, un extrait de la conversation (≤ 4 000 caractères) est envoyé à `claude -p --model haiku` sans outils ni session, qui renvoie un titre de 3 à 7 mots.
+- **Titres** : après les échanges 1, 2, 3 puis tous les 3, un extrait de la conversation (≤ 4 000 caractères) et les titres des autres conversations sont envoyés à `claude -p --model haiku` sans outils ni session, qui renvoie un titre de 2 à 5 mots (≤ 40 caractères, sujet concret, différent des autres). Un titre modifié à la main (✎ dans l'historique, double-clic sur le titre sous le nom) est verrouillé (`titleLock`).
 - **Compactage** : la page suit la taille du contexte (champ `usage` des messages de l'assistant : `input_tokens + cache_read_input_tokens + cache_creation_input_tokens`). Au premier échange elle mémorise la taille de départ (instructions, outils, mémoire) ; quand le contexte a grossi de **40 000 tokens**, elle demande `/compact` sur la session (`claude -p --model haiku --resume <session>`). La session garde le même identifiant et la suite de la conversation repart du résumé. L'envoi est bloqué le temps du compactage.
 
 ---

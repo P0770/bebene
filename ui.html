@@ -362,15 +362,30 @@ textarea { min-height: 28px; }
 /* ---- mises à jour : pastille sur l avatar (orange = nouvelle version, vert = mise à jour réussie) ---- */
 #chat { position: relative; }
 header { z-index: 7; }
-.orbw { position: relative; flex: none; background: none; border: 0; padding: 0; border-radius: 50%; cursor: default; color: inherit; }
-.orbw.has { cursor: pointer; }
-.updot { position: absolute; top: -1px; right: -1px; width: 12px; height: 12px; border-radius: 50%; border: 2px solid #17171c; display: none; }
+/* rond de Bébène : discret au repos, ⚙ au survol (clic = réglages) ; pastille de mise à jour = petit bouton sur le bord */
+.orbw { position: relative; flex: none; width: 40px; height: 40px; }
+.orbb { position: relative; display: block; width: 40px; height: 40px; padding: 0; border: 0; border-radius: 50%; background: none; color: inherit; cursor: pointer; }
+.orbw .orb { width: 40px; height: 40px; background: radial-gradient(circle at 50% 38%, #2f2b30, #1d1b20 72%);
+  box-shadow: inset 0 0 0 1px rgba(235,154,120,.28), 0 2px 8px rgba(0,0,0,.35); transition: box-shadow .18s; }
+.orbw .orb img { transition: opacity .18s, filter .18s, transform .18s; }
+.orbb .gear { position: absolute; inset: 0; display: grid; place-items: center; color: #f3c1a8; opacity: 0; transform: rotate(-40deg) scale(.8);
+  transition: opacity .18s, transform .3s; pointer-events: none; }
+.orbb:hover .orb, .orbb:focus-visible .orb { box-shadow: inset 0 0 0 1.5px rgba(235,154,120,.75), 0 0 0 4px rgba(217,119,87,.16), 0 2px 8px rgba(0,0,0,.35); }
+.orbb:hover .orb img, .orbb:focus-visible .orb img { opacity: .22; filter: blur(1px); transform: scale(.92); }
+.orbb:hover .gear, .orbb:focus-visible .gear { opacity: 1; transform: none; }
+.orbb:active .gear { transform: rotate(30deg) scale(.92); }
+.orbb:focus { outline: none; }
+.updot { position: absolute; top: -3px; right: -3px; width: 14px; height: 14px; padding: 0; border-radius: 50%; border: 2px solid #17171c; display: none; cursor: pointer; z-index: 2; }
+.updot::before { content: ''; position: absolute; inset: -6px; border-radius: 50%; }   /* zone de clic plus large que le point */
 .orbw.new .updot { display: block; background: #f0a050; animation: updp 1.8s ease-in-out infinite; }
 .orbw.ok .updot { display: block; background: #6fcf7a; box-shadow: 0 0 8px rgba(111,207,122,.75); }
 @keyframes updp { 0%, 100% { box-shadow: 0 0 4px rgba(240,160,80,.6); } 50% { box-shadow: 0 0 0 4px rgba(240,160,80,.18), 0 0 12px rgba(240,160,80,.95); } }
-.orbw.has:hover::after { content: attr(data-tip); position: absolute; left: -4px; top: calc(100% + 8px); white-space: nowrap; font-size: 12px; color: var(--text);
+.updot:hover::after { content: attr(data-tip); position: absolute; left: -24px; top: calc(100% + 10px); white-space: nowrap; font-size: 12px; color: var(--text);
   background: rgba(var(--pop),.97); border: 1px solid rgba(var(--ov),.12); border-radius: 10px; padding: 6px 11px; z-index: 50; pointer-events: none; box-shadow: 0 8px 20px rgba(0,0,0,.45); }
-.orbw.new:hover::after { border-color: rgba(240,160,80,.55); } .orbw.ok:hover::after { border-color: rgba(111,207,122,.55); }
+.orbw.new .updot:hover::after { border-color: rgba(240,160,80,.55); } .orbw.ok .updot:hover::after { border-color: rgba(111,207,122,.55); }
+html.light .orbw .orb { background: radial-gradient(circle at 50% 38%, #fff, #efe6e1 72%); }
+html.light .orbb .gear { color: #c8623f; }
+html.light .updot { border-color: #fff; }
 .updpop { position: absolute; top: 66px; left: 14px; width: 340px; z-index: 45; display: none; padding: 14px 14px 12px; border-radius: 16px; font-size: 13px;
   background: linear-gradient(170deg, rgba(38,30,32,.99), rgba(25,23,27,.99)); border: 1px solid rgba(240,160,80,.3); box-shadow: 0 18px 40px rgba(0,0,0,.5); }
 .updpop.ok { border-color: rgba(111,207,122,.35); }
@@ -444,6 +459,75 @@ html.light body.flash #sub, html.light .icon-btn.coffee:hover { color: #a87512; 
 html.light .box:focus-within { border-color: rgba(200,98,63,.5); }
 html.light .approve, html.light .ask { border-color: rgba(200,98,63,.35); }
 html.light ::-webkit-scrollbar-thumb { background: rgba(40,30,35,.18); }
+/* ================= v1.50 ================= */
+/* recherche en cours : ligne temporaire (retirée à la fin) */
+.srch { display: flex; align-items: center; gap: 8px; width: fit-content; max-width: 100%; font-size: 12.5px; color: var(--muted); padding: 4px 11px; margin: 5px 0;
+  border-radius: 999px; background: rgba(var(--ov),.05); border: 1px dashed rgba(235,154,120,.35); animation: srchp 1.6s ease-in-out infinite; }
+.srch .si { flex: none; }
+.srch .st { min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+@keyframes srchp { 50% { opacity: .55; } }
+/* modification de fichier : une seule ligne, dépliable */
+.diff summary { display: flex; align-items: center; gap: 7px; max-width: 100%; list-style: none; padding: 3px 11px; border-radius: 999px; background: rgba(var(--ov),.05); border: 1px solid rgba(var(--ov),.08); margin: 5px 0 0; }
+.diff summary::-webkit-details-marker { display: none; }
+.diff summary i { width: 6px; height: 6px; border-radius: 50%; background: var(--accent); flex: none; }
+.diff summary span { min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.diff summary em { flex: none; font-style: normal; font-size: 11px; color: var(--accent-2); }
+.diff[open] summary em { opacity: .6; }
+.diff pre { margin-top: 6px; }
+/* menu clic droit sur une réponse */
+#ctxm { position: fixed; z-index: 70; display: none; min-width: 205px; padding: 5px; border-radius: 12px; background: rgba(var(--pop),.98); border: 1px solid rgba(var(--ov),.12); box-shadow: 0 14px 34px rgba(0,0,0,.45); }
+#ctxm.open { display: block; }
+#ctxm button { display: flex; align-items: center; gap: 9px; width: 100%; font: inherit; font-size: 13px; color: var(--text); background: none; border: 0; border-radius: 8px; padding: 7px 10px; cursor: pointer; text-align: left; }
+#ctxm button:hover { background: rgba(217,119,87,.14); }
+#ctxm svg { flex: none; color: var(--muted); }
+/* petit message en bas */
+#toast { position: fixed; left: 50%; bottom: 118px; transform: translate(-50%, 8px); z-index: 80; opacity: 0; pointer-events: none; transition: opacity .2s, transform .2s; max-width: calc(100% - 40px);
+  font-size: 12.5px; padding: 8px 14px; border-radius: 12px; background: rgba(var(--pop),.98); border: 1px solid rgba(111,207,122,.45); box-shadow: 0 10px 26px rgba(0,0,0,.4);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+#toast.open { opacity: 1; transform: translate(-50%, 0); pointer-events: auto; }
+#toast.err { border-color: rgba(240,90,90,.5); }
+#toast u { color: var(--accent-2); }
+/* pause de quota */
+.pause { margin: 8px 0 4px; padding: 12px 14px; border-radius: 14px; background: rgba(224,184,79,.07); border: 1px solid rgba(224,184,79,.35); font-size: 13px; }
+.pause.done { opacity: .75; }
+.pause .ph { font-weight: 600; }
+.pause .pq { font-size: 12px; color: var(--muted); margin: 2px 0 4px; }
+.pause .pk { font-size: 10.5px; font-weight: 600; letter-spacing: .6px; text-transform: uppercase; color: #a89c80; margin: 9px 0 2px; }
+.pause ul { margin: 0; padding-left: 18px; }
+.pause li { margin: 1px 0; }
+.pause li.ok { color: var(--muted); }
+.pause li.ok::marker { content: '✓  '; color: #7bc67e; }
+.pause .req { white-space: pre-wrap; max-height: 90px; overflow: auto; }
+.pause .pn { font-size: 12px; color: var(--muted); margin-top: 10px; }
+.pause .pst { font-size: 12px; color: #e0b84f; margin-top: 8px; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.pause .pst:empty { display: none; }
+.pause .pb { display: flex; justify-content: flex-end; margin-top: 10px; }
+.pause .go { font: inherit; font-size: 13px; font-weight: 600; color: #fff; background: var(--accent); border: 0; border-radius: 9px; padding: 7px 14px; cursor: pointer; }
+.pause .go.sec { background: rgba(var(--ov),.09); color: var(--text); font-weight: 500; padding: 5px 11px; }
+.pause .pdone { font-size: 12px; color: var(--muted); }
+html.light .pause .pk { color: #8a7a52; }
+/* historique : sous-groupes, renommer */
+.mhead { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.mgadd { font: inherit; font-size: 11px; font-weight: 600; letter-spacing: 0; text-transform: none; color: var(--accent-2); background: none; border: 0; border-radius: 6px; padding: 2px 7px; cursor: pointer; }
+.mgadd:hover { background: rgba(235,154,120,.12); }
+.mgrp { display: flex; align-items: center; gap: 6px; padding: 6px 8px; margin-top: 2px; border-radius: 8px; font-size: 12.5px; font-weight: 600; cursor: pointer; user-select: none; }
+.mgrp:hover { background: rgba(var(--ov),.05); }
+.mgrp .gch { flex: none; width: 10px; color: var(--muted); font-size: 10px; transition: transform .15s; }
+.mgrp.open .gch { transform: rotate(90deg); }
+.mgrp .gn { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.mgrp .cnt { font-size: 11px; font-weight: 400; color: var(--muted); background: rgba(var(--ov),.06); border-radius: 999px; padding: 0 7px; flex: none; }
+.mgrp.loose { cursor: default; font-size: 10.5px; letter-spacing: .6px; text-transform: uppercase; color: #6f6f79; padding-top: 10px; }
+.mgrp.loose:hover { background: none; }
+.mgrp .rn, .mitem .rn { opacity: 0; background: none; border: 0; color: var(--muted); font-size: 12px; cursor: pointer; border-radius: 6px; width: 22px; height: 22px; flex: none; }
+.mgrp .del { opacity: 0; background: none; border: 0; color: var(--muted); font-size: 15px; cursor: pointer; border-radius: 6px; width: 22px; height: 22px; flex: none; }
+.mgrp:hover .rn, .mgrp:hover .del, .mitem:hover .rn, .mgrp .del.arm { opacity: 1; }
+.mgrp .del.arm { width: auto; padding: 0 7px; font-size: 12px; font-weight: 400; color: #f08a85; background: rgba(240,90,90,.12); }
+.mgrp .rn:hover, .mitem .rn:hover { color: var(--accent-2); background: rgba(235,154,120,.12); }
+.mgrp .del:hover { color: #f08a85; background: rgba(240,100,100,.1); }
+.mitem.ing { padding-left: 24px; }
+.mnone.gin { padding-left: 26px; font-size: 12px; }
+input.ren, input.gren { flex: 1; min-width: 0; font: inherit; font-size: 13px; font-weight: 400; padding: 4px 7px; border-radius: 7px; border: 1px solid var(--accent); background: var(--raised); color: var(--text); outline: none; }
+#sub { cursor: text; }
 </style>
 </head>
 <body>
@@ -464,7 +548,12 @@ html.light ::-webkit-scrollbar-thumb { background: rgba(40,30,35,.18); }
 </aside>
 <div id="chat">
 <header>
-  <button class="orbw" id="orbw" data-tip=""><div class="orb" id="orb"></div><span class="updot"></span></button>
+  <!-- le rond = Bébène ; au survol, ⚙ apparaît dessus : clic = réglages. La pastille (mise à jour) est un bouton à part. -->
+  <div class="orbw" id="orbw">
+    <button class="orbb" id="cfg" title="Réglages" aria-label="Réglages"><div class="orb" id="orb"></div>
+      <span class="gear"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg></span></button>
+    <button class="updot" id="updot" title=""></button>
+  </div>
   <div class="who"><b id="name">Bébène</b><span id="sub">Prêt à t'aider</span></div>
   <span class="dir" id="dir" hidden>…</span>
   <div class="hbtns">
@@ -480,9 +569,6 @@ html.light ::-webkit-scrollbar-thumb { background: rgba(40,30,35,.18); }
     <button class="icon-btn" id="pin" title="Épingler : garder ouverte quand je clique ailleurs">
       <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 17v5"/><path d="M9 3h6l-1 6 3 3v2H7v-2l3-3z"/></svg>
     </button>
-    <button class="icon-btn" id="cfg" title="Réglages">
-      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg>
-    </button>
     <button class="icon-btn" id="close" title="Fermer (Échap)">
       <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>
     </button>
@@ -491,6 +577,8 @@ html.light ::-webkit-scrollbar-thumb { background: rgba(40,30,35,.18); }
 
 <div class="updpop" id="updpop"></div>
 <div class="updpop" id="notepop"></div>
+<div id="ctxm"></div>
+<div id="toast"></div>
 
 <!-- barre de choix : mode (toggle) + menus dépliants Projet et Historique -->
 <div class="modebar">
@@ -514,7 +602,7 @@ html.light ::-webkit-scrollbar-thumb { background: rgba(40,30,35,.18); }
       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5"/><path d="M12 7v5l3 2"/></svg>
       <svg class="chev" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg></button>
     <div class="ddmenu right">
-      <div class="msec" id="mConvTitle">Conversations récentes</div>
+      <div class="msec mhead"><span id="mConvTitle">Conversations récentes</span><button class="mgadd" id="mGroupAdd" title="Créer un sous-groupe pour ranger les conversations">＋ Groupe</button></div>
       <div id="mConvs"></div>
       <button class="mlink" id="term">Continuer cette conversation dans le terminal ›</button>
     </div>
@@ -608,10 +696,16 @@ if (!convs.length && store.get('hist', '')) {                       // reprise d
   store.set('hist', ''); store.set('sid', '');
 }
 let convArm = '';   // conversation dont la suppression attend confirmation
+let GROUPS = {}; try { GROUPS = JSON.parse(store.get('groups', '{}')) || {}; } catch { GROUPS = {}; }
+let gFold = new Set(); try { gFold = new Set(JSON.parse(store.get('gfold', '[]')) || []); } catch { }
+let gArm = '', gEdit = null, cEdit = '';      // groupe à confirmer (suppression) ; groupe en cours de saisie ({ name } ou { name: null } = nouveau) ; conversation renommée
+let ptrDown = false, menuDirty = false;   // bouton de souris enfoncé ; menu à redessiner après le clic
+
 let conv = convs.find(c => c.id === store.get('cur', '')) || null;
 let flash = false, project = conv ? conv.project || '' : store.get('project', ''), projects = [];
 let granted = new Set(conv && conv.granted ? conv.granted : []);   // actions autorisées pour la conversation en cours
-let lastCtx = 0, compacting = false, compactNote = null;              // compactage (déclaré avant le premier refresh())
+let lastCtx = 0, compacting = false, compactNote = null;
+let turn = null, quotaStop = null;   // tâche en cours : demande, fichiers modifiés, étapes (résumé si pause de quota)              // compactage (déclaré avant le premier refresh())
 let sid = conv ? conv.sid || '' : '', busy = false, cur = null, gotResult = false, denials = [], pendingAsk = null, pendingReady = null;
 // ---- plusieurs tâches en même temps ----
 // Chaque conversation qui travaille a sa « vue » : son fil (élément log), sa session, son état. La vue affichée occupe les variables
@@ -620,10 +714,10 @@ const newKey = () => 'k' + Date.now().toString(36) + Math.random().toString(36).
 let rkey = conv ? conv.id : newKey(), inBg = false, autoAll = !!(conv && conv.autoAll), pendingHand = null;
 const VIEWS = {};
 function snapshot() {
-  return { log, conv, sid, busy, cur, gotResult, denials, pendingAsk, pendingReady, pendingHand, lastCtx, compacting, compactNote, flash, project, granted, rkey, autoAll };
+  return { log, conv, sid, busy, cur, gotResult, denials, pendingAsk, pendingReady, pendingHand, lastCtx, compacting, compactNote, flash, project, granted, rkey, autoAll, turn, quotaStop };
 }
 function restore(v) {
-  ({ log, conv, sid, busy, cur, gotResult, denials, pendingAsk, pendingReady, pendingHand, lastCtx, compacting, compactNote, flash, project, granted, rkey, autoAll } = v);
+  ({ log, conv, sid, busy, cur, gotResult, denials, pendingAsk, pendingReady, pendingHand, lastCtx, compacting, compactNote, flash, project, granted, rkey, autoAll, turn, quotaStop } = v);
 }
 function withRun(key, fn) {                            // exécute fn dans le contexte de la tâche « key » (affichée ou en fond)
   if (key === rkey) return fn();
@@ -664,13 +758,13 @@ function save() {
   if (flash || !log.children.length) return;                       // flash : rien n'est enregistré
   if (!conv) { conv = { id: 'c' + Date.now().toString(36), title: '', sid: sid, project: project, updated: Date.now(), hist: '' }; convs.unshift(conv); }
   conv.sid = sid; conv.hist = log.innerHTML; conv.updated = Date.now(); conv.project = project; conv.granted = [...granted]; conv.autoAll = autoAll;
-  if (!conv.title) { const u = log.querySelector('.msg.user'); conv.title = u ? u.textContent.trim().slice(0, 70) : 'Conversation'; }
+  if (!conv.title) { const u = log.querySelector('.msg.user'); conv.title = u ? shortTitle(u.textContent) : 'Conversation'; }
   persist();
   if (inBg) return;                                                   // tâche en fond : l'écran reste sur la conversation affichée
   store.set('cur', conv.id); renderMenu(); setSub();
 }
 
-function diffHtml(name, i) {
+function diffHtml(name, i, label) {
   const rows = [];
   const add = (s, cls, p) => String(s == null ? '' : s).split('\n').forEach(l => rows.push('<div class="' + cls + '">' + p + ' ' + esc(l) + '</div>'));
   if (name === 'Edit') { add(i.old_string, 'del', '-'); add(i.new_string, 'ins', '+'); }
@@ -678,7 +772,7 @@ function diffHtml(name, i) {
   else if (name === 'Write') add(i.content, 'ins', '+');
   else return '';
   const more = rows.length > 200 ? '<div class="more">… ' + (rows.length - 200) + ' lignes de plus</div>' : '';
-  return '<details class="diff"><summary>Voir les changements</summary><pre>' + rows.slice(0, 200).join('') + more + '</pre></details>';
+  return '<details class="diff"><summary>' + (label ? '<i></i><span>' + esc(label) + '</span><em>voir</em>' : 'Voir les changements') + '</summary><pre>' + rows.slice(0, 200).join('') + more + '</pre></details>';
 }
 
 function askApproval(list) {
@@ -729,6 +823,7 @@ function takeQuestion(t) {
 }
 // ---- étapes d'une tâche longue (outil TodoWrite de Claude) : une carte cochée qui se met à jour, et « 3/5 » sur le chat ----
 function showPlan(todos) {
+  if (turn && todos.length) turn.todos = todos.map(t => ({ content: String(t.content || ''), status: String(t.status || '') }));
   if (!cur || !todos.length) return;
   const done = todos.filter(t => t.status === 'completed').length;
   const html = '<div class="ph"><span>Étapes</span><b>' + done + '/' + todos.length + '</b></div>' + todos.map(t =>
@@ -824,11 +919,14 @@ function moveConv(id, p) {
 }
 function askMove(el, id) {
   const c = convs.find(x => x.id === id); if (!c) return;
-  const opts = [''].concat(projects).map(p => '<option value="' + esc(p) + '"' + ((c.project || '') === p ? ' selected' : '') + '>' + (p ? '# ' + esc(p) : '∅ Aucun projet') + '</option>').join('');
+  const gs = groupsOf(c.project || ''), inG = !!(c.group && gs.includes(c.group));
+  const opts = (gs.length ? '<optgroup label="Sous-groupe">' + [''].concat(gs).map(g => '<option value="g:' + esc(g) + '"' + ((inG ? c.group : '') === g ? ' selected' : '') + '>' + (g ? '📂 ' + esc(g) : 'Sans groupe') + '</option>').join('') + '</optgroup>' : '')
+    + '<optgroup label="Projet">' + [''].concat(projects).map(p => '<option value="p:' + esc(p) + '"' + (!gs.length && (c.project || '') === p ? ' selected' : '') + '>' + (p ? '# ' + esc(p) : '∅ Aucun projet') + '</option>').join('') + '</optgroup>';
+  $('#mConvs').__h = null;                                              // la liste sera redessinée après le choix
   el.innerHTML = '<select class="mvsel" title="Déplacer vers…">' + opts + '</select>';
   const sel = el.querySelector('select');
   sel.onclick = e => e.stopPropagation();
-  sel.onchange = () => moveConv(id, sel.value);
+  sel.onchange = () => { const v = sel.value; if (v.startsWith('g:')) { c.group = v.slice(2); persist(); renderMenuNow(); } else { c.group = ''; moveConv(id, v.slice(2)); } };
   sel.onblur = () => setTimeout(renderMenu, 150);
   sel.focus();
 }
@@ -911,6 +1009,11 @@ function compacted(ok, pre, post_) {
 function submit(text, allowed, silent) {
   text = (text || input.value).trim();
   if (busy || compacting || !text) return;
+  if (!silent) {
+    const pc = openPause();                                            // tâche en pause : écrire = demander de continuer
+    if (pc) { if (resumePause(pc, false, text)) { input.value = ''; autosize(); } return; }
+    turn = { req: text, files: [], todos: null, acts: 0 };
+  } else if (!turn) turn = { req: text, files: [], todos: null, acts: 0 };
   if (!silent) { input.value = ''; autosize(); el('msg user', esc(text)); decorate(); }
   cur = el('msg bot', '<div class="typing"><span></span><span></span><span></span></div>');
   busy = true; gotResult = false; denials = []; pendingAsk = null; pendingReady = null; pendingHand = null; refresh(); scroll();
@@ -957,7 +1060,7 @@ const liveCut = t => {
   const m = t.match(/(?:^|\n)(`{1,3}[a-z-]{0,10})$/);
   return m && '```bebene-'.startsWith(m[1]) ? t.slice(0, t.length - m[1].length) : t;
 };
-function liveStart() { if (!cur) return; live = addToCur('md live', ''); liveText = ''; liveShown = 0; }
+function liveStart() { if (!cur) return; hideSearch(); live = addToCur('md live', ''); liveText = ''; liveShown = 0; }
 function liveRender() {
   const near = log.scrollHeight - log.scrollTop - log.clientHeight < 90;   // on ne fait défiler que si on lisait déjà le bas
   live.innerHTML = md(liveCut(liveText).slice(0, liveShown));
@@ -991,7 +1094,7 @@ function liveEnd(text) {
 function onLine(l) {
   let o; try { o = JSON.parse(l); } catch { return; }
   if (o.session_id && o.session_id !== sid) setSid(o.session_id);
-  if (o.type === "rate_limit_event" && o.rate_limit_info) { store.set("quota", JSON.stringify(o.rate_limit_info)); setQuota(o.rate_limit_info); }
+  if (o.type === "rate_limit_event" && o.rate_limit_info) { store.set("quota", JSON.stringify(o.rate_limit_info)); setQuota(o.rate_limit_info); checkQuota(o.rate_limit_info); }
   if (o.type === 'assistant' && o.message && o.message.usage) { const u = o.message.usage; lastCtx = (u.input_tokens || 0) + (u.cache_read_input_tokens || 0) + (u.cache_creation_input_tokens || 0); }
   if (o.type === 'system' && o.subtype === 'init' && /haiku/i.test(o.model || '') && cur && !cur.querySelector('.lite'))
     addToCur('tool lite', '<i></i><span>⚡ Réponse rapide (Haiku)</span>');   // question simple : modèle léger, moins de quota
@@ -1004,6 +1107,7 @@ function onLine(l) {
     for (const c of o.message.content) {
       if (c.type === 'text' && !c.text.trim() && !o.parent_tool_use_id) liveEnd();
       if (c.type === 'text' && c.text.trim()) {
+        if (!o.parent_tool_use_id) hideSearch();
         const pn = projectIn(c.text); if (pn) attachProject(pn);
         const q = takeQuestion(c.text);
         if (live && !o.parent_tool_use_id) liveEnd(q.text);                // l'aperçu en direct devient le message définitif
@@ -1015,10 +1119,15 @@ function onLine(l) {
       if (c.type === 'tool_use' && c.name === 'TodoWrite' && !o.parent_tool_use_id) { showPlan((c.input || {}).todos || []); continue; }
       if (c.type === 'tool_use') {
         const i = c.input || {};
+        if (turn) turn.acts++;
+        const sr = searchOf(c.name, i);
+        if (sr) { showSearch(sr); continue; }                            // recherche : ligne temporaire, retirée à la fin
+        hideSearch();
+        if (turn && i.file_path && /^(Write|Edit|MultiEdit|NotebookEdit)$/.test(c.name) && !turn.files.includes(i.file_path)) turn.files.push(i.file_path);
         const what = i.command || i.file_path || i.pattern || i.url || i.query || i.description || '';
-        addToCur('tool', '<i></i><span>' + esc(toolName(c.name) + (what ? ' · ' + String(what).split('\n')[0] : '')) + '</span>');
-        const d = diffHtml(c.name, i);
-        if (d) addToCur('', d);
+        const label = toolName(c.name) + (what ? ' · ' + String(what).split('\n')[0] : '');
+        const d = diffHtml(c.name, i, label);
+        addToCur(d ? '' : 'tool', d || '<i></i><span>' + esc(label) + '</span>');
       }
     }
   }
@@ -1031,15 +1140,18 @@ function onLine(l) {
 
 function finish(code, err) {
   if (live) liveEnd(liveCut(liveText));                               // arrêté en pleine écriture : on garde ce qui est arrivé
+  const lastTxt = cur ? textOf(cur) : '';
   if (cur) {
     const t = cur.querySelector('.typing'); if (t) t.remove();
-    if (code !== '0' && !gotResult)
+    cur.querySelectorAll('.srch').forEach(x => x.remove());            // recherche finie : sa trace disparaît
+    if (code !== '0' && !gotResult && !quotaStop)
       addToCur('err', esc(err.trim() || (code === '1' ? 'Arrêté.' : 'Erreur (code ' + code + ').')));
     if (!cur.children.length) cur.remove();
   }
   cur = null; busy = false; refresh();
   let kind = 'done';
-  if (denials.length) { askApproval(denials); kind = 'perm'; }
+  if (quotaStop) { showPause(quotaStop, lastTxt); kind = 'pause'; quotaStop = null; denials = []; }
+  else if (denials.length) { askApproval(denials); kind = 'perm'; }
   else if (pendingHand && code === '0') { showHand(pendingHand); kind = 'hand'; }
   else if (pendingAsk && code === '0') { showAsk(pendingAsk); kind = 'ask'; }
   else if (pendingReady && code === '0') showReady(pendingReady);
@@ -1056,7 +1168,7 @@ function leave() {
   if (flash && sid) post('forget\n' + sid);                         // on efface la trace de la conversation flash
   park();
   busy = false; cur = null; gotResult = false; denials = []; pendingAsk = null; pendingReady = null; pendingHand = null;
-  lastCtx = 0; compacting = false; compactNote = null;
+  lastCtx = 0; compacting = false; compactNote = null; turn = null; quotaStop = null;
   return true;
 }
 function newChat(opts) {
@@ -1096,59 +1208,151 @@ function setSub() {
 }
 // Titre résumé par Claude : après les 3 premiers échanges, puis tous les 3 (la conversation évolue)
 function askTitle(code) {
-  if (flash || !conv || code !== '0') return;
+  if (flash || !conv || code !== '0' || conv.titleLock) return;      // titre écrit à la main : on n'y touche plus
   const n = log.querySelectorAll('.msg.user').length;
   if (!(n <= 3 || n % 3 === 0) || conv.titledAt === n) return;
   conv.titledAt = n;
   let parts = [...log.querySelectorAll('.msg.user, .msg.bot')].map(m => (m.classList.contains('user') ? 'Utilisateur : ' : 'Assistant : ') + textOf(m).slice(0, 700)).filter(x => x.length > 14);
   let ex = parts.join('\n\n');
   if (ex.length > 4000) ex = ex.slice(0, 1500) + '\n[…]\n' + ex.slice(-2500);
+  const others = convs.filter(c => c !== conv && c.title).slice(0, 15).map(c => c.title);   // pour un titre qui se distingue des autres
+  if (others.length) ex = 'Titres des autres conversations (le tien doit être différent) : ' + others.join(' | ') + '\n\n' + ex;
   post('title\n' + conv.id + '\n' + ex);
 }
 function ago(t) {
   const m = Math.round((Date.now() - t) / 60000);
   return m < 1 ? "à l'instant" : m < 60 ? 'il y a ' + m + ' min' : m < 1440 ? 'il y a ' + Math.round(m / 60) + ' h' : 'il y a ' + Math.round(m / 1440) + ' j';
 }
+// ---- sous-groupes de l'historique (par projet ; « » = sans projet) : la conversation garde tout, seul conv.group change ----
+function saveGroups() { store.set('groups', JSON.stringify(GROUPS)); store.set('gfold', JSON.stringify([...gFold])); }
+function groupsOf(scope) {
+  const l = (GROUPS[scope] || []).slice();
+  convs.forEach(c => { if ((c.project || '') === scope && c.group && !l.includes(c.group)) l.push(c.group); });
+  return l;
+}
+function menuScope() { return flash ? '' : project; }
+// Le menu n'est pas redessiné pendant un clic (bouton enfoncé) ni pendant une saisie dedans : un élément remplacé entre
+// l'appui et le relâchement perd son clic (ex. une tâche en fond qui avance pendant qu'on clique dans l'historique).
 function renderMenu() {
-  $('#mProjects').innerHTML = projects.length ? projects.map(p =>
+  if (ptrDown || editingIn('.dd')) { menuDirty = true; return; }
+  renderMenuNow();
+}
+function renderMenuNow() {
+  menuDirty = false;
+  setHTML($('#mProjects'), projects.length ? projects.map(p =>
     '<button class="mitem' + (p === project && !flash ? ' on' : '') + '" data-p="' + esc(p) + '"><span class="ic">#</span><span class="tx">' + esc(p) + '</span>' + (n => n ? '<small class="cnt">' + n + '</small>' : '')(convs.filter(c => c.project === p).length) + '</button>').join('')
-    : '<div class="mnone">Aucun projet pour l\'instant.</div>';
+    : '<div class="mnone">Aucun projet pour l\'instant.</div>');
   $('#mNoProj').classList.toggle('on', !project && !flash);
-  $('#mProjects').querySelectorAll('[data-p]').forEach(b => b.onclick = () => newChat({ project: b.dataset.p }));
   // historique du contexte courant : dans un projet = ses conversations seulement ; sans projet = les conversations sans projet
-  // état de chaque conversation : ⏳ travaille, 🐾 a besoin de toi, ❓ question, 🔐 accord, ✅ finie en fond (pas encore relue)
-  const ST = { hand: '🐾', ask: '❓', perm: '🔐', done: '✅' };
+  // état de chaque conversation : ⏳ travaille, 🐾 a besoin de toi, ❓ question, 🔐 accord, ⏸ en pause (quota), ✅ finie en fond (pas encore relue)
+  const ST = { hand: '🐾', ask: '❓', perm: '🔐', pause: '⏸', done: '✅' };
   const stOf = c => { const vw = viewOf(c); return (c === conv && busy) || (vw && vw.busy) ? '⏳' : ST[c.attn] || ''; };
   // les tâches en cours ou qui t'attendent apparaissent toujours, quel que soit le projet
-  const scope = flash ? '' : project, mine = convs.filter(c => (c.project || '') === scope || stOf(c));
+  const scope = menuScope(), mine = convs.filter(c => (c.project || '') === scope || stOf(c));
   $('#ddHist').classList.toggle('attn', convs.some(c => c !== conv && stOf(c)));   // une tâche en fond travaille ou t'attend
   $('#mConvTitle').textContent = scope ? 'Conversations · ' + scope : 'Conversations sans projet';
-  $('#mConvs').innerHTML = mine.length ? mine.slice(0, 20).map(c =>
-    '<div class="mitem conv' + (conv && c.id === conv.id ? ' on' : '') + '" data-c="' + c.id + '"><span class="tx">' + (stOf(c) ? '<span class="cst">' + stOf(c) + '</span>' : '') + esc(c.title || 'Conversation')
-    + '<small>' + ago(c.updated) + '</small></span><button class="mv" data-mv="' + c.id + '" title="Déplacer vers un projet…">⇢</button><button class="del' + (convArm === c.id ? ' arm' : '') + '" data-del="' + c.id + '" title="Supprimer">' + (convArm === c.id ? 'Sûr ?' : '×') + '</button></div>').join('')
-    : '<div class="mnone">' + (scope ? 'Pas encore de conversation dans ce projet.' : 'Pas encore de conversation.') + '</div>';
-  $('#mConvs').querySelectorAll('[data-c]').forEach(el => el.onclick = e => {
-    if (e.target.dataset.mv) { e.stopPropagation(); askMove(el, e.target.dataset.mv); return; }
-    if (e.target.closest('select')) return;
-    if (e.target.dataset.del) {                                         // 1er clic : « Sûr ? » ; 2e clic : supprimée (le menu reste ouvert)
-      e.stopPropagation(); const id = e.target.dataset.del;
-      if (convArm !== id) { convArm = id; renderMenu(); setTimeout(() => { if (convArm === id) { convArm = ''; renderMenu(); } }, 4000); return; }
-      const gone = convs.find(c => c.id === id), vw = gone && viewOf(gone);
-      if (vw) { post('stop\n' + vw.rkey); delete VIEWS[vw.rkey]; }      // une tâche en fond s'arrête avec sa conversation
-      if (conv && conv.id === id && busy) post('stop\n' + rkey);
-      convArm = ''; convs = convs.filter(c => c.id !== id); if (conv && conv.id === id) conv = null; persist(); renderMenu(); return;
-    }
-    const c = convs.find(x => x.id === el.dataset.c); if (c) openConv(c);
+  const item = (c, ing) => '<div class="mitem conv' + (ing ? ' ing' : '') + (conv && c.id === conv.id ? ' on' : '') + '" data-c="' + c.id + '">'
+    + (cEdit === c.id
+      ? '<input class="ren" data-ren="' + c.id + '" value="' + esc(c.title || '') + '" maxlength="60" placeholder="Titre de la conversation">'
+      : '<span class="tx">' + (stOf(c) ? '<span class="cst">' + stOf(c) + '</span>' : '') + esc(c.title || 'Conversation')
+        + '<small>' + ago(c.updated) + (c.project !== undefined && (c.project || '') !== scope ? ' · # ' + esc(c.project || 'sans projet') : '') + '</small></span>'
+        + '<button class="rn" data-rn="' + c.id + '" title="Renommer">✎</button>'
+        + '<button class="mv" data-mv="' + c.id + '" title="Déplacer vers un sous-groupe ou un projet…">⇢</button>'
+        + '<button class="del' + (convArm === c.id ? ' arm' : '') + '" data-del="' + c.id + '" title="Supprimer">' + (convArm === c.id ? 'Sûr ?' : '×') + '</button>')
+    + '</div>';
+  const gs = groupsOf(scope), inScope = c => (c.project || '') === scope;
+  let h = gEdit && gEdit.name === null ? '<div class="mgrp new"><span class="gch"></span><input class="gren" placeholder="Nom du sous-groupe…" maxlength="40"></div>' : '';
+  gs.forEach(g => {
+    const list = mine.filter(c => inScope(c) && c.group === g), open = !gFold.has(scope + '\n' + g);
+    h += '<div class="mgrp' + (open ? ' open' : '') + '" data-g="' + esc(g) + '"><span class="gch">▸</span>'
+      + (gEdit && gEdit.name === g
+        ? '<input class="gren" value="' + esc(g) + '" maxlength="40">'
+        : '<span class="gn">' + esc(g) + '</span><small class="cnt">' + list.length + '</small>'
+          + '<button class="rn" data-grn="1" title="Renommer le sous-groupe">✎</button>'
+          + '<button class="del' + (gArm === g ? ' arm' : '') + '" data-gdel="1" title="Supprimer le sous-groupe (ses conversations sont gardées, hors groupe)">' + (gArm === g ? 'Sûr ?' : '×') + '</button>')
+      + '</div>';
+    if (open) h += list.length ? list.map(c => item(c, true)).join('') : '<div class="mnone gin">Vide : ⇢ sur une conversation pour l\'y ranger.</div>';
   });
-  $('#mConvs').querySelectorAll('[data-c]').forEach(el => el.oncontextmenu = e => { e.preventDefault(); e.stopPropagation(); askMove(el, el.dataset.c); });   // clic droit = déplacer
+  const loose = mine.filter(c => !(inScope(c) && c.group && gs.includes(c.group)));
+  if (gs.length && loose.length) h += '<div class="mgrp loose">Sans groupe</div>';
+  h += loose.map(c => item(c, false)).join('');
+  if (!mine.length && !gs.length && !h) h = '<div class="mnone">' + (scope ? 'Pas encore de conversation dans ce projet.' : 'Pas encore de conversation.') + '</div>';
+  if (setHTML($('#mConvs'), h)) { const i = $('#mConvs').querySelector('input'); if (i && document.activeElement !== i) { i.focus(); i.select(); } }
+  $('#mGroupAdd').hidden = flash;
 }
+// clics dans les menus : un seul gestionnaire par liste (les éléments peuvent être redessinés sans perdre leurs actions)
+$('#mProjects').addEventListener('click', e => { const b = e.target.closest('[data-p]'); if (b) newChat({ project: b.dataset.p }); });
+$('#mGroupAdd').onclick = () => { gEdit = { name: null }; cEdit = ''; renderMenuNow(); };
+function commitEdit(inp, cancel) {
+  if (!inp || !inp.isConnected || inp.__done) return; inp.__done = true;
+  const v = inp.value.trim().replace(/\s+/g, ' '), scope = menuScope();
+  if (inp.classList.contains('ren')) {
+    const c = convs.find(x => x.id === inp.dataset.ren);
+    if (c && v && !cancel && v !== c.title) { c.title = v; c.titleLock = true; persist(); setSub(); }
+    cEdit = '';
+  } else if (gEdit) {
+    const old = gEdit.name, l = GROUPS[scope] = groupsOf(scope);
+    if (v && !cancel && v !== old && !l.includes(v)) {
+      if (old === null) l.push(v);
+      else {
+        l[l.indexOf(old)] = v;
+        convs.forEach(c => { if ((c.project || '') === scope && c.group === old) c.group = v; });
+        if (gFold.delete(scope + '\n' + old)) gFold.add(scope + '\n' + v);
+        persist();
+      }
+      saveGroups();
+    }
+    gEdit = null;
+  }
+  renderMenuNow();
+}
+$('#mConvs').addEventListener('keydown', e => {
+  if (!e.target.matches('input')) return;
+  if (e.key === 'Enter') { e.preventDefault(); commitEdit(e.target); }
+  if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); commitEdit(e.target, true); }   // Échap annule la saisie, le menu reste
+});
+$('#mConvs').addEventListener('focusout', e => { if (e.target.matches('input.ren, input.gren')) setTimeout(() => commitEdit(e.target), 0); });
+$('#mConvs').addEventListener('click', e => {
+  const t = e.target;
+  if (t.closest('input, select')) return;
+  const grp = t.closest('.mgrp');
+  if (grp) {
+    if (!grp.dataset.g) return;                                         // « Sans groupe » / saisie d'un nouveau groupe
+    const g = grp.dataset.g, scope = menuScope();
+    if (t.dataset.grn) { gEdit = { name: g }; cEdit = ''; renderMenuNow(); return; }
+    if (t.dataset.gdel) {                                               // 1er clic : « Sûr ? » ; 2e clic : supprimé, ses conversations restent (sans groupe)
+      if (gArm !== g) { gArm = g; renderMenuNow(); setTimeout(() => { if (gArm === g) { gArm = ''; renderMenu(); } }, 4000); return; }
+      GROUPS[scope] = groupsOf(scope).filter(x => x !== g);
+      convs.forEach(c => { if ((c.project || '') === scope && c.group === g) c.group = ''; });
+      gArm = ''; gFold.delete(scope + '\n' + g); saveGroups(); persist(); renderMenuNow(); return;
+    }
+    const k = scope + '\n' + g; if (!gFold.delete(k)) gFold.add(k);   // clic sur le nom : déplier / replier
+    saveGroups(); renderMenuNow(); return;
+  }
+  const row = t.closest('[data-c]'); if (!row) return;
+  if (t.dataset.rn) { cEdit = t.dataset.rn; gEdit = null; renderMenuNow(); return; }
+  if (t.dataset.mv) { askMove(row, t.dataset.mv); return; }
+  if (t.dataset.del) {                                                  // 1er clic : « Sûr ? » ; 2e clic : supprimée (le menu reste ouvert)
+    const id = t.dataset.del;
+    if (convArm !== id) { convArm = id; renderMenuNow(); setTimeout(() => { if (convArm === id) { convArm = ''; renderMenu(); } }, 4000); return; }
+    const gone = convs.find(c => c.id === id), vw = gone && viewOf(gone);
+    if (vw) { post('stop\n' + vw.rkey); delete VIEWS[vw.rkey]; }      // une tâche en fond s'arrête avec sa conversation
+    if (conv && conv.id === id && busy) post('stop\n' + rkey);
+    convArm = ''; convs = convs.filter(c => c.id !== id); if (conv && conv.id === id) conv = null; persist(); renderMenuNow(); return;
+  }
+  const c = convs.find(x => x.id === row.dataset.c); if (c) openConv(c);
+});
+$('#mConvs').addEventListener('contextmenu', e => {                   // clic droit sur une conversation = déplacer
+  const row = e.target.closest('[data-c]'); if (!row || e.target.closest('input, select')) return;
+  e.preventDefault(); e.stopPropagation(); askMove(row, row.dataset.c);
+});
 // ---- mises à jour (pastille sur l'avatar, en haut à gauche) ----
 let UPD = null, updStatus = '', updErr = false;
 function renderUpd() {
-  const w = $('#orbw'); w.classList.remove('new', 'ok', 'has');
-  if (UPD && UPD.available) { w.classList.add('new', 'has'); w.dataset.tip = '⬆ Nouvelle mise à jour : Bébène ' + UPD.latest + ' (tu as la ' + UPD.current + ')'; }
-  else if (UPD && UPD.ok) { w.classList.add('ok', 'has'); w.dataset.tip = '✓ Mise à jour réussie : Bébène ' + UPD.current; }
-  else { w.dataset.tip = ''; $('#updpop').classList.remove('open'); }
+  const w = $('#orbw'), d = $('#updot'); w.classList.remove('new', 'ok', 'has');
+  if (UPD && UPD.available) { w.classList.add('new', 'has'); d.dataset.tip = '⬆ Nouvelle mise à jour : Bébène ' + UPD.latest + ' (tu as la ' + UPD.current + ')'; }
+  else if (UPD && UPD.ok) { w.classList.add('ok', 'has'); d.dataset.tip = '✓ Mise à jour réussie : Bébène ' + UPD.current; }
+  else { d.dataset.tip = ''; $('#updpop').classList.remove('open'); }
   if ($('#updpop').classList.contains('open')) fillPop();
 }
 function fillPop() {
@@ -1168,8 +1372,8 @@ function fillPop() {
   const go = $('#updGo'); if (go) go.onclick = () => { updErr = false; updStatus = 'Préparation…'; fillPop(); post('updinstall'); };
   const ok = $('#updOk'); if (ok) ok.onclick = () => { post('updseen'); UPD.ok = false; p.classList.remove('open'); renderUpd(); };
 }
-$('#orbw').onclick = e => { e.stopPropagation(); if (!$('#orbw').classList.contains('has')) return; const p = $('#updpop'); p.classList.toggle('open'); if (p.classList.contains('open')) fillPop(); };
-document.addEventListener('click', e => { if (!inside(e, '#updpop, #orbw')) $('#updpop').classList.remove('open'); });
+$('#updot').onclick = e => { e.stopPropagation(); if (!$('#orbw').classList.contains('has')) return; const p = $('#updpop'), was = p.classList.contains('open'); closePops(); p.classList.toggle('open', !was); if (p.classList.contains('open')) fillPop(); };
+document.addEventListener('click', e => { if (!inside(e, '#updpop, #updot')) $('#updpop').classList.remove('open'); });
 // ---- post-it : liste (affichés / masqués), nouveau, afficher, masquer, supprimer ----
 const NCOL = { jaune: '#ffee9e', rose: '#ffc7d6', vert: '#c8eeba', bleu: '#bddefc', orange: '#ffcda8' };
 let NOTES = { enabled: false, notes: [] }, noteArm = '';
@@ -1179,7 +1383,7 @@ function renderNotes() {
   $('#nc').textContent = NOTES.notes.length; $('#notes').classList.toggle('has', NOTES.notes.length > 0);
   $('#notes').title = 'Post-it · ' + shown + ' affiché' + (shown > 1 ? 's' : '') + ', ' + (NOTES.notes.length - shown) + ' masqué' + (NOTES.notes.length - shown > 1 ? 's' : '');
   const p = $('#notepop');
-  p.innerHTML = '<div class="nh"><h4>Post-it</h4><button class="pri" id="nNew">+ Nouveau</button></div>'
+  if (!setHTML(p, '<div class="nh"><h4>Post-it</h4><button class="pri" id="nNew">+ Nouveau</button></div>'
     + '<div class="sub">Épinglé 📌 : reste à l\'écran même discussion fermée. Masqué : gardé en mémoire, clique pour le rouvrir.</div>'
     + '<div class="nl">' + (NOTES.notes.length ? NOTES.notes.map(n =>
       '<div class="ni' + (n.shown ? '' : ' off') + '"><span class="dot" style="background:' + (NCOL[n.color] || NCOL.jaune) + '"></span>'
@@ -1187,20 +1391,20 @@ function renderNotes() {
       + '<span class="st">' + (n.shown ? (n.pinned ? '📌' : 'affiché') : 'masqué') + '</span>'
       + (n.shown ? '<button data-nhide="' + n.id + '">Masquer</button>' : '<button data-nshow="' + n.id + '">Afficher</button>')
       + '<button class="del" data-ndel="' + n.id + '">' + (noteArm === n.id ? 'Sûr ?' : '×') + '</button></div>').join('')
-      : '<div class="empty">Aucun post-it pour l\'instant.</div>') + '</div>';
+      : '<div class="empty">Aucun post-it pour l\'instant.</div>') + '</div>')) return;
   $('#nNew').onclick = () => post('notenew');
   p.querySelectorAll('[data-nshow]').forEach(b => b.onclick = () => post('noteshow\n' + b.dataset.nshow));
   p.querySelectorAll('[data-nhide]').forEach(b => b.onclick = () => post('notehide\n' + b.dataset.nhide));
   p.querySelectorAll('[data-ndel]').forEach(b => b.onclick = () => {
     if (noteArm === b.dataset.ndel) { noteArm = ''; post('notedel\n' + b.dataset.ndel); return; }   // 2e clic : supprimé (vers la Corbeille)
-    noteArm = b.dataset.ndel; renderNotes(); setTimeout(() => { if (noteArm) { noteArm = ''; renderNotes(); } }, 4000);
+    noteArm = b.dataset.ndel; renderNotes(); setTimeout(() => { if (noteArm === b.dataset.ndel) { noteArm = ''; renderNotes(); } }, 4000);
   });
 }
-$('#notes').onclick = e => { e.stopPropagation(); $('#updpop').classList.remove('open'); $('#notepop').classList.toggle('open'); renderNotes(); };
+$('#notes').onclick = e => { e.stopPropagation(); const p = $('#notepop'), was = p.classList.contains('open'); closePops(); p.classList.toggle('open', !was); renderNotes(); };
 document.addEventListener('click', e => { if (!inside(e, '#notepop, #notes')) $('#notepop').classList.remove('open'); });
 post('notes');
 function closeMenu() { document.querySelectorAll('.dd.open').forEach(d => d.classList.remove('open')); }
-function toggleDd(id) { const d = $(id), was = d.classList.contains('open'); closeMenu(); if (!was) { d.classList.add('open'); post('projects'); renderMenu(); } }
+function toggleDd(id) { const d = $(id), was = d.classList.contains('open'); closePops(); if (!was) { d.classList.add('open'); post('projects'); renderMenu(); } }
 $('#ddProj').onclick = e => { e.stopPropagation(); toggleDd('#ddP'); };
 $('#ddHist').onclick = e => { e.stopPropagation(); toggleDd('#ddH'); };
 document.addEventListener('click', e => { if (!inside(e, '.dd')) closeMenu(); });
@@ -1208,7 +1412,7 @@ $('#mNormal').onclick = () => { if (flash) newChat({ project: '' }); };
 $('#mFlash').onclick = () => { if (!flash) newChat({ flash: true }); };
 $('#mNoProj').onclick = () => newChat({ project: '' });
 // glisser l'en-tête = déplacer la fenêtre
-$('header').addEventListener('mousedown', e => { if (e.button === 0 && !e.target.closest('button')) { e.preventDefault(); post('drag'); } });
+$('header').addEventListener('mousedown', e => { if (e.button === 0 && !e.target.closest('button, #sub')) { e.preventDefault(); post('drag'); } });
 // bords et coins : agrandir / réduire la fenêtre (C# suit la souris ; taille minimale imposée côté C#)
 ['n', 's', 'e', 'w', 'ne', 'nw', 'se', 'sw'].forEach(d => {
   const h = document.createElement('div'); h.className = 'rsz rsz-' + d; document.body.appendChild(h);
@@ -1219,6 +1423,196 @@ $('#mProjAdd').onclick = () => { const n = $('#mProjName').value.trim(); if (n) 
 $('#mProjName').onkeydown = e => { if (e.key === 'Enter') $('#mProjAdd').click(); };
 
 function autosize() { input.style.height = 'auto'; input.style.height = Math.min(input.scrollHeight, 150) + 'px'; refresh(); listHint(); }
+
+// ---- fenêtres flottantes de la discussion (menus #, historique, post-it, mise à jour, clic droit) :
+// une seule ouverte à la fois ; clic dehors ou Échap = fermée ; un clic dedans ne la ferme jamais.
+function closePops() {
+  closeMenu();
+  ['#updpop', '#notepop', '#ctxm'].forEach(q => { const p = $(q); if (p) p.classList.remove('open'); });
+}
+function anyPop() { return !!document.querySelector('.dd.open, #updpop.open, #notepop.open, #ctxm.open'); }
+document.addEventListener('pointerdown', () => { ptrDown = true; }, true);
+document.addEventListener('pointerup', () => { ptrDown = false; if (menuDirty) setTimeout(renderMenu, 0); }, true);   // après le clic
+document.addEventListener('pointermove', e => { if (ptrDown && !e.buttons) { ptrDown = false; if (menuDirty) renderMenu(); } }, true);   // relâché hors de la page (glisser la fenêtre…)
+window.addEventListener('blur', () => { ptrDown = false; });
+function editingIn(q) { const a = document.activeElement; return !!(a && a.closest && a.closest(q) && /^(INPUT|SELECT|TEXTAREA)$/.test(a.tagName)); }
+function setHTML(node, html) { if (node.__h === html) return false; node.innerHTML = html; node.__h = html; return true; }   // rien ne change = rien n'est remplacé
+function shortTitle(t) {                                             // titre provisoire : début du 1er message, coupé à un mot
+  t = String(t || '').replace(/\s+/g, ' ').trim();
+  if (t.length <= 42) return t || 'Conversation';
+  const c = t.slice(0, 42), i = c.lastIndexOf(' ');
+  return (i > 20 ? c.slice(0, i) : c) + '…';
+}
+// renommer la conversation affichée : double-clic sur son titre (sous le nom)
+$('#sub').title = 'Double-clic pour renommer la conversation';
+$('#sub').ondblclick = () => {
+  if (!conv || flash) return;
+  cEdit = conv.id; gEdit = null;
+  if (!$('#ddH').classList.contains('open')) toggleDd('#ddH');
+  renderMenuNow();
+};
+
+// ---- recherches en cours : une ligne temporaire « où je cherche », retirée à la fin avec les commandes de recherche ----
+const SHORT = p => { p = String(p || '').replace(/\\/g, '/').replace(/\/+$/, ''); const a = p.split('/'); return a.length > 3 ? '…/' + a.slice(-2).join('/') : p; };
+const HOST = u => { try { return new URL(u).hostname.replace(/^www\./, ''); } catch { return String(u || '').slice(0, 60); } };
+const SEARCH_CMD = /^(ls|dir|find|tree|grep|egrep|rg|cat|type|head|tail|wc|stat|file|du|Get-ChildItem|gci|Get-Item|Get-ItemProperty|Select-String|sls|Get-Content|gc|Test-Path|Resolve-Path|where(?:\.exe)?|which|Get-Command)\b/i;
+function cmdPlace(cmd) {
+  const q = cmd.match(/["']([^"']*[\\/~][^"']*)["']/); if (q) return q[1];
+  const w = cmd.split(/\s+/).find(x => /[\\/~]/.test(x) && !/^-/.test(x) && !/[|<>]/.test(x)); return w || '';
+}
+function searchOf(n, i) {
+  if (n === 'Read') return { ic: '📄', t: 'Je lis ' + SHORT(i.file_path) };
+  if (n === 'Glob') return { ic: '📁', t: 'Je cherche ' + (i.pattern || 'des fichiers') + (i.path ? ' dans ' + SHORT(i.path) : '') };
+  if (n === 'Grep') return { ic: '🔎', t: 'Je cherche « ' + String(i.pattern || '').slice(0, 40) + ' »' + (i.path ? ' dans ' + SHORT(i.path) : '') };
+  if (n === 'LS') return { ic: '📁', t: 'Je regarde ' + SHORT(i.path) };
+  if (n === 'WebSearch') return { ic: '🌐', t: 'Je cherche sur le web : ' + String(i.query || '').slice(0, 70) };
+  if (n === 'WebFetch') return { ic: '🌐', t: 'Je lis ' + HOST(i.url) };
+  if ((n === 'Task' || n === 'Agent') && /explore/i.test(i.subagent_type || '')) return { ic: '🔎', t: 'J\'explore : ' + String(i.description || '').slice(0, 70) };
+  const ch = n.match(/^mcp__claude-in-chrome__(\w+)/);
+  if (ch) {
+    if (/navigate/.test(ch[1]) && i.url) return { ic: '🌐', t: 'Je consulte ' + HOST(i.url) };
+    if (/read_page|get_page_text|find|tabs_context/.test(ch[1])) return { ic: '🌐', t: 'Je lis la page dans Chrome' };
+    return null;
+  }
+  const mc = n.match(/^mcp__(.+?)__(\w+)$/);
+  if (mc && /^(search|list|get|read|query|fetch|find)/i.test(mc[2])) {
+    const svc = mc[1].replace(/^claude_ai_/, '').replace(/_/g, ' ');
+    return { ic: /mail|outlook/i.test(svc) ? '✉️' : /calendar|agenda/i.test(svc) ? '📅' : '🪟', t: 'Je consulte ' + svc };
+  }
+  if (n === 'Bash' || n === 'PowerShell') {
+    const cmd = String(i.command || '').trim();
+    if (/ecran\.ps1/i.test(cmd)) return { ic: '🪟', t: 'Je regarde la fenêtre' };
+    const c0 = cmd.replace(/^(?:powershell|pwsh)(?:\.exe)?\s+(?:-\w+\s+)*["']?/i, '').replace(/^cd\s+(?:"[^"]*"|'[^']*'|\S+)\s*(?:&&|;)\s*/i, '');
+    const m = c0.match(SEARCH_CMD); if (!m) return null;
+    if (/[>]|\b(rm|del|Remove-Item|mv|Move-Item|cp|Copy-Item|Set-Content|Out-File|New-Item|mkdir)\b/i.test(cmd)) return null;   // la commande modifie aussi : on la garde
+    const place = cmdPlace(c0), w = m[1].toLowerCase();
+    const ic = /grep|rg|sls|select-string/.test(w) ? '🔎' : /cat|type|head|tail|get-content|^gc$/.test(w) ? '📄' : '📁';
+    return { ic, t: (ic === '📄' ? 'Je lis ' : 'Je cherche dans ') + (place ? SHORT(place) : i.description ? String(i.description).slice(0, 60) : 'tes fichiers') };
+  }
+  return null;
+}
+function showSearch(sr) {
+  if (!cur) return;
+  let d = cur.querySelector(':scope > .srch');
+  if (!d) d = addToCur('srch', '');
+  else if (d.nextElementSibling && !d.nextElementSibling.classList.contains('typing')) cur.insertBefore(d, cur.querySelector('.typing'));   // toujours en bas
+  d.innerHTML = '<span class="si">' + sr.ic + '</span><span class="st">' + esc(sr.t) + '</span>';
+  d.title = sr.t;
+}
+function hideSearch() { if (cur) cur.querySelectorAll(':scope > .srch').forEach(x => x.remove()); }
+
+// ---- pause avant la fin du quota : sous 3 % restant (session 5 h ou semaine), la tâche s'arrête proprement,
+// un résumé s'affiche, et rien ne repart tant que tu ne demandes pas de continuer (nouvelle session + résumé).
+const QUOTA_MIN = 0.03;
+function quotaLow(info) {
+  const w = (info && info.unifiedWindows) || {};
+  for (const [k, label] of [['five_hour', 'Session (5 h)'], ['seven_day', 'Semaine']]) {
+    const x = w[k]; if (!x || typeof x.utilization !== 'number') continue;
+    if (x.resetsAt && x.resetsAt * 1000 <= Date.now()) continue;         // fenêtre déjà rechargée
+    const rem = 1 - x.utilization;
+    if (rem <= QUOTA_MIN) return { label, rem: Math.max(0, rem), reset: x.resetsAt ? left(x.resetsAt) || '' : '' };
+  }
+  return null;
+}
+function checkQuota(info) {                                           // dans le contexte d'une tâche (affichée ou en fond)
+  if (!busy || quotaStop) return;
+  const low = quotaLow(info); if (!low) return;
+  quotaStop = low; post('stop\n' + rkey);
+}
+function quotaLine(low) { return low.label + ' : ' + Math.round(low.rem * 100) + ' % restant' + (low.reset ? ' · recharge dans ' + low.reset : ''); }
+function showPause(low, lastTxt) {
+  const t = turn || { req: '', files: [], todos: null, acts: 0 };
+  const todos = t.todos || [], ok = todos.filter(x => x.status === 'completed'), rest = todos.filter(x => x.status !== 'completed');
+  const p = { req: t.req, files: t.files, todos: t.todos, last: String(lastTxt || '').slice(-1500), acts: t.acts };
+  const li = (a, cls) => a.map(x => '<li' + (cls ? ' class="' + cls + '"' : '') + '>' + esc(x) + '</li>').join('');
+  const card = el('pause', '<div class="ph">⏸ Tâche en pause · quota presque épuisé</div>'
+    + '<div class="pq">' + esc(quotaLine(low)) + '. J\'ai arrêté proprement avant la limite.</div>'
+    + '<div class="pk">Demande</div><div class="req">' + esc(t.req || '(inconnue)') + '</div>'
+    + '<div class="pk">Avancement</div><div>' + (todos.length ? ok.length + ' étape' + (ok.length > 1 ? 's' : '') + ' sur ' + todos.length + ' terminée' + (ok.length > 1 ? 's' : '')
+      : (t.acts || 0) + ' action' + ((t.acts || 0) > 1 ? 's' : '') + ' faite' + ((t.acts || 0) > 1 ? 's' : '') + ' (lectures, commandes, modifications)') + '</div>'
+    + (ok.length ? '<div class="pk">Fait</div><ul>' + li(ok.map(x => x.content), 'ok') + '</ul>' : '')
+    + (rest.length ? '<div class="pk">Reste à faire</div><ul>' + li(rest.map(x => x.content)) + '</ul>' : '')
+    + '<div class="pk">Fichiers modifiés</div>' + (t.files.length ? '<ul>' + li(t.files.map(SHORT)) + '</ul>' : '<div>Aucun</div>')
+    + '<div class="pn">' + (todos.length
+      ? 'À la reprise, une nouvelle session reçoit ce résumé et repart de l\'étape en cours.'
+      : 'La tâche n\'était pas découpée en étapes : à la reprise, je garde ta demande, les fichiers modifiés et mon dernier message, et je vérifie ce qui est déjà fait. S\'il manque quelque chose, je te le redemanderai.')
+    + ' Rien ne repart tout seul.</div>'
+    + '<div class="pst"></div><div class="pb"><button class="go">▶ Continuer</button></div>');
+  card.dataset.p = JSON.stringify(p);
+  scroll();
+}
+function openPause() { const l = log.querySelectorAll('.pause:not(.done)'); return l.length ? l[l.length - 1] : null; }
+function resumeText(p, extra) {
+  const todos = p.todos || [], ok = todos.filter(x => x.status === 'completed'), rest = todos.filter(x => x.status !== 'completed');
+  return '[Reprise après une pause] La tâche ci-dessous a été arrêtée parce que le quota Claude était presque épuisé. '
+    + 'Tu es dans une nouvelle session : tu n\'as que ce résumé.\n\nDemande initiale :\n' + (p.req || '(inconnue)')
+    + (ok.length ? '\n\nÉtapes terminées :\n' + ok.map(x => '- ' + x.content).join('\n') : '')
+    + (rest.length ? '\n\nÉtapes restantes (dans l\'ordre) :\n' + rest.map(x => '- ' + x.content).join('\n') : '')
+    + '\n\nFichiers déjà modifiés :\n' + ((p.files || []).length ? p.files.map(f => '- ' + f).join('\n') : '(aucun)')
+    + (p.last ? '\n\nTon dernier message avant la pause :\n' + p.last : '')
+    + (extra ? '\n\nMessage de l\'utilisateur pour la reprise :\n' + extra : '')
+    + '\n\nReprends exactement là où ça s\'est arrêté : vérifie d\'abord l\'état réel des fichiers modifiés (la dernière action a pu être coupée), '
+    + 'ne refais pas ce qui est terminé, puis continue avec ce qui reste. Si une information indispensable manque, demande-la au lieu de deviner.';
+}
+function resumePause(card, force, extra) {
+  if (busy || compacting) return false;
+  const low = lastQuota && quotaLow(lastQuota);
+  if (low && !force) {                                                 // encore sous le seuil : on prévient, on relit le quota, on attend ton choix
+    card.querySelector('.pst').innerHTML = esc('Le quota est encore bas (' + quotaLine(low) + ').') + ' <button class="go sec" data-force="1">Reprendre quand même</button>';
+    post('quotaprobe'); scroll(); return false;
+  }
+  let p = {}; try { p = JSON.parse(card.dataset.p || '{}'); } catch { }
+  card.classList.add('done'); card.querySelector('.pst').innerHTML = '';
+  card.querySelector('.pb').innerHTML = '<span class="pdone">▶ Reprise dans une nouvelle session</span>';
+  sid = ''; post('sid\n'); if (conv) { conv.sid = ''; conv.base = 0; }   // nouvelle réflexion : suivi clair, contexte léger
+  el('msg user', esc(extra || '▶ Continuer la tâche')); decorate();
+  turn = { req: p.req || '', files: (p.files || []).slice(), todos: p.todos || null, acts: 0 };
+  submit(resumeText(p, extra), '', true);
+  return true;
+}
+document.addEventListener('click', e => {
+  const b = e.target.closest('#log .pause .go'); if (!b) return;
+  const extra = b.dataset.force ? input.value.trim() : '';
+  if (resumePause(b.closest('.pause'), !!b.dataset.force, extra) && extra) { input.value = ''; autosize(); }
+});
+
+// ---- clic droit sur une réponse : copier, télécharger en .txt ----
+let ctxMsg = null;
+document.addEventListener('contextmenu', e => {
+  const m = e.target.closest && e.target.closest('#log .msg.bot');
+  if (!m || !textOf(m)) return;                                       // ailleurs : menu habituel (copier / coller dans la saisie…)
+  e.preventDefault(); closePops(); ctxMsg = m;
+  const sel = String(getSelection() || '').trim(), p = $('#ctxm');
+  p.innerHTML = (sel ? '<button data-a="sel">' + ICO_COPY + '<span>Copier la sélection</span></button>' : '')
+    + '<button data-a="copy">' + ICO_COPY + '<span>Copier la réponse</span></button>'
+    + '<button data-a="txt"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12M7 10l5 5 5-5M5 21h14"/></svg><span>Télécharger en .txt</span></button>';
+  p.dataset.sel = sel; p.classList.add('open');
+  const r = p.getBoundingClientRect();
+  p.style.left = Math.max(6, Math.min(e.clientX, innerWidth - r.width - 6)) + 'px';
+  p.style.top = Math.max(6, Math.min(e.clientY, innerHeight - r.height - 6)) + 'px';
+});
+$('#ctxm').addEventListener('click', e => {
+  const b = e.target.closest('button'), p = $('#ctxm'); if (!b || !ctxMsg) return;
+  p.classList.remove('open');
+  if (b.dataset.a === 'sel') post('copy\n' + p.dataset.sel);
+  if (b.dataset.a === 'copy') post('copy\n' + textOf(ctxMsg));
+  if (b.dataset.a === 'txt') saveTxt(ctxMsg);
+});
+document.addEventListener('click', e => { if (!inside(e, '#ctxm')) $('#ctxm').classList.remove('open'); });
+document.addEventListener('scroll', () => $('#ctxm').classList.remove('open'), true);
+function saveTxt(m) {
+  const t = textOf(m); if (!t) return;
+  const d = new Date(), pad = n => String(n).padStart(2, '0');
+  const base = !flash && conv && conv.title ? conv.title : shortTitle(t.split('\n')[0].replace(/[#*_`>]/g, ''));
+  post('savetxt\n' + base + ' - ' + d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate()) + ' ' + pad(d.getHours()) + 'h' + pad(d.getMinutes()) + '\n' + t);
+}
+// ---- petit message en bas de la fenêtre (fichier enregistré…) ----
+let toastT = 0;
+function toast(html, onclick, err) {
+  const t = $('#toast'); t.innerHTML = html; t.classList.toggle('err', !!err); t.classList.add('open');
+  t.onclick = onclick ? () => { t.classList.remove('open'); onclick(); } : null; t.style.cursor = onclick ? 'pointer' : '';
+  clearTimeout(toastT); toastT = setTimeout(() => t.classList.remove('open'), 6000);
+}
 
 window.chrome.webview.addEventListener('message', e => {
   const d = String(e.data), i = d.indexOf('\n');
@@ -1239,7 +1633,9 @@ window.chrome.webview.addEventListener('message', e => {
   else if (k === 'pinned') { $('#pin').classList.toggle('on', v === '1'); }
   else if (k === 'cal') { CAL = JSON.parse(v); renderDash(); }
   else if (k === 'calbusy') { $('#cstat').textContent = 'Mise à jour des calendriers…'; }
-  else if (k === 'quota') { try { const q = JSON.parse(v); store.set('quota', v); setQuota(q); } catch {} }
+  else if (k === 'quota') { try { const q = JSON.parse(v); store.set('quota', v); setQuota(q); [rkey].concat(Object.keys(VIEWS)).forEach(key => withRun(key, () => checkQuota(q))); } catch {} }
+  else if (k === 'saved') toast('⬇ Enregistré dans Téléchargements : <b>' + esc(v.split(/[\\/]/).pop()) + '</b> · <u>Afficher</u>', () => post('reveal\n' + v));
+  else if (k === 'saveerr') toast('Impossible d\'enregistrer le fichier : ' + esc(v), null, true);
   else if (k === 'dash') { const p = v.split('\n'); applyDash(p[0] === '1', p[1] === '1'); }
   else if (k === 'name') { $('#name').textContent = v; document.title = v; applyMode(); }
   else if (k === 'theme') { document.documentElement.classList.toggle('light', v === 'light'); store.set('theme', v); }
@@ -1249,7 +1645,7 @@ window.chrome.webview.addEventListener('message', e => {
   else if (k === 'updstatus') { const j = v.indexOf('\n'), st = j < 0 ? v : v.slice(0, j), msg = j < 0 ? '' : v.slice(j + 1);
     updErr = st === 'err'; updStatus = st === 'err' ? 'Échec : ' + msg : st === 'restart' ? 'Installation… Bébène redémarre dans un instant.' : msg;
     if (UPD) { $('#updpop').classList.add('open'); fillPop(); } }
-  else if (k === 'title') { const j = v.indexOf('\n'), c = convs.find(x => x.id === v.slice(0, j)); if (c) { c.title = v.slice(j + 1).trim(); persist(); renderMenu(); setSub(); } }
+  else if (k === 'title') { const j = v.indexOf('\n'), c = convs.find(x => x.id === v.slice(0, j)); if (c && !c.titleLock) { c.title = v.slice(j + 1).trim(); persist(); renderMenu(); setSub(); } }
   else if (k === 'paths') {
     const add = v.split('\n').filter(Boolean).map(p => '"' + p + '"').join(' ');
     input.value = (input.value.trim() ? input.value.trimEnd() + ' ' : '') + add + ' ';
@@ -1292,7 +1688,7 @@ function listHint() {
   if (m) h.innerHTML = '<b>' + (m[2] ? 'Liste numérotée' : 'Liste à puces') + '</b> · <kbd>Entrée</kbd> élément suivant · <kbd>Entrée</kbd> sur un élément vide : fin · <kbd>Ctrl</kbd>+<kbd>Entrée</kbd> envoyer';
 }
 input.addEventListener('keyup', listHint); input.addEventListener('click', listHint);
-document.addEventListener('keydown', e => { if (e.key === 'Escape') { if (document.querySelector('.dd.open')) closeMenu(); else post('hide'); } });
+document.addEventListener('keydown', e => { if (e.key === 'Escape') { if (anyPop()) closePops(); else post('hide'); } });
 send.onclick = () => busy ? post('stop\n' + rkey) : submit();
 $('#new').onclick = () => newChat({ project: project });
 $('#term').onclick = () => post('terminal');
