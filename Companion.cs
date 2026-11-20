@@ -22,7 +22,7 @@ using Microsoft.Web.WebView2.WinForms;
 [assembly: System.Reflection.AssemblyVersion("1.43.0.0")]
 
 static class Program {
-    public const string Version = "1.45";
+    public const string Version = "1.46";
     public static bool OpenSetup;
     public static readonly uint Pid = (uint)Process.GetCurrentProcess().Id;   // identifiant de Bébène (lu une seule fois)   // --setup : ouvrir directement l'assistant d'installation
 
@@ -1659,7 +1659,7 @@ static class Calendars {
                         else { errs.Add(name + " : " + ex.Message); continue; }
                     }
                     if (ics.IndexOf("BEGIN:VCALENDAR", StringComparison.OrdinalIgnoreCase) < 0) { errs.Add(name + " : ce lien n'est pas un calendrier iCal"); continue; }
-                    foreach (var e in Parse(ics, from, to)) { e.Cal = name; e.Color = ColorOf(i); e.ForList = list; e.Kind = Classify(e.Title); all.Add(e); }
+                    foreach (var e in Parse(ics, from, to)) { e.Cal = name; e.Color = ColorOf(i); e.ForList = list; e.Kind = Classify(e.Title); if (e.Kind.Length == 0) e.Kind = Classify(name); all.Add(e); }   // calendrier « examen » / « rdv » : tout ce qu il contient compte
                 }
             } catch (Exception ex) { errs.Add(ex.Message); Program.Log("Calendriers", ex.ToString()); }
             all.Sort((a, b) => a.Start.CompareTo(b.Start));
@@ -2900,6 +2900,8 @@ class NoteWindow : Form {
             if (Regex.IsMatch(e.LinkText ?? "", "^(https?://|mailto:)", RegexOptions.IgnoreCase)) try { Process.Start(e.LinkText); } catch { }
         };
         saveT.Tick += (s, e) => { saveT.Stop(); n.Text = box.Text.Replace("\r", ""); Notes.Save(n); };
+        hotT.Tick += (s, e) => CheckHot();                                   // la souris peut entrer par le texte (contrôle enfant)
+        VisibleChanged += (s, e) => { if (Visible) hotT.Start(); else { hotT.Stop(); hot = false; } };
         Apply(n);
         Place();
     }
@@ -2921,8 +2923,8 @@ class NoteWindow : Form {
     // ---- réduire à la barre de titre (bouton –, double-clic sur la barre, ou clic droit) ----
     void ToggleFold() { n.Folded = !n.Folded; Notes.Save(n); FoldLayout(); }
     void FoldLayout() {
-        if (n.Folded) { ask.Visible = false; box.Visible = false; MinimumSize = new Size(160, HeadH); Height = HeadH; }
-        else { MinimumSize = new Size(160, 120); if (Height < 120) Height = n.H; box.Visible = true; }
+        if (n.Folded) { box.Visible = false; MinimumSize = new Size(160, HeadH); Height = HeadH; }
+        else { MinimumSize = new Size(160, 120); if (Height < 120) Height = n.H; box.Visible = !ask.Visible; }
         Invalidate();
     }
     void Place() {
@@ -2942,54 +2944,76 @@ class NoteWindow : Form {
     void Layout2() {
         if (box == null) return;
         box.SetBounds(Pad, HeadH + 4, Math.Max(10, ClientSize.Width - 2 * Pad), Math.Max(10, ClientSize.Height - HeadH - 4 - Pad - 4));
-        ask.SetBounds(0, HeadH, ClientSize.Width, ClientSize.Height - HeadH);
+        ask.SetBounds(0, 0, ClientSize.Width, ClientSize.Height);
         LayoutAsk();
     }
 
-    // ---- en-tête dessiné : + à gauche ; couleur, épingle, – (réduire) à droite ----
+    // ---- en-tête dessiné, visible seulement au survol (ou réduit) : + à gauche ; couleur, épingle, corbeille, –, × à droite ----
     Rectangle BtnNew { get { return new Rectangle(6, 3, 22, 22); } }
-    Rectangle BtnFold { get { return new Rectangle(ClientSize.Width - 28, 3, 22, 22); } }
-    Rectangle BtnPin { get { return new Rectangle(ClientSize.Width - 52, 3, 22, 22); } }
-    Rectangle BtnColor { get { return new Rectangle(ClientSize.Width - 76, 3, 22, 22); } }
+    Rectangle BtnClose { get { return new Rectangle(ClientSize.Width - 28, 3, 22, 22); } }
+    Rectangle BtnFold { get { return new Rectangle(ClientSize.Width - 52, 3, 22, 22); } }
+    Rectangle BtnDel { get { return new Rectangle(ClientSize.Width - 76, 3, 22, 22); } }
+    Rectangle BtnPin { get { return new Rectangle(ClientSize.Width - 100, 3, 22, 22); } }
+    Rectangle BtnColor { get { return new Rectangle(ClientSize.Width - 124, 3, 22, 22); } }
+    Rectangle[] Btns { get { return new[] { BtnNew, BtnClose, BtnFold, BtnDel, BtnPin, BtnColor }; } }
+    bool OnBtn(Point p) { if (!hot) return false; foreach (var r in Btns) if (r.Contains(p)) return true; return false; }
     Point hover = new Point(-1, -1);
+    bool hot;                                                                // souris sur le post-it : la barre apparaît
+    readonly System.Windows.Forms.Timer hotT = new System.Windows.Forms.Timer { Interval = 120 };
+    void CheckHot() {
+        bool h = Visible && (Bounds.Contains(Cursor.Position) || (Control.MouseButtons != MouseButtons.None && hot));
+        if (h != hot) { hot = h; if (!h) hover = new Point(-1, -1); Invalidate(new Rectangle(0, 0, ClientSize.Width, HeadH)); }
+    }
     protected override void OnPaint(PaintEventArgs e) {
         var g = e.Graphics; g.SmoothingMode = SmoothingMode.AntiAlias;
-        using (var hb = new SolidBrush(Notes.Head(n.Color))) g.FillRectangle(hb, 0, 0, ClientSize.Width, HeadH);
+        if (hot || n.Folded) using (var hb = new SolidBrush(Notes.Head(n.Color))) g.FillRectangle(hb, 0, 0, ClientSize.Width, HeadH);
         var ink = Color.FromArgb(150, 60, 45, 30);
-        foreach (var r in new[] { BtnNew, BtnFold, BtnPin, BtnColor })
-            if (r.Contains(hover)) using (var b = new SolidBrush(Color.FromArgb(40, 0, 0, 0))) g.FillEllipse(b, r);
-        using (var p = new Pen(ink, 1.8f)) {
-            var r = BtnNew; int cx = r.X + 11, cy = r.Y + 11;
-            g.DrawLine(p, cx - 5, cy, cx + 5, cy); g.DrawLine(p, cx, cy - 5, cx, cy + 5);
-            r = BtnFold; cx = r.X + 11; cy = r.Y + 11;
-            if (n.Folded) g.DrawRectangle(p, cx - 5, cy - 4, 10, 8);                   // ▢ = rouvrir
-            else g.DrawLine(p, cx - 5, cy + 1, cx + 5, cy + 1);                         // – = réduire
-            r = BtnPin; cx = r.X + 11; cy = r.Y + 11;                                // punaise : tête ronde + pointe
-            if (n.Pinned) using (var b = new SolidBrush(Color.FromArgb(217, 119, 87))) g.FillEllipse(b, cx - 5, cy - 7, 10, 10);
-            else g.DrawEllipse(p, cx - 4, cy - 6, 8, 8);
-            g.DrawLine(p, cx, cy + 2, cx, cy + 8);
+        if (hot) {
+            foreach (var r in Btns)
+                if (r.Contains(hover)) using (var b = new SolidBrush(r == BtnDel ? Color.FromArgb(60, 190, 50, 40) : Color.FromArgb(40, 0, 0, 0))) g.FillEllipse(b, r);
+            using (var p = new Pen(ink, 1.8f)) {
+                var r = BtnNew; int cx = r.X + 11, cy = r.Y + 11;
+                g.DrawLine(p, cx - 5, cy, cx + 5, cy); g.DrawLine(p, cx, cy - 5, cx, cy + 5);
+                r = BtnClose; cx = r.X + 11; cy = r.Y + 11;                          // × = masquer
+                g.DrawLine(p, cx - 4, cy - 4, cx + 4, cy + 4); g.DrawLine(p, cx + 4, cy - 4, cx - 4, cy + 4);
+                r = BtnFold; cx = r.X + 11; cy = r.Y + 11;
+                if (n.Folded) g.DrawRectangle(p, cx - 5, cy - 4, 10, 8);              // ▢ = rouvrir
+                else g.DrawLine(p, cx - 5, cy + 1, cx + 5, cy + 1);                    // – = réduire
+                r = BtnPin; cx = r.X + 11; cy = r.Y + 11;                            // punaise : tête ronde + pointe
+                if (n.Pinned) using (var b = new SolidBrush(Color.FromArgb(217, 119, 87))) g.FillEllipse(b, cx - 5, cy - 7, 10, 10);
+                else g.DrawEllipse(p, cx - 4, cy - 6, 8, 8);
+                g.DrawLine(p, cx, cy + 2, cx, cy + 8);
+            }
+            using (var p = new Pen(ink, 1.5f)) {                                     // corbeille = supprimer
+                var r = BtnDel; int cx = r.X + 11, cy = r.Y + 11;
+                g.DrawLine(p, cx - 6, cy - 4, cx + 6, cy - 4); g.DrawLine(p, cx - 2, cy - 6, cx + 2, cy - 6);
+                g.DrawRectangle(p, cx - 4, cy - 4, 8, 10); g.DrawLine(p, cx - 1, cy - 1, cx - 1, cy + 4); g.DrawLine(p, cx + 2, cy - 1, cx + 2, cy + 4);
+            }
+            string next = Notes.Colors[(Array.IndexOf(Notes.Colors, n.Color) + 1) % Notes.Colors.Length];
+            var rc = BtnColor;
+            using (var b = new SolidBrush(Notes.Back(next))) g.FillEllipse(b, rc.X + 5, rc.Y + 5, 12, 12);
+            using (var p = new Pen(Color.FromArgb(110, 60, 45, 30), 1.2f)) g.DrawEllipse(p, rc.X + 5, rc.Y + 5, 12, 12);
         }
-        string next = Notes.Colors[(Array.IndexOf(Notes.Colors, n.Color) + 1) % Notes.Colors.Length];
-        var rc = BtnColor;
-        using (var b = new SolidBrush(Notes.Back(next))) g.FillEllipse(b, rc.X + 5, rc.Y + 5, 12, 12);
-        using (var p = new Pen(Color.FromArgb(110, 60, 45, 30), 1.2f)) g.DrawEllipse(p, rc.X + 5, rc.Y + 5, 12, 12);
+        int textL = hot ? 32 : 10, textR = hot ? BtnColor.X - 4 : ClientSize.Width - 10;
         if (n.Folded) {                                                      // réduit : le titre (1re ligne) dans la barre
-            var tr = new RectangleF(32, 6, Math.Max(10, BtnColor.X - 36), 18);
+            var tr = new RectangleF(textL, 6, Math.Max(10, textR - textL), 18);
             using (var b = new SolidBrush(Color.FromArgb(200, 50, 38, 26))) using (var f = new Font("Segoe UI", 9f, FontStyle.Bold))
             using (var sf = new StringFormat { Trimming = StringTrimming.EllipsisCharacter, FormatFlags = StringFormatFlags.NoWrap })
                 g.DrawString(n.Title, f, b, tr, sf);
         }
-        else if (box.TextLength == 0 && ClientSize.Width > 200)             // aide dans l en-tête tant que la note est vide
+        else if (hot && box.TextLength == 0 && ClientSize.Width > 260)       // aide dans l en-tête tant que la note est vide
             using (var b = new SolidBrush(Color.FromArgb(130, 60, 45, 30))) using (var f = new Font("Segoe UI", 8.5f))
                 g.DrawString("« - » liste · « [] » case", f, b, 32, 7);
     }
-    protected override void OnMouseMove(MouseEventArgs e) { base.OnMouseMove(e); hover = e.Location; Invalidate(new Rectangle(0, 0, ClientSize.Width, HeadH)); }
+    protected override void OnMouseMove(MouseEventArgs e) { base.OnMouseMove(e); hover = e.Location; CheckHot(); Invalidate(new Rectangle(0, 0, ClientSize.Width, HeadH)); }
     protected override void OnMouseLeave(EventArgs e) { base.OnMouseLeave(e); hover = new Point(-1, -1); Invalidate(new Rectangle(0, 0, ClientSize.Width, HeadH)); }
     protected override void OnMouseUp(MouseEventArgs e) {
         base.OnMouseUp(e);
-        if (e.Button != MouseButtons.Left) return;
+        if (e.Button != MouseButtons.Left || !hot) return;
         if (BtnNew.Contains(e.Location)) Notes.New();
+        else if (BtnClose.Contains(e.Location)) Notes.Hide(n.Id);
         else if (BtnFold.Contains(e.Location)) ToggleFold();
+        else if (BtnDel.Contains(e.Location)) AskDelete();
         else if (BtnPin.Contains(e.Location)) { n.Pinned = !n.Pinned; Notes.Save(n); Invalidate(); Notes.Refresh(); }
         else if (BtnColor.Contains(e.Location)) { n.Color = Notes.Colors[(Array.IndexOf(Notes.Colors, n.Color) + 1) % Notes.Colors.Length]; Notes.Save(n); Apply(n); }
     }
@@ -3004,47 +3028,30 @@ class NoteWindow : Form {
             if (t && r) { m.Result = (IntPtr)14; return; } if (t && l) { m.Result = (IntPtr)13; return; }
             if (r) { m.Result = (IntPtr)11; return; } if (l) { m.Result = (IntPtr)10; return; }
             if (bo) { m.Result = (IntPtr)15; return; } if (t) { m.Result = (IntPtr)12; return; }
-            if (p.Y < HeadH && !BtnNew.Contains(p) && !BtnFold.Contains(p) && !BtnPin.Contains(p) && !BtnColor.Contains(p)) { m.Result = (IntPtr)2; return; }   // HTCAPTION
+            if (p.Y < HeadH && !OnBtn(p) && !ask.Visible) { m.Result = (IntPtr)2; return; }   // HTCAPTION
         }
         if (m.Msg == 0xA3) { ToggleFold(); return; }                         // double-clic sur la barre : réduire / rouvrir
-        if (m.Msg == 0xA5) { ShowMenu(); return; }                           // clic droit sur la barre : menu
         if (m.Msg == 0x0232) { n.X = Left; n.Y = Top; n.W = Width; if (!n.Folded) n.H = Height; Notes.Save(n); }   // WM_EXITSIZEMOVE
         base.WndProc(ref m);
     }
 
-    // ---- clic droit sur la barre : réduire, fermer (masquer / supprimer) ----
-    void ShowMenu() {
-        var cm = new ContextMenuStrip();
-        cm.Items.Add(n.Folded ? "Rouvrir" : "Réduire", null, (s, e) => ToggleFold());
-        cm.Items.Add("Fermer / supprimer…", null, (s, e) => { if (n.Folded) ToggleFold(); ask.Visible = true; ask.BringToFront(); Invalidate(); });
-        cm.Closed += (s, e) => BeginInvoke((Action)cm.Dispose);
-        cm.Show(Cursor.Position);
-    }
-    // ---- fermer : masquer (gardé en mémoire) ou supprimer ----
-    Label askL; Button bHide, bDel, bCancel;
+    // ---- supprimer : bandeau « Post-it supprimé · Annuler » 5 s, puis vers la Corbeille ----
+    Label askL; Button bUndo;
+    readonly System.Windows.Forms.Timer delT = new System.Windows.Forms.Timer { Interval = 5000 };
     void BuildAsk() {
-        askL = new Label { Text = "Fermer ce post-it ?", Font = new Font("Segoe UI", 10f, FontStyle.Bold), ForeColor = Color.FromArgb(60, 45, 30), AutoSize = false, TextAlign = ContentAlignment.MiddleCenter };
-        bHide = Btn("Masquer (gardé)", Color.FromArgb(217, 119, 87), Color.White);
-        bDel = Btn("Supprimer", Color.FromArgb(255, 255, 255), Color.FromArgb(190, 50, 40));
-        bCancel = Btn("Annuler", Color.FromArgb(255, 255, 255), Color.FromArgb(70, 60, 50));
-        bHide.Click += (s, e) => { ask.Visible = false; Notes.Hide(n.Id); };
-        bDel.Click += (s, e) => {
-            if (bDel.Text == "Supprimer") { bDel.Text = "Sûr ? Supprimer"; return; }     // 2e clic : supprimé (vers la Corbeille)
-            Notes.Delete(n.Id);
-        };
-        bCancel.Click += (s, e) => { ask.Visible = false; bDel.Text = "Supprimer"; Invalidate(); };
-        ask.Controls.AddRange(new Control[] { askL, bHide, bDel, bCancel });
+        askL = new Label { Text = "Post-it supprimé", Font = new Font("Segoe UI", 9.5f, FontStyle.Bold), ForeColor = Color.FromArgb(60, 45, 30), AutoSize = false, TextAlign = ContentAlignment.MiddleLeft };
+        bUndo = new Button { Text = "Annuler", FlatStyle = FlatStyle.Flat, BackColor = Color.FromArgb(217, 119, 87), ForeColor = Color.White, Font = new Font("Segoe UI", 9f), Cursor = Cursors.Hand };
+        bUndo.FlatAppearance.BorderSize = 0;
+        bUndo.Click += (s, e) => { delT.Stop(); ask.Visible = false; if (!n.Folded) box.Visible = true; Invalidate(); };
+        delT.Tick += (s, e) => { delT.Stop(); Notes.Delete(n.Id); };
+        ask.Controls.AddRange(new Control[] { askL, bUndo });
     }
-    Button Btn(string t, Color back, Color fore) {
-        var b = new Button { Text = t, FlatStyle = FlatStyle.Flat, BackColor = back, ForeColor = fore, Font = new Font("Segoe UI", 9.5f), Cursor = Cursors.Hand };
-        b.FlatAppearance.BorderColor = Color.FromArgb(200, 180, 150); b.FlatAppearance.BorderSize = 1;
-        return b;
-    }
+    void AskDelete() { box.Visible = false; ask.Visible = true; ask.BringToFront(); LayoutAsk(); delT.Stop(); delT.Start(); }
     void LayoutAsk() {
         if (askL == null) return;
-        int w = Math.Max(120, ask.Width - 24), y = Math.Max(6, (ask.Height - 128) / 2);
-        askL.SetBounds(12, y, w, 24);
-        bHide.SetBounds(12, y + 30, w, 28); bDel.SetBounds(12, y + 62, w, 28); bCancel.SetBounds(12, y + 94, w, 28);
+        int y = Math.Max(0, (ask.Height - 24) / 2);
+        bUndo.SetBounds(ask.Width - 84, y, 76, 24);
+        askL.SetBounds(10, y, Math.Max(20, ask.Width - 100), 24);
     }
 
     // ---- listes : « - » / « • » et cases « ☐ » continuent à la ligne suivante ; « [] » devient une case ; clic sur une case = cochée ----
@@ -3838,7 +3845,9 @@ class ChatPanel : Form {
             + "Format exact, à la toute fin de ta réponse : un bloc de code de langage bebene-question contenant du JSON {\"q\":\"la question\",\"choix\":[\"…\",\"…\"],\"autre\":false} "
             + "avec 1 à 3 choix courts (les plus probables en premier) ; \"autre\":true seulement si la réponse est vraiment ouverte ou compliquée ; \"choix\":[] et \"autre\":true pour une info libre (ex. un nom). "
             + "Une question à la fois : tu recevras la réponse dans le message suivant, puis tu continues (ou tu poses la suivante). "
-            + "Jamais pour les détails mineurs ni pour demander une autorisation : pour ceux-là, choisis un défaut raisonnable et dis-le. "
+            + "Jamais pour les détails mineurs ni pour demander une autorisation, ni pour une question simple ou une demande basique : choisis un défaut raisonnable et dis-le. "
+            + "RÉPONSES : réponds à ce qui est demandé, puis arrête-toi. Une seule réponse, pas plusieurs variantes ou versions au choix, sauf si l'utilisateur en demande. "
+            + "Ne termine JAMAIS par une proposition de suite ou de continuation (« Tu veux que… ? », « Je peux aussi… », « Si tu veux, … », pistes ou options non demandées). "
             + "Tu ne peux PAS modifier ton propre programme (code, installation, réglages, données de Bébène) : c'est verrouillé. Si on te le demande, explique que l'évolution de Bébène se fait avec Claude Code dans le terminal. "
             + Templates.PersonaLine() + Notes.PersonaLine()
             + Settings.Str("Prompt", "");
