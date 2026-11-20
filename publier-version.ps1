@@ -61,7 +61,14 @@ if ($exists) {
 $zip = Get-ChildItem "$src\paquets\Bebene-$version-*.zip" | Sort-Object LastWriteTime | Select-Object -Last 1
 
 $f = [IO.File]::ReadAllText("$src\fonctions.json", [Text.Encoding]::UTF8) | ConvertFrom-Json
-$new = @($f | Where-Object { $_.depuis -eq $version } | ForEach-Object { "- **$($_.titre)** : $($_.desc)" })
+# nouveautés : tout ce qui est apparu depuis la dernière Release publiée (des versions intermédiaires peuvent ne pas avoir été publiées)
+$ErrorActionPreference = 'Continue'
+$prevTag = (& $gh release list --limit 1 --json tagName --jq '.[0].tagName' 2>$null)
+$ErrorActionPreference = 'Stop'
+$prev = [version]'0.0'; try { if ($prevTag) { $prev = [version]($prevTag -replace '^v', '') } } catch { }
+$cur = [version]$version
+$new = @($f | Where-Object { try { $d = [version]$_.depuis; $d -gt $prev -and $d -le $cur } catch { $false } } |
+        Sort-Object { [version]$_.depuis } | ForEach-Object { "- **$($_.titre)** ($($_.depuis)) : $($_.desc)" })
 $notes = "$Message`n`n"
 if ($new.Count) { $notes += "### Nouveautés`n" + ($new -join "`n") + "`n`n" }
 $notes += "### Installer`nTélécharge **$($zip.Name)** ci-dessous, dézippe-le, lance ``ClaudeCompanion.exe`` et suis l'assistant d'installation.`nMise à jour : ferme Bébène (clic droit sur l'icône → Quitter), dézippe par-dessus, relance."

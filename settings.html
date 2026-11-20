@@ -251,6 +251,10 @@ html.light .hk:hover { border-color: #bdb5ae; }
     <label class="switch"><input type="checkbox" id="caveman"><span class="track"></span></label>
   </div>
   <div class="row">
+    <div class="lbl"><b>Réponse rapide automatique</b><span>Question simple (sans fichier ni action) → Haiku, plus rapide et moins de quota. Seulement si le modèle est « par défaut ».</span></div>
+    <label class="switch"><input type="checkbox" id="autoModel"><span class="track"></span></label>
+  </div>
+  <div class="row">
     <div class="lbl"><b>Écriture en direct</b><span>La réponse s'écrit mot par mot pendant que Claude la rédige, au lieu d'apparaître d'un bloc.</span></div>
     <label class="switch"><input type="checkbox" id="stream"><span class="track"></span></label>
   </div>
@@ -498,7 +502,7 @@ function render(s) {
   $('#hname').textContent = s.name;
   if (document.activeElement !== $('#name')) $('#name').value = s.name;
   if (document.activeElement !== $('#prompt')) $('#prompt').value = s.prompt;
-  $('#showCat').checked = s.showCat; $('#topMost').checked = s.topMost; $('#autoStart').checked = s.autoStart; $('#caveman').checked = s.caveman; $('#chrome').checked = s.chrome; $('#postits').checked = s.postits; $('#prepare').checked = s.prepare; $('#spell').checked = s.spell; $('#stream').checked = s.stream; showHotkeys(s);
+  $('#showCat').checked = s.showCat; $('#topMost').checked = s.topMost; $('#autoStart').checked = s.autoStart; $('#caveman').checked = s.caveman; $('#chrome').checked = s.chrome; $('#postits').checked = s.postits; $('#prepare').checked = s.prepare; $('#spell').checked = s.spell; $('#stream').checked = s.stream; $('#autoModel').checked = s.autoModel; showHotkeys(s);
   $('#model').value = s.model;
   $('#workDir').textContent = s.workDir; $('#workDir').title = s.workDir;
   $('#version').textContent = 'Version ' + s.version;
@@ -540,7 +544,7 @@ $('#mAdd').onclick = () => {
 
 document.querySelectorAll('[data-act]').forEach(b => b.onclick = () => post(b.dataset.act));
 $('#light').onchange = e => { document.documentElement.classList.toggle('light', e.target.checked); set({ light: e.target.checked }); };
-['showCat', 'topMost', 'autoStart', 'caveman', 'stream', 'chrome', 'postits', 'prepare', 'spell'].forEach(id => $('#' + id).onchange = e => set({ [id]: e.target.checked }));
+['showCat', 'topMost', 'autoStart', 'caveman', 'stream', 'autoModel', 'chrome', 'postits', 'prepare', 'spell'].forEach(id => $('#' + id).onchange = e => set({ [id]: e.target.checked }));
 $('#model').onchange = e => set({ model: e.target.value });
 $('#name').onchange = e => set({ name: e.target.value });
 $('#name').onkeydown = e => { if (e.key === 'Enter') e.target.blur(); };

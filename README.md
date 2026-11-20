@@ -285,7 +285,12 @@ Tout est expliqué pas à pas dans **[docs/MISE-A-JOUR.md](docs/MISE-A-JOUR.md)*
 
 ```
 bebene/
-├── Companion.cs                 tout le programme (≈ 3 000 lignes de C# 5)
+├── Companion.cs                 démarrage, réglages, le chat animé (+ Version de l'app)
+├── Discussion.cs                fenêtre de discussion, tâches Claude en parallèle
+├── PostIts.cs · Agenda.cs       post-it · calendriers, mails, rappels
+├── Correcteur.cs · Modeles.cs   correcteur d'orthographe · modèles de référence
+├── Installation.cs · Reglages.cs  assistant d'installation, mises à jour · fenêtre des réglages
+├── tests/tests.ps1              tous les tests (images, gardien, pages ; -Claude : tâches réelles)
 ├── ui.html                      page de la discussion (WebView2)
 ├── settings.html                page des réglages et assistant d'installation
 ├── fonctions.json               catalogue des fonctions (affiché dans les réglages + notes de version)

@@ -65,7 +65,7 @@ $csc = "$env:WINDIR\Microsoft.NET\Framework64\v4.0.30319\csc.exe"
 & $csc /nologo /target:winexe /platform:x64 /unsafe /optimize+ /codepage:65001 /win32icon:"$Out\bebene.ico" /out:"$Out\ClaudeCompanion.exe" `
     /r:System.Windows.Forms.dll /r:System.Drawing.dll /r:System.Web.Extensions.dll /r:System.Core.dll /r:Microsoft.CSharp.dll /r:System.Security.dll /r:System.IO.Compression.dll /r:System.IO.Compression.FileSystem.dll /r:Microsoft.VisualBasic.dll `
     /lib:"$env:WINDIR\Microsoft.NET\Framework64\v4.0.30319\WPF" /r:UIAutomationClient.dll /r:UIAutomationTypes.dll /r:WindowsBase.dll `
-    /r:"$Out\Microsoft.Web.WebView2.Core.dll" /r:"$Out\Microsoft.Web.WebView2.WinForms.dll" "$src\Companion.cs"
+    /r:"$Out\Microsoft.Web.WebView2.Core.dll" /r:"$Out\Microsoft.Web.WebView2.WinForms.dll" (Get-ChildItem "$src\*.cs").FullName   # Companion.cs (chat) + Discussion, PostIts, Agenda, Correcteur, Modeles, Installation, Reglages
 if ($LASTEXITCODE -ne 0) { throw "Échec de la compilation" }
 
 if ($Install) {

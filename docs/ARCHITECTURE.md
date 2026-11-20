@@ -23,7 +23,11 @@ Ce document explique comment Bébène fonctionne de l'intérieur : utile pour le
         Réglages : registre HKCU\Software\ClaudeCompanion          Journal : %LOCALAPPDATA%\ClaudeCompanion\bebene.log
 ```
 
-Tout le programme tient dans **`Companion.cs`** (≈ 3 000 lignes). Il est compilé par le `csc.exe` du .NET Framework 4 présent dans Windows : **C# 5 uniquement** (pas de `?.`, pas de `$"…"`, pas de `nameof`, pas de fonctions locales).
+Le programme est réparti en 8 fichiers C# compilés ensemble (`build.ps1` prend tous les `*.cs`) : **`Companion.cs`** (démarrage, réglages, chat animé, `Version`), `Discussion.cs` (fenêtre de discussion et tâches Claude), `PostIts.cs`, `Agenda.cs` (calendriers, mails, rappels), `Correcteur.cs`, `Modeles.cs`, `Installation.cs` (assistant, mises à jour), `Reglages.cs`. Il est compilé par le `csc.exe` du .NET Framework 4 présent dans Windows : **C# 5 uniquement** (pas de `?.`, pas de `$"…"`, pas de `nameof`, pas de fonctions locales).
+
+**Tâches en parallèle** : chaque conversation a sa propre session `claude -p --input-format stream-json` gardée ouverte (classe `Runner` dans `Discussion.cs`) ; jusqu'à 3 travaillent en même temps. Les messages entre la page et C# portent la clé de la conversation (`send\n<clé>…`, `rline\n<clé>\n<json>`, `rdone\n<clé>\n<code>`) ; la page garde une « vue » par tâche en fond (`VIEWS`, `withRun`). Une session est relancée avec `--resume` si ses réglages changent, et se ferme après 10 min sans message.
+
+**Tests** : `tests\tests.ps1` (ajouter `-Claude` pour le test réel des tâches).
 
 ---
 

@@ -154,4 +154,4 @@ gh auth login --web --git-protocol https
 | `GitHub CLI introuvable` | `winget install GitHub.cli`, puis rouvrir le terminal |
 | `Envoi refusé par GitHub` | `gh auth login` pour se reconnecter |
 | `Bébène n'est pas compilé` | lancer `.\build.ps1` une fois |
-| Erreur de compilation | lire la ligne `Companion.cs(ligne,colonne)` affichée et la donner à Claude Code |
+| Erreur de compilation | lire la ligne `Fichier.cs(ligne,colonne)` affichée et la donner à Claude Code |

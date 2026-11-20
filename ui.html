@@ -409,6 +409,22 @@ header { z-index: 7; }
 .coffee .steam { opacity: .55; transition: opacity .2s; }
 .coffee:hover .steam { opacity: 1; animation: steam 1.2s ease-in-out infinite; }
 @keyframes steam { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-1.2px); } }
+/* multitâche : étapes, besoin de toi, état des conversations */
+.plan { margin: 6px 0; padding: 8px 11px; border-radius: 12px; background: rgba(var(--ov),.04); border: 1px solid rgba(var(--ov),.07); font-size: 12.5px; }
+.plan .ph { display: flex; justify-content: space-between; color: var(--muted); font-size: 11.5px; margin-bottom: 4px; text-transform: uppercase; letter-spacing: .04em; }
+.plan .ph b { color: var(--accent-2); }
+.plan .pi { display: flex; gap: 7px; padding: 2px 0; color: var(--muted); }
+.plan .pi .pc { width: 14px; height: 14px; flex: none; border-radius: 4px; border: 1px solid rgba(var(--ov),.18); font-size: 10px; display: grid; place-items: center; margin-top: 2px; }
+.plan .pi.completed { text-decoration: line-through; opacity: .7; }
+.plan .pi.completed .pc { background: #7bc67e; border-color: #7bc67e; color: #fff; }
+.plan .pi.in_progress { color: var(--text); font-weight: 600; }
+.plan .pi.in_progress .pc { border-color: var(--accent); color: var(--accent); }
+.ask.hand { border-color: rgba(240,160,80,.55); }
+.ask .hint { color: var(--muted); font-size: 11.5px; margin-top: 6px; }
+.approve .all { color: var(--accent-2); }
+.mitem .cst { margin-right: 6px; }
+#ddHist { position: relative; }
+#ddHist.attn::after { content: ""; position: absolute; top: 3px; right: 3px; width: 8px; height: 8px; border-radius: 50%; background: var(--accent); box-shadow: 0 0 6px rgba(240,160,80,.8); }
 /* poignées de redimensionnement (invisibles, sur les bords) */
 .rsz { position: fixed; z-index: 90; }
 .rsz-n, .rsz-s { left: 10px; right: 10px; height: 5px; cursor: ns-resize; } .rsz-n { top: 0; } .rsz-s { bottom: 0; }
@@ -546,7 +562,7 @@ html.light ::-webkit-scrollbar-thumb { background: rgba(40,30,35,.18); }
 </div>
 <script>
 const $ = s => document.querySelector(s);
-const log = $('#log'), input = $('#input'), send = $('#send'), auto = $('#auto');
+let log = $('#log'); const input = $('#input'), send = $('#send'), auto = $('#auto');   // log : le fil de la conversation affichée (chaque tâche a le sien)
 const store = {
   get(k, d) { try { const v = localStorage.getItem(k); return v === null ? d : v; } catch { return d; } },
   set(k, v) { try { localStorage.setItem(k, v); } catch {} }
@@ -597,6 +613,36 @@ let flash = false, project = conv ? conv.project || '' : store.get('project', ''
 let granted = new Set(conv && conv.granted ? conv.granted : []);   // actions autorisées pour la conversation en cours
 let lastCtx = 0, compacting = false, compactNote = null;              // compactage (déclaré avant le premier refresh())
 let sid = conv ? conv.sid || '' : '', busy = false, cur = null, gotResult = false, denials = [], pendingAsk = null, pendingReady = null;
+// ---- plusieurs tâches en même temps ----
+// Chaque conversation qui travaille a sa « vue » : son fil (élément log), sa session, son état. La vue affichée occupe les variables
+// globales ; une tâche qui tourne en fond garde la sienne dans VIEWS[clé], et ses messages y sont traités (withRun) sans toucher l'écran.
+const newKey = () => 'k' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+let rkey = conv ? conv.id : newKey(), inBg = false, autoAll = !!(conv && conv.autoAll), pendingHand = null;
+const VIEWS = {};
+function snapshot() {
+  return { log, conv, sid, busy, cur, gotResult, denials, pendingAsk, pendingReady, pendingHand, lastCtx, compacting, compactNote, flash, project, granted, rkey, autoAll };
+}
+function restore(v) {
+  ({ log, conv, sid, busy, cur, gotResult, denials, pendingAsk, pendingReady, pendingHand, lastCtx, compacting, compactNote, flash, project, granted, rkey, autoAll } = v);
+}
+function withRun(key, fn) {                            // exécute fn dans le contexte de la tâche « key » (affichée ou en fond)
+  if (key === rkey) return fn();
+  const v = VIEWS[key]; if (!v) return;                 // tâche inconnue (page rechargée) : ignorée
+  const shown = snapshot(), wasBg = inBg;
+  restore(v); inBg = true;
+  try { fn(); } finally { VIEWS[key] = snapshot(); restore(shown); inBg = wasBg; }
+  renderMenu();
+}
+function showLog(el) {                                 // met ce fil à l'écran à la place du précédent
+  if (el === log) return;
+  log.removeAttribute('id'); log.replaceWith(el); el.id = 'log'; log = el;
+}
+function park() {                                      // la conversation affichée part en fond (si elle travaille encore)
+  if (live) { const d = live; liveEnd(); if (d.parentNode) d.remove(); }   // l'aperçu en direct sera remplacé par le message complet
+  if (busy || compacting) VIEWS[rkey] = snapshot();
+  const fresh = document.createElement('div'); fresh.className = log.className; showLog(fresh);
+}
+function viewOf(c) { return Object.values(VIEWS).find(v => v.conv === c || v.rkey === c.id); }
 auto.checked = store.get('auto', '0') === '1';
 log.innerHTML = conv ? conv.hist || '' : '';
 log.querySelectorAll('.approve .ab').forEach(b => b.outerHTML = '<div style="color:var(--muted)">Demande expirée.</div>');
@@ -617,9 +663,11 @@ function persist() {
 function save() {
   if (flash || !log.children.length) return;                       // flash : rien n'est enregistré
   if (!conv) { conv = { id: 'c' + Date.now().toString(36), title: '', sid: sid, project: project, updated: Date.now(), hist: '' }; convs.unshift(conv); }
-  conv.sid = sid; conv.hist = log.innerHTML; conv.updated = Date.now(); conv.project = project; conv.granted = [...granted];
+  conv.sid = sid; conv.hist = log.innerHTML; conv.updated = Date.now(); conv.project = project; conv.granted = [...granted]; conv.autoAll = autoAll;
   if (!conv.title) { const u = log.querySelector('.msg.user'); conv.title = u ? u.textContent.trim().slice(0, 70) : 'Conversation'; }
-  persist(); store.set('cur', conv.id); renderMenu(); setSub();
+  persist();
+  if (inBg) return;                                                   // tâche en fond : l'écran reste sur la conversation affichée
+  store.set('cur', conv.id); renderMenu(); setSub();
 }
 
 function diffHtml(name, i) {
@@ -641,7 +689,12 @@ function askApproval(list) {
     return '<li><b>' + esc(toolName(d.tool_name)) + '</b>' + (what ? ' <code>' + esc(what) + '</code>' : '') + '</li>';
   }).join('');
   const card = el('approve', '<div class="ah">🔐 Claude a besoin de ton accord</div><ul>' + items + '</ul>'
-    + '<div class="ab"><button class="no">Refuser</button><button class="yes">Autoriser</button></div>');
+    + '<div class="ab"><button class="no">Refuser</button><button class="all" title="Plus aucune demande d\'accord dans cette conversation">Tout autoriser ici</button><button class="yes">Autoriser</button></div>');
+  card.querySelector('.all').onclick = () => {
+    card.innerHTML = '<div class="ah">🔓 Tout est autorisé dans cette conversation</div>';
+    autoAll = true; if (conv) conv.autoAll = true;
+    submit("Je t'autorise. Continue ce que tu faisais (tu as mon accord pour toutes les actions jusqu'à la fin de cette conversation).", '', true);
+  };
   card.querySelector('.yes').onclick = () => {
     card.innerHTML = '<div class="ah">✅ Autorisé</div>';
     names.forEach(n => granted.add(n)); if (conv) conv.granted = [...granted];   // valable pour toute la conversation
@@ -667,7 +720,44 @@ function takeQuestion(t) {
     try { const o = JSON.parse(j.trim()); ready = { quoi: String((o && o.quoi) || 'le fichier') }; } catch { ready = { quoi: 'le fichier' }; }
     return '';
   });
-  return { text: text2, ask, ready };
+  let hand = null;                                                      // besoin de la souris / du clavier, ou de voir un écran
+  const text3 = text2.replace(/```bebene-main\s*([\s\S]*?)```/g, (m, j) => {
+    try { const o = JSON.parse(j.trim()); hand = { quoi: String((o && o.quoi) || ''), type: /cran/i.test(String(o && o.type)) ? 'ecran' : 'souris' }; } catch { hand = { quoi: '', type: 'souris' }; }
+    return '';
+  });
+  return { text: text3, ask, ready, hand };
+}
+// ---- étapes d'une tâche longue (outil TodoWrite de Claude) : une carte cochée qui se met à jour, et « 3/5 » sur le chat ----
+function showPlan(todos) {
+  if (!cur || !todos.length) return;
+  const done = todos.filter(t => t.status === 'completed').length;
+  const html = '<div class="ph"><span>Étapes</span><b>' + done + '/' + todos.length + '</b></div>' + todos.map(t =>
+    '<div class="pi ' + esc(t.status || '') + '"><span class="pc">' + (t.status === 'completed' ? '✓' : t.status === 'in_progress' ? '›' : '') + '</span>'
+    + esc(String(t.status === 'in_progress' && t.activeForm ? t.activeForm : t.content || '')) + '</div>').join('');
+  let p = cur.querySelector('.plan');
+  if (p) p.innerHTML = html; else p = addToCur('plan', html);
+  post('progress\n' + rkey + '\n' + done + '\n' + todos.length);
+}
+// ---- besoin de toi : Bébène a besoin de ta souris / ton clavier, ou de voir une fenêtre qu'il ne peut pas capturer ----
+function showHand(h) {
+  const card = el('ask hand', '');
+  card.dataset.h = JSON.stringify(h);
+  card.innerHTML = '<div class="ah"><span>🐾</span><span>' + (h.type === 'ecran' ? 'J\'ai besoin de voir un écran' : 'J\'ai besoin de ta souris et de ton clavier')
+    + (h.quoi ? ' · ' + esc(h.quoi) : '') + '</span></div><div class="ab"><div class="rb">'
+    + (h.type === 'ecran' ? '<button class="go">👀 C\'est affiché, regarde</button>' : '<button class="go">🖱 Vas-y, prends la main</button>')
+    + '<button class="adj">Pas maintenant</button></div><div class="hint">Ou réponds-lui ci-dessous (une info, un chemin, une capture…).</div></div>';
+  bindHand(card); scroll();
+}
+function bindHand(card) {
+  let h; try { h = JSON.parse(card.dataset.h); } catch { return; }
+  const done = t => { card.querySelector('.ab').outerHTML = '<div class="done">' + t + '</div>'; };
+  card.querySelector('.go').onclick = () => {
+    if (busy || compacting) return;
+    done(h.type === 'ecran' ? '→ Écran affiché' : '→ Souris et clavier prêtés');
+    submit(h.type === 'ecran' ? 'C\'est fait : ce que tu voulais voir est affiché à l\'écran maintenant. Regarde et continue.'
+      : 'C\'est bon : tu peux utiliser ma souris et mon clavier maintenant, je n\'y touche plus jusqu\'à ce que tu aies fini. Continue.');
+  };
+  card.querySelector('.adj').onclick = () => { done('→ Plus tard'); post('calm\n' + rkey); save(); };
 }
 function showAsk(a) {
   const card = el('ask', '');
@@ -712,7 +802,7 @@ function bindReady(card) {
 function reviveAsks() {
   log.querySelectorAll('.ask').forEach(c => {
     if (!c.querySelector('.ab')) return;
-    if (c === log.lastElementChild) { if (c.classList.contains('ready')) bindReady(c); else bindAsk(c); }
+    if (c === log.lastElementChild) { if (c.classList.contains('ready')) bindReady(c); else if (c.classList.contains('hand')) bindHand(c); else bindAsk(c); }
     else c.querySelector('.ab').outerHTML = '<div class="done">Question passée.</div>';
   });
 }
@@ -743,6 +833,7 @@ function askMove(el, id) {
   sel.focus();
 }
 function refresh() {
+  if (inBg) return;
   $('#empty').style.display = log.children.length ? 'none' : 'flex';
   send.disabled = compacting || (!busy && !input.value.trim());
   send.classList.toggle('stop', busy);
@@ -784,8 +875,8 @@ function textOf(m) {
     const c = d.cloneNode(true); c.querySelectorAll('.cpy').forEach(x => x.remove()); return c.innerText.trim();
   }).filter(Boolean).join('\n\n');
 }
-log.addEventListener('click', e => {
-  const b = e.target.closest('.cpy'); if (!b) return;
+document.addEventListener('click', e => {                         // boutons Copier du fil affiché
+  const b = e.target.closest('.cpy'); if (!b || !b.closest('#log')) return;
   e.stopPropagation();
   let t;
   if (b.classList.contains('code')) t = b.closest('.cw').querySelector('pre').textContent.replace(/\n$/, '');
@@ -806,7 +897,7 @@ function maybeCompact(code) {
   if (lastCtx - holder.base < COMPACT_GROWTH) return;
   compacting = true; refresh();
   compactNote = el('note run', '♻ Je résume le début de la conversation pour économiser des tokens…'); scroll();
-  post('compact\n' + sid);
+  post('compact\n' + rkey + '\n' + sid);
 }
 function compacted(ok, pre, post_) {
   compacting = false;
@@ -822,8 +913,10 @@ function submit(text, allowed, silent) {
   if (busy || compacting || !text) return;
   if (!silent) { input.value = ''; autosize(); el('msg user', esc(text)); decorate(); }
   cur = el('msg bot', '<div class="typing"><span></span><span></span><span></span></div>');
-  busy = true; gotResult = false; denials = []; pendingAsk = null; pendingReady = null; refresh(); scroll();
-  post('send\n' + (auto.checked ? 1 : 0) + '\n' + sid + '\n' + (allowed || [...granted].join(',')) + '\n' + text);
+  busy = true; gotResult = false; denials = []; pendingAsk = null; pendingReady = null; pendingHand = null; refresh(); scroll();
+  if (conv) conv.attn = '';
+  post('send\n' + rkey + '\n' + (auto.checked || autoAll ? 1 : 0) + '\n' + sid + '\n' + (allowed || [...granted].join(',')) + '\n' + (flash ? 1 : 0) + '\n' + project + '\n' + text);
+  renderMenu();
 }
 
 // Quota restant, d'après les infos officielles renvoyées par Claude Code (rate_limit_event)
@@ -882,6 +975,7 @@ function liveTick(ts) {
   if (liveShown < t.length) liveRaf = requestAnimationFrame(liveTick);
 }
 function liveDelta(s) {
+  if (inBg) return;                                                    // tâche en fond : pas d'aperçu, le message complet arrivera
   if (!live) liveStart(); if (!live) return;
   liveText += s; if (!liveRaf) liveRaf = requestAnimationFrame(liveTick);
 }
@@ -899,6 +993,8 @@ function onLine(l) {
   if (o.session_id && o.session_id !== sid) setSid(o.session_id);
   if (o.type === "rate_limit_event" && o.rate_limit_info) { store.set("quota", JSON.stringify(o.rate_limit_info)); setQuota(o.rate_limit_info); }
   if (o.type === 'assistant' && o.message && o.message.usage) { const u = o.message.usage; lastCtx = (u.input_tokens || 0) + (u.cache_read_input_tokens || 0) + (u.cache_creation_input_tokens || 0); }
+  if (o.type === 'system' && o.subtype === 'init' && /haiku/i.test(o.model || '') && cur && !cur.querySelector('.lite'))
+    addToCur('tool lite', '<i></i><span>⚡ Réponse rapide (Haiku)</span>');   // question simple : modèle léger, moins de quota
   if (o.type === 'stream_event') {                                    // écriture en direct (réponse principale seulement)
     const ev = o.event || {};
     if (!o.parent_tool_use_id && cur && ev.type === 'content_block_delta' && ev.delta && ev.delta.type === 'text_delta') liveDelta(ev.delta.text || '');
@@ -914,7 +1010,9 @@ function onLine(l) {
         else if (q.text.trim()) addToCur('md', md(q.text)).dataset.raw = q.text;
         if (q.ask) pendingAsk = q.ask;
         if (q.ready) pendingReady = q.ready;
+        if (q.hand) pendingHand = q.hand;
       }
+      if (c.type === 'tool_use' && c.name === 'TodoWrite' && !o.parent_tool_use_id) { showPlan((c.input || {}).todos || []); continue; }
       if (c.type === 'tool_use') {
         const i = c.input || {};
         const what = i.command || i.file_path || i.pattern || i.url || i.query || i.description || '';
@@ -940,33 +1038,51 @@ function finish(code, err) {
     if (!cur.children.length) cur.remove();
   }
   cur = null; busy = false; refresh();
-  if (denials.length) askApproval(denials);
-  else if (pendingAsk && code === '0') showAsk(pendingAsk);
+  let kind = 'done';
+  if (denials.length) { askApproval(denials); kind = 'perm'; }
+  else if (pendingHand && code === '0') { showHand(pendingHand); kind = 'hand'; }
+  else if (pendingAsk && code === '0') { showAsk(pendingAsk); kind = 'ask'; }
   else if (pendingReady && code === '0') showReady(pendingReady);
-  pendingAsk = null; pendingReady = null;
+  pendingAsk = null; pendingReady = null; pendingHand = null;
   denials = []; decorate(); scroll(); save(); askTitle(code); maybeCompact(code);
+  if (conv && inBg) { conv.attn = kind; persist(); }                  // pastille dans l'historique jusqu'à ce qu'on la rouvre (après save : la conversation existe)
+  if (code !== '-1') post('notify\n' + kind + '\n' + (inBg ? 0 : 1) + '\n' + rkey + '\n' + (flash ? 'Flash' : conv && conv.title ? conv.title : 'Nouvelle conversation'));
 }
 
 // opts : { flash, project } ; ouvre une conversation vide
-function newChat(opts) {
-  if (busy || compacting) return;
-  opts = opts || {};
+// quitter la conversation affichée : si elle travaille encore, elle continue en fond (sauf une question Flash, qui ne laisse aucune trace)
+function leave() {
+  if (flash && (busy || compacting)) { el('note', 'Attends la fin de la question Flash (ou clique sur Arrêter) : elle ne peut pas continuer en fond.'); scroll(); return false; }
   if (flash && sid) post('forget\n' + sid);                         // on efface la trace de la conversation flash
-  flash = !!opts.flash; granted = new Set();
+  park();
+  busy = false; cur = null; gotResult = false; denials = []; pendingAsk = null; pendingReady = null; pendingHand = null;
+  lastCtx = 0; compacting = false; compactNote = null;
+  return true;
+}
+function newChat(opts) {
+  if (!leave()) return;
+  opts = opts || {};
+  flash = !!opts.flash; granted = new Set(); autoAll = false; rkey = newKey();
   if (opts.project !== undefined) project = opts.project;
   if (flash) project = '';
-  conv = null; store.set('cur', ''); store.set('project', project); post('calm');
-  sid = ''; post('sid\n'); log.innerHTML = ''; applyMode(); refresh(); input.focus(); closeMenu();
+  conv = null; store.set('cur', ''); store.set('project', project);
+  sid = ''; post('sid\n'); applyMode(); refresh(); input.focus(); closeMenu();
 }
 function openConv(c) {
-  if (busy || compacting) return;
-  if (flash && sid) post('forget\n' + sid);
-  flash = false; conv = c; sid = c.sid || ''; project = c.project || ''; granted = new Set(c.granted || []);
+  if (c === conv && !flash) { closeMenu(); return; }
+  if (!leave()) return;
+  const v = viewOf(c);
+  if (v) { delete VIEWS[v.rkey]; showLog(v.log); restore(v); }        // tâche en fond (ou finie en fond) : on reprend sa vue telle quelle
+  else {
+    flash = false; conv = c; sid = c.sid || ''; project = c.project || ''; granted = new Set(c.granted || []); autoAll = !!c.autoAll; rkey = c.id;
+    log.innerHTML = c.hist || ''; log.querySelectorAll('.approve .ab').forEach(b => b.outerHTML = '<div style="color:var(--muted)">Demande expirée.</div>'); reviveAsks();
+  }
+  c.attn = ''; persist();
   store.set('cur', c.id); post('sid\n' + sid);
-  log.innerHTML = c.hist || ''; log.querySelectorAll('.approve .ab').forEach(b => b.outerHTML = '<div style="color:var(--muted)">Demande expirée.</div>'); reviveAsks(); post('calm');
   decorate(); applyMode(); refresh(); scroll(); closeMenu();
 }
 function applyMode() {
+  if (inBg) return;
   post('mode\n' + (flash ? 1 : 0) + '\n' + project);
   document.body.classList.toggle('flash', flash);
   $('#mNormal').classList.toggle('on', !flash); $('#mFlash').classList.toggle('on', flash);
@@ -1000,10 +1116,15 @@ function renderMenu() {
   $('#mNoProj').classList.toggle('on', !project && !flash);
   $('#mProjects').querySelectorAll('[data-p]').forEach(b => b.onclick = () => newChat({ project: b.dataset.p }));
   // historique du contexte courant : dans un projet = ses conversations seulement ; sans projet = les conversations sans projet
-  const scope = flash ? '' : project, mine = convs.filter(c => (c.project || '') === scope);
+  // état de chaque conversation : ⏳ travaille, 🐾 a besoin de toi, ❓ question, 🔐 accord, ✅ finie en fond (pas encore relue)
+  const ST = { hand: '🐾', ask: '❓', perm: '🔐', done: '✅' };
+  const stOf = c => { const vw = viewOf(c); return (c === conv && busy) || (vw && vw.busy) ? '⏳' : ST[c.attn] || ''; };
+  // les tâches en cours ou qui t'attendent apparaissent toujours, quel que soit le projet
+  const scope = flash ? '' : project, mine = convs.filter(c => (c.project || '') === scope || stOf(c));
+  $('#ddHist').classList.toggle('attn', convs.some(c => c !== conv && stOf(c)));   // une tâche en fond travaille ou t'attend
   $('#mConvTitle').textContent = scope ? 'Conversations · ' + scope : 'Conversations sans projet';
   $('#mConvs').innerHTML = mine.length ? mine.slice(0, 20).map(c =>
-    '<div class="mitem conv' + (conv && c.id === conv.id ? ' on' : '') + '" data-c="' + c.id + '"><span class="tx">' + esc(c.title || 'Conversation')
+    '<div class="mitem conv' + (conv && c.id === conv.id ? ' on' : '') + '" data-c="' + c.id + '"><span class="tx">' + (stOf(c) ? '<span class="cst">' + stOf(c) + '</span>' : '') + esc(c.title || 'Conversation')
     + '<small>' + ago(c.updated) + '</small></span><button class="mv" data-mv="' + c.id + '" title="Déplacer vers un projet…">⇢</button><button class="del' + (convArm === c.id ? ' arm' : '') + '" data-del="' + c.id + '" title="Supprimer">' + (convArm === c.id ? 'Sûr ?' : '×') + '</button></div>').join('')
     : '<div class="mnone">' + (scope ? 'Pas encore de conversation dans ce projet.' : 'Pas encore de conversation.') + '</div>';
   $('#mConvs').querySelectorAll('[data-c]').forEach(el => el.onclick = e => {
@@ -1012,6 +1133,9 @@ function renderMenu() {
     if (e.target.dataset.del) {                                         // 1er clic : « Sûr ? » ; 2e clic : supprimée (le menu reste ouvert)
       e.stopPropagation(); const id = e.target.dataset.del;
       if (convArm !== id) { convArm = id; renderMenu(); setTimeout(() => { if (convArm === id) { convArm = ''; renderMenu(); } }, 4000); return; }
+      const gone = convs.find(c => c.id === id), vw = gone && viewOf(gone);
+      if (vw) { post('stop\n' + vw.rkey); delete VIEWS[vw.rkey]; }      // une tâche en fond s'arrête avec sa conversation
+      if (conv && conv.id === id && busy) post('stop\n' + rkey);
       convArm = ''; convs = convs.filter(c => c.id !== id); if (conv && conv.id === id) conv = null; persist(); renderMenu(); return;
     }
     const c = convs.find(x => x.id === el.dataset.c); if (c) openConv(c);
@@ -1099,8 +1223,15 @@ function autosize() { input.style.height = 'auto'; input.style.height = Math.min
 window.chrome.webview.addEventListener('message', e => {
   const d = String(e.data), i = d.indexOf('\n');
   const k = i < 0 ? d : d.slice(0, i), v = i < 0 ? '' : d.slice(i + 1);
-  if (k === 'line') onLine(v);
-  else if (k === 'done') { const j = v.indexOf('\n'); finish(j < 0 ? v : v.slice(0, j), j < 0 ? '' : v.slice(j + 1)); }
+  // messages d'une tâche : rline / rdone / compacted portent la clé de leur conversation (affichée ou en fond)
+  const kv = s => { const j = s.indexOf('\n'); return j < 0 ? [s, ''] : [s.slice(0, j), s.slice(j + 1)]; };
+  if (k === 'rline') { const [key, l] = kv(v); withRun(key, () => onLine(l)); }
+  else if (k === 'rdone') { const [key, r] = kv(v), [code, err] = kv(r); withRun(key, () => finish(code, err)); }
+  else if (k === 'compacted') { const [key, r] = kv(v), p = r.split('\n'); withRun(key, () => compacted(p[0] === '1', +p[1], +p[2])); }
+  else if (k === 'openconv') {                                       // clic sur une notification Windows
+    const vw = VIEWS[v], c = vw ? vw.conv : convs.find(x => x.id === v);
+    if (v !== rkey && c) openConv(c);
+  }
   else if (k === 'notes') { try { NOTES = JSON.parse(v); renderNotes(); } catch { } }
   else if (k === 'dir') { $('#dir').textContent = v; $('#dir').title = v + ' — cliquer pour changer'; }
   else if (k === 'new') newChat();
@@ -1114,7 +1245,6 @@ window.chrome.webview.addEventListener('message', e => {
   else if (k === 'theme') { document.documentElement.classList.toggle('light', v === 'light'); store.set('theme', v); }
   else if (k === 'projects') { try { projects = JSON.parse(v); } catch { projects = []; } renderMenu(); }
   else if (k === 'project') { newChat({ project: v }); }
-  else if (k === 'compacted') { const p = v.split('\n'); compacted(p[0] === '1', +p[1], +p[2]); }
   else if (k === 'upd') { try { UPD = JSON.parse(v); } catch { UPD = null; } renderUpd(); }
   else if (k === 'updstatus') { const j = v.indexOf('\n'), st = j < 0 ? v : v.slice(0, j), msg = j < 0 ? '' : v.slice(j + 1);
     updErr = st === 'err'; updStatus = st === 'err' ? 'Échec : ' + msg : st === 'restart' ? 'Installation… Bébène redémarre dans un instant.' : msg;
@@ -1163,12 +1293,12 @@ function listHint() {
 }
 input.addEventListener('keyup', listHint); input.addEventListener('click', listHint);
 document.addEventListener('keydown', e => { if (e.key === 'Escape') { if (document.querySelector('.dd.open')) closeMenu(); else post('hide'); } });
-send.onclick = () => busy ? post('stop') : submit();
+send.onclick = () => busy ? post('stop\n' + rkey) : submit();
 $('#new').onclick = () => newChat({ project: project });
 $('#term').onclick = () => post('terminal');
 $('#cfg').onclick = () => post('settings');
 $('#coffee').onclick = () => window.open('https://buymeacoffee.com/p0770');                 // ouvert dans le navigateur (lien externe)
-function setSid(v) { sid = v; post('sid\n' + v); save(); }
+function setSid(v) { sid = v; if (!inBg) post('sid\n' + v); save(); }
 $('#close').onclick = () => post('hide');
 $('#pin').onclick = () => { const on = !$('#pin').classList.contains('on'); $('#pin').classList.toggle('on', on); $('#pin').title = on ? 'Épinglée : reste ouverte (cliquer pour libérer)' : 'Épingler : garder ouverte quand je clique ailleurs'; post('pin\n' + (on ? 1 : 0)); };
 $('#dir').onclick = () => post('folder');
