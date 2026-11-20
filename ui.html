@@ -143,6 +143,19 @@ kbd { font: 11px "Segoe UI", sans-serif; background: var(--raised); border-radiu
 .approve ul { margin: 8px 0 10px; padding-left: 1.1em; color: var(--muted); }
 .approve li { margin: 3px 0; overflow-wrap: anywhere; }
 .approve .ab { display: flex; justify-content: flex-end; gap: 8px; }
+.ask { border: 1px solid #5a4038; background: rgba(217,119,87,.07); border-radius: 16px; padding: 10px 12px; font-size: 13px; animation: rise .25s ease; }
+.ask .ah { font-weight: 600; display: flex; gap: 8px; align-items: flex-start; line-height: 1.4; }
+.ask .ah span:first-child { color: var(--accent); font-size: 15px; line-height: 1.2; }
+.ask .ch { display: flex; flex-direction: column; gap: 6px; margin-top: 9px; }
+.ask button { font: inherit; font-size: 13px; text-align: left; border-radius: 10px; padding: 7px 12px; cursor: pointer; border: 1px solid var(--line); background: var(--raised); color: var(--text); }
+.ask button:hover { border-color: var(--accent); }
+.ask button.o { color: var(--muted); }
+.ask .ot { display: none; gap: 6px; margin-top: 6px; }
+.ask .ot.on { display: flex; }
+.ask .ot input { flex: 1; min-width: 0; font: inherit; font-size: 13px; padding: 7px 10px; border-radius: 10px; border: 1px solid var(--line); background: var(--raised); color: var(--text); outline: none; }
+.ask .ot input:focus { border-color: var(--accent); }
+.ask .ot button { background: var(--accent); border-color: var(--accent); color: #fff; text-align: center; }
+.ask .done { margin-top: 6px; color: var(--muted); }
 .approve button { font: inherit; font-size: 13px; border-radius: 9px; padding: 6px 14px; cursor: pointer; border: 1px solid var(--line); background: var(--raised); color: var(--text); }
 .approve .yes { background: var(--accent); border-color: var(--accent); color: #fff; }
 .approve .yes:hover { background: var(--accent-2); }
@@ -492,6 +505,9 @@ const esc = s => s.replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&
 const md = t => (window.marked && window.DOMPurify) ? DOMPurify.sanitize(marked.parse(t)) : esc(t).replace(/\n/g, '<br>');
 const TOOLS = { Read: 'Lecture', Write: 'Écriture', Edit: 'Modification', MultiEdit: 'Modification', Bash: 'Commande',
   PowerShell: 'Commande', Glob: 'Recherche', Grep: 'Recherche', WebSearch: 'Recherche web', WebFetch: 'Page web', TodoWrite: 'Plan', Task: 'Sous-tâche' };
+const toolName = n => /^mcp__claude-in-chrome__/.test(n) ? 'Chrome' : TOOLS[n] || n;
+// accord : un outil Chrome autorisé = tout Chrome (sinon une carte par outil : lire, cliquer, remplir…)
+const grantName = n => /^mcp__claude-in-chrome__/.test(n) ? 'mcp__claude-in-chrome' : n;
 
 const CAT = '<svg viewBox="0 0 40 40"><path d="M7 15 L9 3 L17 10 Q20 9 23 10 L31 3 L33 15 Q36 20 34 27 Q30 36 20 36 Q10 36 6 27 Q4 20 7 15Z" fill="#141417" stroke="#55555f" stroke-width="1.2"/>'
   + '<path d="M10 12 L10.5 6 L14.5 10Z M30 12 L29.5 6 L25.5 10Z" fill="#5c3440"/>'
@@ -510,10 +526,11 @@ let conv = convs.find(c => c.id === store.get('cur', '')) || null;
 let flash = false, project = conv ? conv.project || '' : store.get('project', ''), projects = [];
 let granted = new Set(conv && conv.granted ? conv.granted : []);   // actions autorisées pour la conversation en cours
 let lastCtx = 0, compacting = false, compactNote = null;              // compactage (déclaré avant le premier refresh())
-let sid = conv ? conv.sid || '' : '', busy = false, cur = null, gotResult = false, denials = [];
+let sid = conv ? conv.sid || '' : '', busy = false, cur = null, gotResult = false, denials = [], pendingAsk = null;
 auto.checked = store.get('auto', '0') === '1';
 log.innerHTML = conv ? conv.hist || '' : '';
 log.querySelectorAll('.approve .ab').forEach(b => b.outerHTML = '<div style="color:var(--muted)">Demande expirée.</div>');
+reviveAsks();
 refresh();
 setTimeout(() => decorate(), 0);
 // Le stockage local est limité (~5 Mo) : on garde au plus 40 conversations, on raccourcit les vieilles,
@@ -547,11 +564,11 @@ function diffHtml(name, i) {
 }
 
 function askApproval(list) {
-  const names = [...new Set(list.map(d => d.tool_name))].filter(n => /^[A-Za-z]+$/.test(n));
+  const names = [...new Set(list.map(d => grantName(d.tool_name)))].filter(n => /^[A-Za-z][A-Za-z0-9_-]*$/.test(n));
   const items = list.map(d => {
     const i = d.tool_input || {};
     const what = String(i.command || i.file_path || i.url || i.path || '').slice(0, 300);
-    return '<li><b>' + esc(TOOLS[d.tool_name] || d.tool_name) + '</b>' + (what ? ' <code>' + esc(what) + '</code>' : '') + '</li>';
+    return '<li><b>' + esc(toolName(d.tool_name)) + '</b>' + (what ? ' <code>' + esc(what) + '</code>' : '') + '</li>';
   }).join('');
   const card = el('approve', '<div class="ah">🔐 Claude a besoin de ton accord</div><ul>' + items + '</ul>'
     + '<div class="ab"><button class="no">Refuser</button><button class="yes">Autoriser</button></div>');
@@ -564,6 +581,53 @@ function askApproval(list) {
   scroll();
 }
 
+// ---- questions de Claude quand il manque une info capitale : 1 question, 1 à 3 choix, « Autre » si besoin ----
+function takeQuestion(t) {
+  let ask = null;
+  const text = t.replace(/```bebene-question\s*([\s\S]*?)```/g, (m, j) => {
+    try {
+      const o = JSON.parse(j.trim());
+      if (o && o.q) ask = { q: String(o.q), choix: (Array.isArray(o.choix) ? o.choix : []).map(String).filter(x => x.trim()).slice(0, 3), autre: !!o.autre };
+    } catch { }
+    return '';
+  });
+  if (ask && !ask.choix.length) ask.autre = true;                       // info libre : seulement le champ
+  return { text, ask };
+}
+function showAsk(a) {
+  const card = el('ask', '');
+  card.dataset.q = JSON.stringify(a);
+  card.innerHTML = '<div class="ah"><span>?</span><span>' + esc(a.q) + '</span></div><div class="ab"><div class="ch">'
+    + a.choix.map((c, i) => '<button data-i="' + i + '">' + esc(c) + '</button>').join('')
+    + (a.autre ? (a.choix.length ? '<button class="o">Autre…</button>' : '') + '<div class="ot' + (a.choix.length ? '' : ' on') + '"><input placeholder="Ta réponse…"><button>Envoyer</button></div>' : '')
+    + '</div></div>';
+  bindAsk(card); scroll();
+  if (!a.choix.length) setTimeout(() => card.querySelector('.ot input').focus(), 50);
+}
+function bindAsk(card) {
+  let a; try { a = JSON.parse(card.dataset.q); } catch { return; }
+  const answer = v => {
+    v = String(v || '').trim(); if (!v || busy || compacting) return;
+    card.querySelector('.ab').outerHTML = '<div class="done">→ ' + esc(v) + '</div>';
+    submit(v);
+  };
+  card.querySelectorAll('.ch > button[data-i]').forEach(b => b.onclick = () => answer(a.choix[+b.dataset.i]));
+  const o = card.querySelector('button.o'), ot = card.querySelector('.ot');
+  if (o) o.onclick = () => { ot.classList.add('on'); o.style.display = 'none'; ot.querySelector('input').focus(); scroll(); };
+  if (ot) {
+    const inp = ot.querySelector('input');
+    ot.querySelector('.ot > button').onclick = () => answer(inp.value);
+    inp.onkeydown = e => { if (e.key === 'Enter') { e.preventDefault(); answer(inp.value); } };
+  }
+}
+// au rechargement : seule la dernière question (sans réponse) reste active
+function reviveAsks() {
+  log.querySelectorAll('.ask').forEach(c => {
+    if (!c.querySelector('.ab')) return;
+    if (c === log.lastElementChild) bindAsk(c);
+    else c.querySelector('.ab').outerHTML = '<div class="done">Question passée.</div>';
+  });
+}
 function refresh() {
   $('#empty').style.display = log.children.length ? 'none' : 'flex';
   send.disabled = compacting || (!busy && !input.value.trim());
@@ -644,7 +708,7 @@ function submit(text, allowed, silent) {
   if (busy || compacting || !text) return;
   if (!silent) { input.value = ''; autosize(); el('msg user', esc(text)); decorate(); }
   cur = el('msg bot', '<div class="typing"><span></span><span></span><span></span></div>');
-  busy = true; gotResult = false; denials = []; refresh(); scroll();
+  busy = true; gotResult = false; denials = []; pendingAsk = null; refresh(); scroll();
   post('send\n' + (auto.checked ? 1 : 0) + '\n' + sid + '\n' + (allowed || [...granted].join(',')) + '\n' + text);
 }
 
@@ -683,11 +747,15 @@ function onLine(l) {
   if (o.type === 'assistant' && o.message && o.message.usage) { const u = o.message.usage; lastCtx = (u.input_tokens || 0) + (u.cache_read_input_tokens || 0) + (u.cache_creation_input_tokens || 0); }
   if (o.type === 'assistant' && o.message && o.message.content) {
     for (const c of o.message.content) {
-      if (c.type === 'text' && c.text.trim()) addToCur('md', md(c.text)).dataset.raw = c.text;
+      if (c.type === 'text' && c.text.trim()) {
+        const q = takeQuestion(c.text);
+        if (q.text.trim()) addToCur('md', md(q.text)).dataset.raw = q.text;
+        if (q.ask) pendingAsk = q.ask;
+      }
       if (c.type === 'tool_use') {
         const i = c.input || {};
         const what = i.command || i.file_path || i.pattern || i.url || i.query || i.description || '';
-        addToCur('tool', '<i></i><span>' + esc((TOOLS[c.name] || c.name) + (what ? ' · ' + String(what).split('\n')[0] : '')) + '</span>');
+        addToCur('tool', '<i></i><span>' + esc(toolName(c.name) + (what ? ' · ' + String(what).split('\n')[0] : '')) + '</span>');
         const d = diffHtml(c.name, i);
         if (d) addToCur('', d);
       }
@@ -709,6 +777,8 @@ function finish(code, err) {
   }
   cur = null; busy = false; refresh();
   if (denials.length) askApproval(denials);
+  else if (pendingAsk && code === '0') showAsk(pendingAsk);
+  pendingAsk = null;
   denials = []; decorate(); scroll(); save(); askTitle(code); maybeCompact(code);
 }
 
@@ -720,7 +790,7 @@ function newChat(opts) {
   flash = !!opts.flash; granted = new Set();
   if (opts.project !== undefined) project = opts.project;
   if (flash) project = '';
-  conv = null; store.set('cur', ''); store.set('project', project);
+  conv = null; store.set('cur', ''); store.set('project', project); post('calm');
   sid = ''; post('sid\n'); log.innerHTML = ''; applyMode(); refresh(); input.focus(); closeMenu();
 }
 function openConv(c) {
@@ -728,7 +798,7 @@ function openConv(c) {
   if (flash && sid) post('forget\n' + sid);
   flash = false; conv = c; sid = c.sid || ''; project = c.project || ''; granted = new Set(c.granted || []);
   store.set('cur', c.id); post('sid\n' + sid);
-  log.innerHTML = c.hist || ''; log.querySelectorAll('.approve .ab').forEach(b => b.outerHTML = '<div style="color:var(--muted)">Demande expirée.</div>');
+  log.innerHTML = c.hist || ''; log.querySelectorAll('.approve .ab').forEach(b => b.outerHTML = '<div style="color:var(--muted)">Demande expirée.</div>'); reviveAsks(); post('calm');
   decorate(); applyMode(); refresh(); scroll(); closeMenu();
 }
 function applyMode() {

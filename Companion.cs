@@ -19,10 +19,10 @@ using Microsoft.Web.WebView2.WinForms;
 
 [assembly: System.Reflection.AssemblyTitle("Bébène")]
 [assembly: System.Reflection.AssemblyProduct("Bébène")]
-[assembly: System.Reflection.AssemblyVersion("1.36.0.0")]
+[assembly: System.Reflection.AssemblyVersion("1.37.0.0")]
 
 static class Program {
-    public const string Version = "1.36";
+    public const string Version = "1.37";
     public static bool OpenSetup;
     public static readonly uint Pid = (uint)Process.GetCurrentProcess().Id;   // identifiant de Bébène (lu une seule fois)   // --setup : ouvrir directement l'assistant d'installation
 
@@ -171,6 +171,8 @@ static class Program {
             File.WriteAllText(args[1], sb.ToString(), Encoding.UTF8); return;
         }
         if (args.Length == 2 && args[0] == "--readytest") { new Companion(false).ReadyPreview(args[1]); return; }
+        if (args.Length == 2 && args[0] == "--asktest") { new Companion(false).ReadyPreview(args[1], "question"); return; }
+        if (args.Length == 2 && args[0] == "--screentest") { File.WriteAllText(args[1], ChatPanel.ScreenCommand(0) + "\n" + ChatPanel.ScreenDir(), new UTF8Encoding(false)); return; }   // test : commande de capture d écran
         if (args.Length == 2 && args[0] == "--preview") { new Companion(false).Preview(args[1]); return; } // planche des poses
         bool first;
         using (new Mutex(true, "ClaudeCompanion_Singleton", out first)) {
@@ -445,10 +447,10 @@ class Companion : Form {
     protected override void WndProc(ref Message m) { if (m.Msg == 0x0312) TogglePanel(); base.WndProc(ref m); }
 
     public string State { get { return state; } }
-    float readyT;
+    float readyT, askT;
     // "ready" : la réponse est arrivée pendant que la discussion était fermée → Bébène, content, attend qu'on l'ouvre
     public void SetState(string s) {
-        state = s; happyT = 0; readyT = 0;
+        state = s; happyT = 0; readyT = 0; askT = 0;
         if (s == "happy" || s == "ready") { jumpT = 0; heartT = 1.4f; }
     }
 
@@ -472,12 +474,12 @@ class Companion : Form {
     }
 
     // test : Bébène content qui attend qu on lise sa réponse (deux sens + avec cœur)
-    public void ReadyPreview(string path) {
-        tray.Visible = false; state = "ready"; act = "sit"; t = 0.3f;
+    public void ReadyPreview(string path, string st = "ready") {
+        tray.Visible = false; state = st; act = "sit"; t = 0.3f;
         using (var sheet = new Bitmap(W * 4, H)) using (var g = Graphics.FromImage(sheet)) {
             g.Clear(Color.FromArgb(255, 40, 44, 52));
             for (int i = 0; i < 4; i++) {
-                heartT = i >= 2 ? 0.9f : 0; t = 0.3f + i * 0.4f; held = i == 3;   // 4e : porté par la peau du cou
+                heartT = i >= 2 && st == "ready" ? 0.9f : 0; t = 0.3f + i * (st == "ready" ? 0.4f : 0.9f); held = i == 3;   // 4e : porté par la peau du cou
                 var pose = held ? HANG : SIT;
                 for (int k = 0; k < tang.Length; k++) tang[k] = pose.ta + pose.tc * k;
                 using (var b = RenderSmall(pose.Clone(), i == 1 ? -1 : 1, i == 2 ? 6 : 0, true)) g.DrawImage(b, i * W, 0);
@@ -512,7 +514,7 @@ class Companion : Form {
     [DllImport("user32.dll")] static extern IntPtr GetForegroundWindow();
     [DllImport("user32.dll")] static extern uint GetWindowThreadProcessId(IntPtr h, out uint pid);
     [DllImport("user32.dll", CharSet = CharSet.Unicode)] static extern int GetWindowText(IntPtr h, StringBuilder s, int n);
-    public static string LastWindow = "";
+    public static string LastWindow = ""; public static long LastHwnd;
     int fgTick;
     void TrackForeground() {
         if (++fgTick % 30 != 0) return;                                     // ~1 fois par seconde
@@ -520,7 +522,7 @@ class Companion : Form {
         if (h == IntPtr.Zero || pid == Program.Pid) return;
         var sb = new StringBuilder(300); GetWindowText(h, sb, 300);
         string tt = sb.ToString().Trim();
-        if (tt.Length > 0 && tt != "Program Manager") LastWindow = tt;
+        if (tt.Length > 0 && tt != "Program Manager") { LastWindow = tt; LastHwnd = h.ToInt64(); }
     }
 
     void Tick() {
@@ -535,10 +537,12 @@ class Companion : Form {
         if (heartT > 0) heartT -= dt;
         if (state == "happy") { happyT += dt; if (happyT > 1.6f) state = "idle"; }
         if (state == "ready") { readyT += dt; if (readyT > 3.5f) { readyT = 0; jumpT = 0; heartT = 1.4f; } }   // petit saut + cœur toutes les 3,5 s
+        // "question" : Claude attend une info capitale → Bébène se gratte la tête, regarde à gauche puis à droite, oreilles qui bougent
+        if (state == "question") { askT += dt; if (askT > 4.5f) { askT = 0; if (!held && !falling) SetAct("scratch", 1.1f); earTw = 5; } }
 
         var wa = Screen.FromPoint(new Point(Left + W / 2, Top + H / 2)).WorkingArea;
         int groundTop = wa.Bottom - 51 * Px;
-        bool busy = state == "thinking" || state == "ready" || Panel.Visible;
+        bool busy = state == "thinking" || state == "ready" || state == "question" || Panel.Visible;
         Pose tgt = SIT; int dx = 0;
 
         if (held) tgt = HANG;
@@ -549,7 +553,7 @@ class Companion : Form {
         } else {
             if (Top != groundTop) Top = groundTop;
             if (!held && (Left < wa.Left - W / 2 || Left > wa.Right - W / 2)) Left = Math.Max(wa.Left, Math.Min(wa.Right - W, Left)); // écran débranché / résolution changée
-            if (busy && act != "sit" && act != "groom" && act != "lick") SetAct("sit", 2);
+            if (busy && act != "sit" && act != "groom" && act != "lick" && !(state == "question" && act == "scratch")) SetAct("sit", 2);
             if (Panel.Visible) face = Panel.Left < Left ? -1 : 1;
             switch (act) {
                 case "groom": tgt = GROOM; if (actT > actDur) SetAct("sit", 2 + rnd.Next(4)); break;
@@ -587,6 +591,7 @@ class Companion : Form {
         var cp = Cursor.Position;
         float hsx = Left + (face > 0 ? cur.hx : CW - cur.hx) * Px, hsy = Top + cur.hy * Px;
         float lx = Math.Max(-0.9f, Math.Min(0.9f, (cp.X - hsx) / 150f)) * face, ly = Math.Max(-1f, Math.Min(1f, (cp.Y - hsy) / 150f));
+        if (state == "question" && !held) { lx = (float)Math.Sin(t * 1.4f) * 0.9f; ly = -0.7f; }   // perplexe : regarde en l air, d un côté puis de l autre
         lookX += (lx - lookX) * 0.2f; lookY += (ly - lookY) * 0.2f;
         earBack += (((held || falling) ? 2.5f : petT > 0 ? 1.2f : 0f) - earBack) * 0.2f;
 
@@ -609,7 +614,7 @@ class Companion : Form {
         }
 
         // queue : chaîne avec inertie
-        float amp = state == "thinking" ? 24 : state == "ready" ? 20 : act == "lie" ? 4 : held ? 16 : walkAmp > 0.3f ? 7 : 10;
+        float amp = state == "thinking" ? 24 : state == "ready" ? 20 : state == "question" ? 14 : act == "lie" ? 4 : held ? 16 : walkAmp > 0.3f ? 7 : 10;
         float freq = state == "thinking" ? 6 : state == "ready" ? 4.5f : 1.8f;
         for (int i = 0; i < tang.Length; i++) {
             float target = cur.ta + cur.tc * i + amp * (float)Math.Sin(t * freq - i * 0.55f) * (i + 1) / tang.Length;
@@ -850,6 +855,21 @@ class Companion : Form {
                         if (ch == 'X') g.FillRectangle(w, x0 + c, y0 + rr, 1, 1); else if (ch == 'O') g.FillRectangle(o, x0 + c, y0 + rr, 1, 1);
                     }
             }
+            if (state == "question") {                                   // bulle « ? » qui change de côté, avec un petit « ? » qui monte
+                int side = ((int)(t / 1.6f) % 2 == 0) ? dir : -dir, bob = (int)(t * 2.5f) % 2;
+                string[] rows = { ".XXXXXXX.", "XXXOOOXXX", "XXOXXXOXX", "XXXXXOXXX", "XXXXOXXXX", "XXXXXXXXX", "XXXXOXXXX", ".XXXXXXX.", "..XX.....", ".X......." };
+                int x0 = (int)(hx + side * (held ? 14 : 10)) - (side > 0 ? 1 : 8), y0 = (held ? (int)Math.Max(0, hy - 10) : (int)Math.Max(0, hy - 25)) - bob;
+                using (var w = new SolidBrush(Color.FromArgb(245, 240, 238, 245))) using (var o = new SolidBrush(Color.FromArgb(255, 217, 119, 87)))
+                    for (int rr = 0; rr < rows.Length; rr++) for (int c = 0; c < 9; c++) {
+                        char ch = rows[rr][side > 0 ? c : 8 - c];
+                        if (ch == 'X') g.FillRectangle(w, x0 + c, y0 + rr, 1, 1); else if (ch == 'O') g.FillRectangle(o, x0 + c, y0 + rr, 1, 1);
+                    }
+                float ph = (t * 0.6f) % 1f;                                   // petit « ? » qui s envole de l autre côté
+                int qx = (int)(hx - side * (7 + ph * 4)), qy = (int)(hy - 9 - ph * 12), qa = (int)(230 * (1 - ph));
+                string[] q = { "XXX", "..X", ".X.", "...", ".X." };
+                using (var b = new SolidBrush(Color.FromArgb(qa, 240, 238, 245)))
+                    for (int rr = 0; rr < q.Length; rr++) for (int c = 0; c < 3; c++) if (q[rr][c] == 'X') g.FillRectangle(b, qx + c, Math.Max(0, qy + rr), 1, 1);
+            }
             if (act == "lie" && actT > 2.5f && !held && !falling) {
                 for (int i = 0; i < 3; i++) {
                     float ph = (t * 0.5f + i / 3f) % 1f;
@@ -987,7 +1007,7 @@ class Companion : Form {
         var d = new Dictionary<string, object> {
             { "name", Settings.Name }, { "model", Settings.Str("Model", "") }, { "scale", scalePct },
             { "showCat", Settings.Bool("ShowCat", true) }, { "topMost", TopMost }, { "autoStart", Settings.AutoStart },
-            { "prompt", Settings.Str("Prompt", "") }, { "caveman", Settings.Bool("Caveman", true) }, { "spell", Settings.Bool("SpellCheck", false) }, { "autoAllow", Settings.Str("AutoAllow", "") }, { "remindExam", Settings.Bool("RemindExam", true) }, { "remindRdv", Settings.Bool("RemindRdv", true) }, { "remindWhen", Settings.Str("RemindWhen", "both") }, { "features", Features() }, { "manual", Manual.Raw() }, { "hidden", new List<string>(Manual.Hidden()) }, { "calendars", Calendars.Config() }, { "locFilter", Settings.Str("LocFilter", "") }, { "gmailUser", Mailbox.GmailUser }, { "gmailSet", Mailbox.GmailReady }, { "outlookOn", Mailbox.OutlookOn }, { "mailStatus", Mailbox.Status }, { "mailRunning", Mailbox.Running },{ "workDir", Panel.WorkDir }, { "hasSession", SessionId.Length > 0 },
+            { "prompt", Settings.Str("Prompt", "") }, { "caveman", Settings.Bool("Caveman", true) }, { "chrome", Settings.Bool("Chrome", true) }, { "spell", Settings.Bool("SpellCheck", false) }, { "autoAllow", Settings.Str("AutoAllow", "") }, { "remindExam", Settings.Bool("RemindExam", true) }, { "remindRdv", Settings.Bool("RemindRdv", true) }, { "remindWhen", Settings.Str("RemindWhen", "both") }, { "features", Features() }, { "manual", Manual.Raw() }, { "hidden", new List<string>(Manual.Hidden()) }, { "calendars", Calendars.Config() }, { "locFilter", Settings.Str("LocFilter", "") }, { "gmailUser", Mailbox.GmailUser }, { "gmailSet", Mailbox.GmailReady }, { "outlookOn", Mailbox.OutlookOn }, { "mailStatus", Mailbox.Status }, { "mailRunning", Mailbox.Running },{ "workDir", Panel.WorkDir }, { "hasSession", SessionId.Length > 0 },
             { "version", Program.Version }
         };
         return new JavaScriptSerializer().Serialize(d);
@@ -1014,6 +1034,7 @@ class Companion : Form {
                 case "showCat": SetCatVisible(Convert.ToBoolean(kv.Value)); break;
                 case "topMost": TopMost = Convert.ToBoolean(kv.Value); Settings.Set("TopMost", TopMost); break;
                 case "caveman": Settings.Set("Caveman", Convert.ToBoolean(kv.Value)); break;
+                case "chrome": Settings.Set("Chrome", Convert.ToBoolean(kv.Value)); break;
                 case "spell": SetSpell(Convert.ToBoolean(kv.Value)); break;
                 case "autoAllow": { var ok = new List<string>(); foreach (var a in Convert.ToString(kv.Value).Split(',')) if (Regex.IsMatch(a, "^[A-Za-z]+$")) ok.Add(a); Settings.Set("AutoAllow", string.Join(",", ok.ToArray())); } break;
                 case "remindExam": Settings.Set("RemindExam", Convert.ToBoolean(kv.Value)); break;
@@ -2924,6 +2945,7 @@ class ChatPanel : Form {
             }
             case "forget": Forget(parts.Length > 1 ? parts[1] : ""); break;
             case "stop": KillTree(); break;
+            case "calm": if (owner.State == "question") owner.SetState("idle"); break;   // question abandonnée (nouvelle conversation…)
             case "send": if (parts.Length == 5) Send(parts[4], parts[1] == "1", parts[2], parts[3]); break;
         }
     }
@@ -2965,16 +2987,79 @@ class ChatPanel : Form {
         return guardSettings = js;
     }
 
+    // « Regarder l'écran » : capture de la fenêtre que l'utilisateur avait devant lui (même si la discussion la recouvre),
+    // ou de tout l'écran. Claude lance ce script puis lit l'image. Hors des dossiers de Bébène (le gardien bloquerait la commande).
+    const string ScreenScript =
+        "param([long]$Hwnd = 0, [switch]$Ecran)\r\n" +
+        "Add-Type -AssemblyName System.Drawing, System.Windows.Forms\r\n" +
+        "Add-Type -TypeDefinition @'\r\n" +
+        "using System; using System.Runtime.InteropServices;\r\n" +
+        "public static class BW {\r\n" +
+        "  [DllImport(\"user32.dll\")] public static extern bool SetProcessDPIAware();\r\n" +
+        "  [DllImport(\"user32.dll\")] public static extern bool IsWindow(IntPtr h);\r\n" +
+        "  [DllImport(\"user32.dll\")] public static extern bool IsIconic(IntPtr h);\r\n" +
+        "  [DllImport(\"user32.dll\")] public static extern bool GetWindowRect(IntPtr h, out RECT r);\r\n" +
+        "  [DllImport(\"user32.dll\")] public static extern bool PrintWindow(IntPtr h, IntPtr hdc, uint f);\r\n" +
+        "  [StructLayout(LayoutKind.Sequential)] public struct RECT { public int L, T, R, B; }\r\n" +
+        "}\r\n" +
+        "'@\r\n" +
+        "[BW]::SetProcessDPIAware() | Out-Null\r\n" +
+        "$dir = Join-Path $env:TEMP 'BebeneEcran'; New-Item -ItemType Directory -Force $dir | Out-Null\r\n" +
+        "$out = Join-Path $dir 'ecran.png'; $h = [IntPtr]$Hwnd; $bmp = $null; $quoi = 'tout l ecran'\r\n" +
+        "if (-not $Ecran -and $Hwnd -ne 0 -and [BW]::IsWindow($h) -and -not [BW]::IsIconic($h)) {\r\n" +
+        "  $r = New-Object BW+RECT; [BW]::GetWindowRect($h, [ref]$r) | Out-Null\r\n" +
+        "  $w = $r.R - $r.L; $hh = $r.B - $r.T\r\n" +
+        "  if ($w -gt 50 -and $hh -gt 50) {\r\n" +
+        "    $bmp = New-Object Drawing.Bitmap $w, $hh; $g = [Drawing.Graphics]::FromImage($bmp); $dc = $g.GetHdc()\r\n" +
+        "    $ok = [BW]::PrintWindow($h, $dc, 2); $g.ReleaseHdc($dc); $g.Dispose()\r\n" +
+        "    if ($ok) { $quoi = 'la fenetre active' } else { $bmp.Dispose(); $bmp = $null }\r\n" +
+        "  }\r\n" +
+        "}\r\n" +
+        "if (-not $bmp) {\r\n" +
+        "  $v = [Windows.Forms.SystemInformation]::VirtualScreen\r\n" +
+        "  $bmp = New-Object Drawing.Bitmap $v.Width, $v.Height; $g = [Drawing.Graphics]::FromImage($bmp)\r\n" +
+        "  $g.CopyFromScreen($v.Left, $v.Top, 0, 0, $bmp.Size); $g.Dispose()\r\n" +
+        "}\r\n" +
+        "if ($bmp.Width -gt 1600) {\r\n" +
+        "  $s = 1600 / $bmp.Width; $sm = New-Object Drawing.Bitmap 1600, ([int]($bmp.Height * $s))\r\n" +
+        "  $g = [Drawing.Graphics]::FromImage($sm); $g.InterpolationMode = 'HighQualityBicubic'; $g.DrawImage($bmp, 0, 0, $sm.Width, $sm.Height); $g.Dispose()\r\n" +
+        "  $bmp.Dispose(); $bmp = $sm\r\n" +
+        "}\r\n" +
+        "$bmp.Save($out, [Drawing.Imaging.ImageFormat]::Png); $bmp.Dispose()\r\n" +
+        "Write-Output \"Capture de $quoi : $out (lis cette image ; si elle est vide ou ne montre qu un logo, relance avec -Ecran a la place de -Hwnd)\"\r\n";
+    static string screenScript;
+    public static string ScreenTool() {
+        if (screenScript != null && File.Exists(screenScript)) return screenScript;
+        string dir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "BebeneOutils");
+        Directory.CreateDirectory(dir);
+        string ps1 = Path.Combine(dir, "ecran.ps1");
+        File.WriteAllText(ps1, ScreenScript, new UTF8Encoding(true));
+        return screenScript = ps1;
+    }
+    public static string ScreenDir() { string d = Path.Combine(Path.GetTempPath(), "BebeneEcran"); Directory.CreateDirectory(d); return d; }
+    public static string ScreenCommand(long hwnd) {
+        return "powershell -NoProfile -ExecutionPolicy Bypass -File \"" + ScreenTool().Replace('\\', '/') + "\"" + (hwnd != 0 ? " -Hwnd " + hwnd : " -Ecran");
+    }
+
+    bool asking;   // la réponse en cours contient une question à l'utilisateur (bloc bebene-question)
+
     void Send(string text, bool autonomous, string sessionId, string allowed) {
         if (proc != null || compactProc != null) { Post("done\n-1\n" + (proc != null ? "Claude est encore en train de répondre : attends la fin ou clique sur Arrêter." : "Je termine de compacter la conversation : réessaie dans un instant.")); return; }
         // Le contexte qui change (fenêtre active) va dans le MESSAGE, pas dans le prompt système :
         // un prompt système stable garde l'historique en cache → beaucoup moins de tokens à chaque échange.
-        if (Companion.LastWindow.Length > 0) text = "[Fenêtre active : " + Companion.LastWindow + "]\n" + text;
+        if (Companion.LastWindow.Length > 0)
+            text = "[Fenêtre active : " + Companion.LastWindow + " · pour la voir : " + ScreenCommand(Companion.LastHwnd) + "]\n" + text;
         string args = "-p --output-format stream-json --verbose --permission-mode " + (autonomous ? "bypassPermissions" : "acceptEdits");
         // actions autorisées : celles accordées dans la conversation + celles pour lesquelles l utilisateur ne veut plus d alerte (réglages)
+        // (noms simples « Bash » ou serveurs MCP « mcp__claude-in-chrome »)
         var allow = new List<string>();
-        foreach (var a in (allowed + "," + Settings.Str("AutoAllow", "")).Split(',')) if (Regex.IsMatch(a, "^[A-Za-z]+$") && !allow.Contains(a)) allow.Add(a);
-        if (allow.Count > 0) args += " --allowedTools " + string.Join(",", allow.ToArray());
+        foreach (var a in (allowed + "," + Settings.Str("AutoAllow", "")).Split(',')) if (Regex.IsMatch(a, "^[A-Za-z][A-Za-z0-9_-]*$") && !allow.Contains(a)) allow.Add(a);
+        // regarder l écran : toujours permis (lecture seule), sans carte d accord
+        allow.Add("Bash(powershell -NoProfile -ExecutionPolicy Bypass -File \"" + ScreenTool().Replace('\\', '/') + "\"*)");
+        args += " --allowedTools " + Util.Quote(string.Join(",", allow.ToArray()));
+        args += " --add-dir " + Util.Quote(ScreenDir());
+        bool chrome = Settings.Bool("Chrome", true);
+        if (chrome) args += " --chrome";                                     // pages web : extension Claude in Chrome
         string model = Settings.Str("Model", "");
         if (Regex.IsMatch(model, "^[a-z0-9.-]+$")) args += " --model " + model;
         if (Regex.IsMatch(sessionId, "^[0-9a-fA-F-]{36}$")) args += " --resume " + sessionId;
@@ -2986,7 +3071,18 @@ class ChatPanel : Form {
             + (Flash ? "CONVERSATION FLASH : l'utilisateur ne veut rien enregistrer. N'écris rien dans la mémoire ClaudeHub, ne crée pas de projet et n'écris jamais la ligne « 📁 Projet ». "
                      : Project.Length > 0 ? "Cette conversation fait partie du projet « " + Project + " » (dossier de travail actuel ; elle est archivée automatiquement dans le projet). Tiens NOTES.md à jour quand ça avance. " : "")
             + "Le message peut commencer par [Fenêtre active : …] : c'est la fenêtre que l'utilisateur avait devant lui (souvent « le fichier ouvert devant moi »). "
+            + "VOIR : quand l'utilisateur parle de ce qu'il a devant lui (« ce champ », « cette page », « ce que je vois », « devant moi », « ici »), regarde D'ABORD l'écran "
+            + "(lance la commande indiquée dans [Fenêtre active], puis lis l'image produite) AVANT de chercher dans ses dossiers. "
+            + "AGIR : tu peux et tu dois agir à la place de l'utilisateur quand il le demande : remplir un champ ou un formulaire web, écrire dans un document, du code, etc. Ne refuse pas. "
+            + (chrome ? "Page web dans Chrome : utilise les outils mcp__claude-in-chrome (tabs_context_mcp pour trouver l'onglet déjà ouvert, puis find / form_input / computer pour remplir, sans recharger la page ni rien envoyer sans accord). "
+                        + "Si l'extension ne répond pas, ou pour un autre navigateur, passe par UI Automation (skill piloter-applis). " : "")
             + "Pour agir dans un programme (Excel, Word, PowerPoint, Outlook, Inventor ou toute autre appli, fichier ouvert compris), utilise la skill piloter-applis. "
+            + "QUESTIONS : s'il te manque une information CAPITALE (que tu ne peux ni voir à l'écran, ni trouver dans la mémoire, ni deviner raisonnablement) ou un choix qui change vraiment le résultat, "
+            + "avant de produire un document, du code, des fichiers ou de remplir quelque chose : n'invente pas, pose UNE seule question et arrête-toi. "
+            + "Format exact, à la toute fin de ta réponse : un bloc de code de langage bebene-question contenant du JSON {\"q\":\"la question\",\"choix\":[\"…\",\"…\"],\"autre\":false} "
+            + "avec 1 à 3 choix courts (les plus probables en premier) ; \"autre\":true seulement si la réponse est vraiment ouverte ou compliquée ; \"choix\":[] et \"autre\":true pour une info libre (ex. un nom). "
+            + "Une question à la fois : tu recevras la réponse dans le message suivant, puis tu continues (ou tu poses la suivante). "
+            + "Jamais pour les détails mineurs ni pour demander une autorisation : pour ceux-là, choisis un défaut raisonnable et dis-le. "
             + "Tu ne peux PAS modifier ton propre programme (code, installation, réglages, données de Bébène) : c'est verrouillé. Si on te le demande, explique que l'évolution de Bébène se fait avec Claude Code dans le terminal. "
             + Settings.Str("Prompt", "");
         args += " --append-system-prompt " + Util.Quote(persona.Replace("\r", " ").Replace("\n", " "));
@@ -3001,7 +3097,12 @@ class ChatPanel : Form {
         psi.EnvironmentVariables["CAVEMAN_DEFAULT_MODE"] = Settings.Bool("Caveman", true) ? "caveman" : "off";
         var p = new Process { StartInfo = psi, EnableRaisingEvents = true };
         var err = new StringBuilder();
-        p.OutputDataReceived += (s, e) => { if (e.Data != null) Post("line\n" + e.Data); };
+        asking = false;
+        p.OutputDataReceived += (s, e) => {
+            if (e.Data == null) return;
+            if (e.Data.StartsWith("{\"type\":\"assistant\"") && e.Data.Contains("bebene-question")) asking = true;
+            Post("line\n" + e.Data);
+        };
         p.ErrorDataReceived += (s, e) => { if (e.Data != null) lock (err) err.AppendLine(e.Data); };
         p.Exited += (s, e) => {
             p.WaitForExit();
@@ -3011,7 +3112,8 @@ class ChatPanel : Form {
                 BeginInvoke((Action)(() => {
                     Post("done\n" + code + "\n" + er);
                     p.Dispose(); proc = null;
-                    owner.SetState(!Visible ? "ready" : code == 0 ? "happy" : "idle");   // fermée : il attend content qu on vienne lire
+                    // question : il se gratte la tête jusqu à la réponse ; fermée : il attend content qu on vienne lire
+                    owner.SetState(asking && code == 0 ? "question" : !Visible ? "ready" : code == 0 ? "happy" : "idle");
                 }));
             } catch { } // l'app se ferme pendant que Claude répond
         };
