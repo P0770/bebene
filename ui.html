@@ -156,6 +156,10 @@ kbd { font: 11px "Segoe UI", sans-serif; background: var(--raised); border-radiu
 .ask .ot input:focus { border-color: var(--accent); }
 .ask .ot button { background: var(--accent); border-color: var(--accent); color: #fff; text-align: center; }
 .ask .done { margin-top: 6px; color: var(--muted); }
+.ask.ready { border-color: rgba(123,198,126,.45); background: rgba(123,198,126,.06); }
+.ask.ready .ah span:first-child { color: #7bc67e; }
+.ask .rb { display: flex; gap: 8px; margin-top: 9px; flex-wrap: wrap; }
+.ask .rb .go { background: linear-gradient(135deg, #e8906d, #c75f3e); border-color: transparent; color: #fff; font-weight: 600; text-align: center; }
 .approve button { font: inherit; font-size: 13px; border-radius: 9px; padding: 6px 14px; cursor: pointer; border: 1px solid var(--line); background: var(--raised); color: var(--text); }
 .approve .yes { background: var(--accent); border-color: var(--accent); color: #fff; }
 .approve .yes:hover { background: var(--accent-2); }
@@ -564,7 +568,7 @@ let conv = convs.find(c => c.id === store.get('cur', '')) || null;
 let flash = false, project = conv ? conv.project || '' : store.get('project', ''), projects = [];
 let granted = new Set(conv && conv.granted ? conv.granted : []);   // actions autorisées pour la conversation en cours
 let lastCtx = 0, compacting = false, compactNote = null;              // compactage (déclaré avant le premier refresh())
-let sid = conv ? conv.sid || '' : '', busy = false, cur = null, gotResult = false, denials = [], pendingAsk = null;
+let sid = conv ? conv.sid || '' : '', busy = false, cur = null, gotResult = false, denials = [], pendingAsk = null, pendingReady = null;
 auto.checked = store.get('auto', '0') === '1';
 log.innerHTML = conv ? conv.hist || '' : '';
 log.querySelectorAll('.approve .ab').forEach(b => b.outerHTML = '<div style="color:var(--muted)">Demande expirée.</div>');
@@ -630,7 +634,12 @@ function takeQuestion(t) {
     return '';
   });
   if (ask && !ask.choix.length) ask.autre = true;                       // info libre : seulement le champ
-  return { text, ask };
+  let ready = null;
+  const text2 = text.replace(/```bebene-pret\s*([\s\S]*?)```/g, (m, j) => {
+    try { const o = JSON.parse(j.trim()); ready = { quoi: String((o && o.quoi) || 'le fichier') }; } catch { ready = { quoi: 'le fichier' }; }
+    return '';
+  });
+  return { text: text2, ask, ready };
 }
 function showAsk(a) {
   const card = el('ask', '');
@@ -659,10 +668,23 @@ function bindAsk(card) {
   }
 }
 // au rechargement : seule la dernière question (sans réponse) reste active
+// plan prêt : un clic pour lancer la production, ou on continue d'ajuster
+function showReady(r) {
+  const card = el('ask ready', '');
+  card.dataset.r = JSON.stringify(r);
+  card.innerHTML = '<div class="ah"><span>✓</span><span>Plan prêt · ' + esc(r.quoi) + '</span></div><div class="ab"><div class="rb">'
+    + '<button class="go">📄 Produire le fichier</button><button class="adj">✏️ Ajuster le plan</button></div></div>';
+  bindReady(card); scroll();
+}
+function bindReady(card) {
+  const done = t => { card.querySelector('.ab').outerHTML = '<div class="done">' + t + '</div>'; };
+  card.querySelector('.go').onclick = () => { if (busy || compacting) return; done('→ Production lancée'); submit('Le plan est bon : produis le fichier maintenant.'); };
+  card.querySelector('.adj').onclick = () => { done('→ Plan à ajuster'); input.placeholder = 'Ce que tu veux changer dans le plan…'; input.focus(); };
+}
 function reviveAsks() {
   log.querySelectorAll('.ask').forEach(c => {
     if (!c.querySelector('.ab')) return;
-    if (c === log.lastElementChild) bindAsk(c);
+    if (c === log.lastElementChild) { if (c.classList.contains('ready')) bindReady(c); else bindAsk(c); }
     else c.querySelector('.ab').outerHTML = '<div class="done">Question passée.</div>';
   });
 }
@@ -772,7 +794,7 @@ function submit(text, allowed, silent) {
   if (busy || compacting || !text) return;
   if (!silent) { input.value = ''; autosize(); el('msg user', esc(text)); decorate(); }
   cur = el('msg bot', '<div class="typing"><span></span><span></span><span></span></div>');
-  busy = true; gotResult = false; denials = []; pendingAsk = null; refresh(); scroll();
+  busy = true; gotResult = false; denials = []; pendingAsk = null; pendingReady = null; refresh(); scroll();
   post('send\n' + (auto.checked ? 1 : 0) + '\n' + sid + '\n' + (allowed || [...granted].join(',')) + '\n' + text);
 }
 
@@ -816,6 +838,7 @@ function onLine(l) {
         const q = takeQuestion(c.text);
         if (q.text.trim()) addToCur('md', md(q.text)).dataset.raw = q.text;
         if (q.ask) pendingAsk = q.ask;
+        if (q.ready) pendingReady = q.ready;
       }
       if (c.type === 'tool_use') {
         const i = c.input || {};
@@ -843,7 +866,8 @@ function finish(code, err) {
   cur = null; busy = false; refresh();
   if (denials.length) askApproval(denials);
   else if (pendingAsk && code === '0') showAsk(pendingAsk);
-  pendingAsk = null;
+  else if (pendingReady && code === '0') showReady(pendingReady);
+  pendingAsk = null; pendingReady = null;
   denials = []; decorate(); scroll(); save(); askTitle(code); maybeCompact(code);
 }
 

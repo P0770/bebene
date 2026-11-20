@@ -238,6 +238,10 @@ details.sec .sb > .card + .card { margin-top: 10px; }
     <div class="lbl"><b>Agir dans Chrome</b><span>Remplir des champs et des formulaires sur les pages ouvertes (extension Claude in Chrome).</span></div>
     <label class="switch"><input type="checkbox" id="chrome"><span class="track"></span></label>
   </div>
+  <div class="row">
+    <div class="lbl"><b>Préparer avant de produire</b><span>Pour un nouveau fichier (rapport, présentation, code…) : Bébène rassemble les infos, propose un plan et les lacunes, et ne produit qu'à ta demande.</span></div>
+    <label class="switch"><input type="checkbox" id="prepare"><span class="track"></span></label>
+  </div>
   <div class="row col">
     <div class="lbl"><b>Instructions personnalisées</b><span>Ce que le chat doit toujours savoir sur toi ou ta façon de travailler.</span></div>
     <textarea id="prompt" placeholder="Ex. : Je débute en programmation, explique simplement. Je travaille surtout en Python."></textarea>
@@ -460,7 +464,7 @@ function render(s) {
   $('#hname').textContent = s.name;
   if (document.activeElement !== $('#name')) $('#name').value = s.name;
   if (document.activeElement !== $('#prompt')) $('#prompt').value = s.prompt;
-  $('#showCat').checked = s.showCat; $('#topMost').checked = s.topMost; $('#autoStart').checked = s.autoStart; $('#caveman').checked = s.caveman; $('#chrome').checked = s.chrome; $('#postits').checked = s.postits; $('#spell').checked = s.spell;
+  $('#showCat').checked = s.showCat; $('#topMost').checked = s.topMost; $('#autoStart').checked = s.autoStart; $('#caveman').checked = s.caveman; $('#chrome').checked = s.chrome; $('#postits').checked = s.postits; $('#prepare').checked = s.prepare; $('#spell').checked = s.spell;
   $('#model').value = s.model;
   $('#workDir').textContent = s.workDir; $('#workDir').title = s.workDir;
   $('#version').textContent = 'Version ' + s.version;
@@ -500,7 +504,7 @@ $('#mAdd').onclick = () => {
 };
 
 document.querySelectorAll('[data-act]').forEach(b => b.onclick = () => post(b.dataset.act));
-['showCat', 'topMost', 'autoStart', 'caveman', 'chrome', 'postits', 'spell'].forEach(id => $('#' + id).onchange = e => set({ [id]: e.target.checked }));
+['showCat', 'topMost', 'autoStart', 'caveman', 'chrome', 'postits', 'prepare', 'spell'].forEach(id => $('#' + id).onchange = e => set({ [id]: e.target.checked }));
 $('#model').onchange = e => set({ model: e.target.value });
 $('#name').onchange = e => set({ name: e.target.value });
 $('#name').onkeydown = e => { if (e.key === 'Enter') e.target.blur(); };

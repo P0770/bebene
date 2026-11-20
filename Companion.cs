@@ -19,10 +19,10 @@ using Microsoft.Web.WebView2.WinForms;
 
 [assembly: System.Reflection.AssemblyTitle("Bébène")]
 [assembly: System.Reflection.AssemblyProduct("Bébène")]
-[assembly: System.Reflection.AssemblyVersion("1.40.0.0")]
+[assembly: System.Reflection.AssemblyVersion("1.41.0.0")]
 
 static class Program {
-    public const string Version = "1.40";
+    public const string Version = "1.41";
     public static bool OpenSetup;
     public static readonly uint Pid = (uint)Process.GetCurrentProcess().Id;   // identifiant de Bébène (lu une seule fois)   // --setup : ouvrir directement l'assistant d'installation
 
@@ -1025,7 +1025,7 @@ class Companion : Form {
         var d = new Dictionary<string, object> {
             { "name", Settings.Name }, { "model", Settings.Str("Model", "") }, { "scale", scalePct },
             { "showCat", Settings.Bool("ShowCat", true) }, { "topMost", TopMost }, { "autoStart", Settings.AutoStart },
-            { "prompt", Settings.Str("Prompt", "") }, { "caveman", Settings.Bool("Caveman", true) }, { "chrome", Settings.Bool("Chrome", true) }, { "postits", Settings.Bool("PostIts", true) }, { "spell", Settings.Bool("SpellCheck", false) }, { "autoAllow", Settings.Str("AutoAllow", "") }, { "remindExam", Settings.Bool("RemindExam", true) }, { "remindRdv", Settings.Bool("RemindRdv", true) }, { "remindWhen", Settings.Str("RemindWhen", "both") }, { "features", Features() }, { "manual", Manual.Raw() }, { "hidden", new List<string>(Manual.Hidden()) }, { "calendars", Calendars.Config() }, { "locFilter", Settings.Str("LocFilter", "") }, { "gmailUser", Mailbox.GmailUser }, { "gmailSet", Mailbox.GmailReady }, { "outlookOn", Mailbox.OutlookOn }, { "mailStatus", Mailbox.Status }, { "mailRunning", Mailbox.Running },{ "workDir", Panel.WorkDir }, { "hasSession", SessionId.Length > 0 },
+            { "prompt", Settings.Str("Prompt", "") }, { "caveman", Settings.Bool("Caveman", true) }, { "chrome", Settings.Bool("Chrome", true) }, { "postits", Settings.Bool("PostIts", true) }, { "prepare", Settings.Bool("Prepare", true) }, { "spell", Settings.Bool("SpellCheck", false) }, { "autoAllow", Settings.Str("AutoAllow", "") }, { "remindExam", Settings.Bool("RemindExam", true) }, { "remindRdv", Settings.Bool("RemindRdv", true) }, { "remindWhen", Settings.Str("RemindWhen", "both") }, { "features", Features() }, { "manual", Manual.Raw() }, { "hidden", new List<string>(Manual.Hidden()) }, { "calendars", Calendars.Config() }, { "locFilter", Settings.Str("LocFilter", "") }, { "gmailUser", Mailbox.GmailUser }, { "gmailSet", Mailbox.GmailReady }, { "outlookOn", Mailbox.OutlookOn }, { "mailStatus", Mailbox.Status }, { "mailRunning", Mailbox.Running },{ "workDir", Panel.WorkDir }, { "hasSession", SessionId.Length > 0 },
             { "version", Program.Version }
         };
         return new JavaScriptSerializer().Serialize(d);
@@ -1054,6 +1054,7 @@ class Companion : Form {
                 case "caveman": Settings.Set("Caveman", Convert.ToBoolean(kv.Value)); break;
                 case "chrome": Settings.Set("Chrome", Convert.ToBoolean(kv.Value)); break;
                 case "postits": Settings.Set("PostIts", Convert.ToBoolean(kv.Value)); Notes.Refresh(); Panel.Post("notes\n" + Notes.Json()); break;
+                case "prepare": Settings.Set("Prepare", Convert.ToBoolean(kv.Value)); break;
                 case "spell": SetSpell(Convert.ToBoolean(kv.Value)); break;
                 case "autoAllow": { var ok = new List<string>(); foreach (var a in Convert.ToString(kv.Value).Split(',')) if (Regex.IsMatch(a, "^[A-Za-z]+$")) ok.Add(a); Settings.Set("AutoAllow", string.Join(",", ok.ToArray())); } break;
                 case "remindExam": Settings.Set("RemindExam", Convert.ToBoolean(kv.Value)); break;
@@ -3661,7 +3662,16 @@ class ChatPanel : Form {
             + (chrome ? "Page web dans Chrome : utilise les outils mcp__claude-in-chrome (tabs_context_mcp pour trouver l'onglet déjà ouvert, puis find / form_input / computer pour remplir, sans recharger la page ni rien envoyer sans accord). "
                         + "Si l'extension ne répond pas, ou pour un autre navigateur, passe par UI Automation (skill piloter-applis). " : "")
             + "Pour agir dans un programme (Excel, Word, PowerPoint, Outlook, Inventor ou toute autre appli, fichier ouvert compris), utilise la skill piloter-applis. "
-            + "QUESTIONS : s'il te manque une information CAPITALE (que tu ne peux ni voir à l'écran, ni trouver dans la mémoire, ni deviner raisonnablement) ou un choix qui change vraiment le résultat, "
+            + (Settings.Bool("Prepare", true)
+                ? "PRÉPARER AVANT DE PRODUIRE : quand l'utilisateur commence un projet ou parle de vouloir faire un fichier (rapport, présentation, document, classeur, code…), "
+                  + "NE CRÉE AUCUN FICHIER de résultat tout de suite. D'abord : écoute, rassemble ce qu'il fournit (textes, fichiers, consignes), lis les modèles de référence utiles, "
+                  + "et comprends la tâche et le contenu. Puis propose un PLAN SYNTHÉTIQUE du résultat (structure, contenu de chaque partie, format), "
+                  + "et signale les LACUNES et problèmes probables (infos manquantes, incohérences, points à risque). Continue à affiner tant qu'il apporte des éléments. "
+                  + "Quand le plan te semble complet, termine ta réponse par un bloc de code de langage bebene-pret contenant du JSON {\"quoi\":\"ce que tu vas produire, en quelques mots\"}. "
+                  + "Ne produis le fichier QUE lorsqu'il le demande explicitement (« fais-le », « génère », « produis le fichier », « vas-y »…), puis produis-le en entier selon le plan validé. "
+                  + "Exceptions, à faire directement : petites retouches d'un fichier existant, post-it, NOTES.md et mémoire ClaudeHub, ou s'il dit lui-même de produire tout de suite. "
+                : "")
+            + "QUESTIONS :s'il te manque une information CAPITALE (que tu ne peux ni voir à l'écran, ni trouver dans la mémoire, ni deviner raisonnablement) ou un choix qui change vraiment le résultat, "
             + "avant de produire un document, du code, des fichiers ou de remplir quelque chose : n'invente pas, pose UNE seule question et arrête-toi. "
             + "Format exact, à la toute fin de ta réponse : un bloc de code de langage bebene-question contenant du JSON {\"q\":\"la question\",\"choix\":[\"…\",\"…\"],\"autre\":false} "
             + "avec 1 à 3 choix courts (les plus probables en premier) ; \"autre\":true seulement si la réponse est vraiment ouverte ou compliquée ; \"choix\":[] et \"autre\":true pour une info libre (ex. un nom). "
