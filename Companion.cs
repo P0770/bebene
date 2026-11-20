@@ -22,7 +22,7 @@ using Microsoft.Web.WebView2.WinForms;
 [assembly: System.Reflection.AssemblyVersion("1.43.0.0")]
 
 static class Program {
-    public const string Version = "1.47";
+    public const string Version = "1.48";
     public static bool OpenSetup;
     public static readonly uint Pid = (uint)Process.GetCurrentProcess().Id;   // identifiant de Bébène (lu une seule fois)   // --setup : ouvrir directement l'assistant d'installation
 
@@ -1098,12 +1098,12 @@ class Companion : Form {
     }
     protected override void OnShown(EventArgs e) { base.OnShown(e); if (Settings.Bool("SpellCheck", false)) Spell.Enable(true); }
 
+    public IntPtr SettingsHwnd { get { return settingsWin != null && !settingsWin.IsDisposed && settingsWin.IsHandleCreated ? settingsWin.Handle : IntPtr.Zero; } }
     public void ShowSettings() { ShowSettings(null); }
     public void ShowSettings(string section) {
         if (settingsWin == null || settingsWin.IsDisposed) settingsWin = new SettingsWindow(this);
         if (!settingsWin.Visible) settingsWin.Show();
-        if (settingsWin.WindowState == FormWindowState.Minimized) settingsWin.WindowState = FormWindowState.Normal;
-        settingsWin.Activate();
+        settingsWin.BringFront();                                             // devant toutes les fenêtres, discussion comprise
         settingsWin.Refresh2();
         if (section != null) settingsWin.Goto(section);
     }
@@ -3373,8 +3373,8 @@ class ChatPanel : Form {
         t.Tick += (s, e2) => {
             t.Stop(); t.Dispose();
             if (!Visible || Pinned || ContainsFocus) return;
-            uint pid; GetWindowThreadProcessId(GetForegroundWindow(), out pid);
-            if (pid == Program.Pid) return;      // le chat, les réglages, un dialogue de Bébène…
+            var fg = GetForegroundWindow(); uint pid; GetWindowThreadProcessId(fg, out pid);
+            if (pid == Program.Pid && fg != owner.SettingsHwnd) return;    // le chat, un post-it, un dialogue de Bébène… (les réglages comptent comme « ailleurs »)
             Hide();
         };
         t.Start();
@@ -3935,6 +3935,29 @@ class SettingsWindow : Form {
     }
 
     protected override void OnHandleCreated(EventArgs e) { base.OnHandleCreated(e); Util.DarkWindow(Handle, false); }
+
+    // ---- au premier plan quand on l utilise (même devant la discussion), puis fenêtre normale : un clic sur une autre fenêtre la fait passer devant ----
+    [DllImport("user32.dll")] static extern bool SetWindowPos(IntPtr h, IntPtr after, int x, int y, int cx, int cy, uint flags);
+    [DllImport("user32.dll")] static extern IntPtr GetForegroundWindow();
+    [DllImport("user32.dll")] static extern int GetWindowLong(IntPtr h, int idx);
+    const uint SWP_KEEP = 0x0001 | 0x0002 | 0x0010;                           // NOSIZE | NOMOVE | NOACTIVATE
+    protected override void OnActivated(EventArgs e) { base.OnActivated(e); SetWindowPos(Handle, (IntPtr)(-1), 0, 0, 0, 0, SWP_KEEP); }   // HWND_TOPMOST
+    protected override void OnDeactivate(EventArgs e) {
+        base.OnDeactivate(e);
+        var t = new System.Windows.Forms.Timer { Interval = 60 };             // laisse Windows activer la fenêtre cliquée
+        t.Tick += (s, e2) => {
+            t.Stop(); t.Dispose(); if (IsDisposed || ContainsFocus) return;
+            SetWindowPos(Handle, (IntPtr)(-2), 0, 0, 0, 0, SWP_KEEP);           // HWND_NOTOPMOST
+            var fg = GetForegroundWindow();
+            if (fg != IntPtr.Zero && fg != Handle && (GetWindowLong(fg, -20) & 0x8) == 0) SetWindowPos(Handle, fg, 0, 0, 0, 0, SWP_KEEP);   // juste derrière la fenêtre cliquée
+        };
+        t.Start();
+    }
+    public void BringFront() {
+        if (WindowState == FormWindowState.Minimized) WindowState = FormWindowState.Normal;
+        SetWindowPos(Handle, (IntPtr)(-1), 0, 0, 0, 0, SWP_KEEP);
+        Activate();
+    }
 
     public void Refresh2() { Post("settings\n" + owner.SettingsJson()); }
     public void Goto(string section) { pendingGoto = section; Post("goto\n" + section); }   // la page peut ne pas être prête : redemandé à "get"

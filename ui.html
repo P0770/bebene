@@ -207,6 +207,7 @@ header .icon-btn { flex: none; }
 .mitem small { display: block; font-size: 11px; color: var(--muted); }
 .mitem .del { opacity: 0; background: none; border: 0; color: var(--muted); font-size: 16px; cursor: pointer; border-radius: 6px; width: 22px; height: 22px; }
 .mitem:hover .del { opacity: 1; }
+.mitem .del.arm { opacity: 1; width: auto; padding: 0 7px; font-size: 12px; color: #f08a85; background: rgba(240,90,90,.12); }
 .mitem .del:hover { color: #f08a85; background: rgba(240,100,100,.1); }
 .mitem .mv { opacity: 0; background: none; border: 0; color: var(--muted); font-size: 13px; cursor: pointer; border-radius: 6px; width: 22px; height: 22px; flex: none; }
 .mitem:hover .mv { opacity: 1; }
@@ -551,6 +552,8 @@ const store = {
   set(k, v) { try { localStorage.setItem(k, v); } catch {} }
 };
 const post = m => window.chrome.webview.postMessage(m);
+// clic « dedans » : chemin fixé au début du clic (un menu redessiné pendant le clic ne compte pas comme « dehors »)
+const inside = (e, sel) => e.composedPath().some(n => n.matches && n.matches(sel));
 document.documentElement.classList.toggle('light', store.get('theme', 'dark') === 'light');   // tout de suite, sans attendre C#
 const esc = s => s.replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 const md = t => (window.marked && window.DOMPurify) ? DOMPurify.sanitize(marked.parse(t)) : esc(t).replace(/\n/g, '<br>');
@@ -588,6 +591,7 @@ if (!convs.length && store.get('hist', '')) {                       // reprise d
   convs.push({ id: 'c' + Date.now().toString(36), title: 'Conversation précédente', sid: store.get('sid', ''), hist: store.get('hist', ''), project: '', updated: Date.now() });
   store.set('hist', ''); store.set('sid', '');
 }
+let convArm = '';   // conversation dont la suppression attend confirmation
 let conv = convs.find(c => c.id === store.get('cur', '')) || null;
 let flash = false, project = conv ? conv.project || '' : store.get('project', ''), projects = [];
 let granted = new Set(conv && conv.granted ? conv.granted : []);   // actions autorisées pour la conversation en cours
@@ -1000,12 +1004,16 @@ function renderMenu() {
   $('#mConvTitle').textContent = scope ? 'Conversations · ' + scope : 'Conversations sans projet';
   $('#mConvs').innerHTML = mine.length ? mine.slice(0, 20).map(c =>
     '<div class="mitem conv' + (conv && c.id === conv.id ? ' on' : '') + '" data-c="' + c.id + '"><span class="tx">' + esc(c.title || 'Conversation')
-    + '<small>' + ago(c.updated) + '</small></span><button class="mv" data-mv="' + c.id + '" title="Déplacer vers un projet…">⇢</button><button class="del" data-del="' + c.id + '" title="Supprimer">×</button></div>').join('')
+    + '<small>' + ago(c.updated) + '</small></span><button class="mv" data-mv="' + c.id + '" title="Déplacer vers un projet…">⇢</button><button class="del' + (convArm === c.id ? ' arm' : '') + '" data-del="' + c.id + '" title="Supprimer">' + (convArm === c.id ? 'Sûr ?' : '×') + '</button></div>').join('')
     : '<div class="mnone">' + (scope ? 'Pas encore de conversation dans ce projet.' : 'Pas encore de conversation.') + '</div>';
   $('#mConvs').querySelectorAll('[data-c]').forEach(el => el.onclick = e => {
     if (e.target.dataset.mv) { e.stopPropagation(); askMove(el, e.target.dataset.mv); return; }
     if (e.target.closest('select')) return;
-    if (e.target.dataset.del) { e.stopPropagation(); convs = convs.filter(c => c.id !== e.target.dataset.del); if (conv && conv.id === e.target.dataset.del) conv = null; persist(); renderMenu(); return; }
+    if (e.target.dataset.del) {                                         // 1er clic : « Sûr ? » ; 2e clic : supprimée (le menu reste ouvert)
+      e.stopPropagation(); const id = e.target.dataset.del;
+      if (convArm !== id) { convArm = id; renderMenu(); setTimeout(() => { if (convArm === id) { convArm = ''; renderMenu(); } }, 4000); return; }
+      convArm = ''; convs = convs.filter(c => c.id !== id); if (conv && conv.id === id) conv = null; persist(); renderMenu(); return;
+    }
     const c = convs.find(x => x.id === el.dataset.c); if (c) openConv(c);
   });
   $('#mConvs').querySelectorAll('[data-c]').forEach(el => el.oncontextmenu = e => { e.preventDefault(); e.stopPropagation(); askMove(el, el.dataset.c); });   // clic droit = déplacer
@@ -1037,7 +1045,7 @@ function fillPop() {
   const ok = $('#updOk'); if (ok) ok.onclick = () => { post('updseen'); UPD.ok = false; p.classList.remove('open'); renderUpd(); };
 }
 $('#orbw').onclick = e => { e.stopPropagation(); if (!$('#orbw').classList.contains('has')) return; const p = $('#updpop'); p.classList.toggle('open'); if (p.classList.contains('open')) fillPop(); };
-document.addEventListener('click', e => { if (!e.target.closest('#updpop') && !e.target.closest('#orbw')) $('#updpop').classList.remove('open'); });
+document.addEventListener('click', e => { if (!inside(e, '#updpop, #orbw')) $('#updpop').classList.remove('open'); });
 // ---- post-it : liste (affichés / masqués), nouveau, afficher, masquer, supprimer ----
 const NCOL = { jaune: '#ffee9e', rose: '#ffc7d6', vert: '#c8eeba', bleu: '#bddefc', orange: '#ffcda8' };
 let NOTES = { enabled: false, notes: [] }, noteArm = '';
@@ -1065,13 +1073,13 @@ function renderNotes() {
   });
 }
 $('#notes').onclick = e => { e.stopPropagation(); $('#updpop').classList.remove('open'); $('#notepop').classList.toggle('open'); renderNotes(); };
-document.addEventListener('click', e => { if (!e.target.closest('#notepop') && !e.target.closest('#notes')) $('#notepop').classList.remove('open'); });
+document.addEventListener('click', e => { if (!inside(e, '#notepop, #notes')) $('#notepop').classList.remove('open'); });
 post('notes');
 function closeMenu() { document.querySelectorAll('.dd.open').forEach(d => d.classList.remove('open')); }
 function toggleDd(id) { const d = $(id), was = d.classList.contains('open'); closeMenu(); if (!was) { d.classList.add('open'); post('projects'); renderMenu(); } }
 $('#ddProj').onclick = e => { e.stopPropagation(); toggleDd('#ddP'); };
 $('#ddHist').onclick = e => { e.stopPropagation(); toggleDd('#ddH'); };
-document.addEventListener('click', e => { if (!e.target.closest('.dd')) closeMenu(); });
+document.addEventListener('click', e => { if (!inside(e, '.dd')) closeMenu(); });
 $('#mNormal').onclick = () => { if (flash) newChat({ project: '' }); };
 $('#mFlash').onclick = () => { if (!flash) newChat({ flash: true }); };
 $('#mNoProj').onclick = () => newChat({ project: '' });
@@ -1240,7 +1248,7 @@ if ($('#dashbtn')) $('#dashbtn').onclick = e => {
   m.classList.toggle('open');
   m.style.top = (r.bottom + 6) + 'px'; m.style.left = Math.max(8, Math.min(r.right - 230, innerWidth - 240)) + 'px';
 };
-document.addEventListener('click', e => { if (!e.target.closest('#dashmenu')) $('#dashmenu').classList.remove('open'); });
+document.addEventListener('click', e => { if (!inside(e, '#dashmenu')) $('#dashmenu').classList.remove('open'); });
 renderDash();
 
 post('ready');

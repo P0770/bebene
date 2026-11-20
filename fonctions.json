@@ -145,5 +145,8 @@
     "ex": "« ? Le CV en français ou en anglais ? » → [Français] [Anglais] [Les deux]" },
   { "cat": "Réglages", "titre": "Personnaliser", "depuis": "1.1",
     "desc": "Nom, taille, modèle Claude, mode économe (Caveman), instructions personnalisées, démarrage avec Windows.",
-    "ex": "Modèle → Haiku pour les petites questions (moins de tokens)" }
+    "ex": "Modèle → Haiku pour les petites questions (moins de tokens)" },
+  { "cat": "Réglages", "titre": "Fenêtres bien rangées", "depuis": "1.48",
+    "desc": "Les réglages s'ouvrent devant tout (discussion comprise) et restent ouverts jusqu'à la croix ; un clic sur une autre fenêtre la ramène devant. Clic en dehors : la discussion, ses volets et les post-it non épinglés se ferment (les réglages restent). Dans les menus (post-it, historique), supprimer demande « Sûr ? » sans refermer le menu.",
+    "ex": "⚙ → réglages devant ; clic sur Word → Word passe devant, les réglages restent ouverts derrière" }
 ]
