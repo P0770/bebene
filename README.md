@@ -57,7 +57,7 @@ Documentation détaillée : [Architecture technique](docs/ARCHITECTURE.md) · [P
 
 ### 1. La discussion
 
-Clic sur le chat, **Alt + Espace** ou **Ctrl + Alt + C** : la discussion s'ouvre juste au-dessus de Bébène.
+Clic sur le chat, **Alt + Espace** ou **Ctrl + Alt + C** (raccourcis modifiables dans Réglages > Système) : la discussion s'ouvre juste au-dessus de Bébène. La réponse s'écrit **en direct**, mot par mot, pendant que Claude la rédige.
 
 <p align="center">
   <img src="docs/images/discussion-vide.png" width="300" alt="Discussion vide">
@@ -181,13 +181,13 @@ Les sections, de la plus utilisée à la moins utilisée :
 | **Lancer** | ouvrir Claude Code, reprendre la conversation dans le terminal, dossier de travail |
 | **Mes examens et rendez-vous** | ajouter à la main, retrouver ceux qu'on a retirés |
 | **Alertes et rappels** | rappels examens / RDV, outils autorisés sans demande, correcteur |
-| **Claude** | modèle (Opus, Sonnet, Haiku), mode économe *Caveman*, instructions personnalisées |
+| **Claude** | modèle (Opus, Sonnet, Haiku), mode économe *Caveman*, écriture en direct, instructions personnalisées |
 | **Ce que Bébène sait faire** | le catalogue de toutes les fonctions avec un exemple, et un badge « Nouveau » |
 | **Compagnon** | nom, taille, afficher le chat, toujours au premier plan |
 | **Calendriers** | liens webcal / .ics, filtre de lieu |
 | **Boîtes mail** | Gmail et Outlook classique |
 | **Assistant d'installation** | checklist interactive (voir ci-dessous) |
-| **Système** | démarrage avec Windows, version |
+| **Système** | correcteur, démarrage avec Windows, raccourcis clavier, version |
 
 **L'assistant d'installation** vérifie et fait chaque étape à ta place : Claude Code installé, compte connecté, mémoire ClaudeHub, outils (RTK, Caveman), raccourci du menu Démarrer, démarrage avec Windows… Il s'ouvre tout seul quand Bébène est lancé sur un PC pas encore prêt.
 
@@ -242,7 +242,7 @@ cd bebene
 
 | Action | Comment |
 |---|---|
-| Ouvrir / fermer la discussion | clic sur le chat, **Alt + Espace**, **Ctrl + Alt + C**, Échap pour fermer |
+| Ouvrir / fermer la discussion | clic sur le chat, **Alt + Espace**, **Ctrl + Alt + C** (modifiables), Échap pour fermer |
 | Nouvelle conversation | ✏️ dans l'en-tête, ou clic droit sur l'icône → *Nouvelle conversation* |
 | Question rapide sans trace | interrupteur **⚡ Flash** |
 | Travailler sur un projet | **# Projet ▾** → choisir ou créer |

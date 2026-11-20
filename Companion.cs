@@ -19,10 +19,10 @@ using Microsoft.Web.WebView2.WinForms;
 
 [assembly: System.Reflection.AssemblyTitle("Bébène")]
 [assembly: System.Reflection.AssemblyProduct("Bébène")]
-[assembly: System.Reflection.AssemblyVersion("1.42.0.0")]
+[assembly: System.Reflection.AssemblyVersion("1.43.0.0")]
 
 static class Program {
-    public const string Version = "1.42";
+    public const string Version = "1.43";
     public static bool OpenSetup;
     public static readonly uint Pid = (uint)Process.GetCurrentProcess().Id;   // identifiant de Bébène (lu une seule fois)   // --setup : ouvrir directement l'assistant d'installation
 
@@ -351,6 +351,7 @@ class Companion : Form {
     [DllImport("user32.dll")] static extern IntPtr GetDC(IntPtr h);
     [DllImport("user32.dll")] static extern int ReleaseDC(IntPtr h, IntPtr dc);
     [DllImport("user32.dll")] static extern bool RegisterHotKey(IntPtr h, int id, uint mod, uint vk);
+    [DllImport("user32.dll")] static extern bool UnregisterHotKey(IntPtr h, int id);
     [DllImport("gdi32.dll")] static extern IntPtr CreateCompatibleDC(IntPtr dc);
     [DllImport("gdi32.dll")] static extern bool DeleteDC(IntPtr dc);
     [DllImport("gdi32.dll")] static extern IntPtr SelectObject(IntPtr dc, IntPtr o);
@@ -428,7 +429,9 @@ class Companion : Form {
         var m = new ContextMenuStrip { Renderer = new ToolStripProfessionalRenderer(new DarkColors()), ForeColor = Color.White, Font = new Font("Segoe UI", 10f), ShowImageMargin = false, Padding = new Padding(4) };
         showItem = new ToolStripMenuItem("Afficher le chat sur le bureau") { Checked = Settings.Bool("ShowCat", true) };
         showItem.Click += (s, e) => SetCatVisible(!showItem.Checked);
-        m.Items.Add(new ToolStripMenuItem("Ouvrir la discussion", null, (s, e) => ShowPanel()) { ShortcutKeyDisplayString = "Alt+Espace" });
+        openItem = new ToolStripMenuItem("Ouvrir la discussion", null, (s, e) => ShowPanel());
+        m.Items.Add(openItem);
+        RegisterHotkeys();                                       // affiche le raccourci dans le menu (si la fenêtre existe déjà)
         m.Items.Add(new ToolStripMenuItem("Nouvelle conversation", null, (s, e) => { ShowPanel(); Panel.Post("new"); }));
         m.Items.Add(new ToolStripMenuItem("Ouvrir Claude Code ici", null, (s, e) => OpenTerminal(false)));
         m.Items.Add(new ToolStripMenuItem("Nouveau post-it", null, (s, e) => Notes.New()));
@@ -478,10 +481,49 @@ class Companion : Form {
     }
     protected override void OnHandleCreated(EventArgs e) {
         base.OnHandleCreated(e);
-        RegisterHotKey(Handle, 1, 0x4003, 0x43);                 // Ctrl+Alt+C
-        AltSpace = RegisterHotKey(Handle, 2, 0x4001, 0x20);      // Alt+Espace
+        RegisterHotkeys();
     }
-    public bool AltSpace;
+    // Raccourcis configurables (réglages > Système) : texte « Ctrl+Alt+Shift+Win+Touche » (nom de touche .NET : A, D1, F5, Space…), vide = aucun
+    public static readonly string[] HotkeyDefaults = { "Alt+Space", "Ctrl+Alt+C" };
+    public bool[] HotkeyOk = new bool[2];
+    ToolStripMenuItem openItem;
+    public static bool ParseHotkey(string s, out uint mod, out uint vk) {
+        mod = 0; vk = 0;
+        if (string.IsNullOrEmpty(s)) return false;
+        foreach (var part in s.Split('+')) {
+            switch (part) {
+                case "Ctrl": mod |= 2; break;
+                case "Alt": mod |= 1; break;
+                case "Shift": mod |= 4; break;
+                case "Win": mod |= 8; break;
+                default:
+                    Keys k;
+                    if (vk != 0 || !Regex.IsMatch(part, "^([A-Z]|D[0-9]|F([1-9]|1[0-9]|2[0-4])|Space|Oem[A-Za-z0-9]+|Insert|Home|End|PageUp|Next|Pause|NumPad[0-9])$")
+                        || !Enum.TryParse(part, out k)) return false;
+                    vk = (uint)k; break;
+            }
+        }
+        // une touche, et un modificateur obligatoire sauf pour les touches de fonction
+        return vk != 0 && (mod != 0 || (vk >= (uint)Keys.F1 && vk <= (uint)Keys.F24));
+    }
+    public static string HotkeyLabel(string s) {
+        if (string.IsNullOrEmpty(s)) return "";
+        return Regex.Replace(s.Replace("Space", "Espace"), @"\bD([0-9])\b", "$1");
+    }
+    public void RegisterHotkeys() {
+        if (!IsHandleCreated) return;
+        var labels = new List<string>();
+        for (int i = 0; i < 2; i++) {
+            UnregisterHotKey(Handle, i + 1);
+            uint mod, vk;
+            string s = Settings.Str("Hotkey" + (i + 1), HotkeyDefaults[i]);
+            HotkeyOk[i] = ParseHotkey(s, out mod, out vk) && RegisterHotKey(Handle, i + 1, mod | 0x4000, vk);
+            if (HotkeyOk[i]) labels.Add(HotkeyLabel(s));
+        }
+        if (openItem != null) openItem.ShortcutKeyDisplayString = labels.Count > 0 ? labels[0] : "";
+    }
+    // pendant qu on tape une nouvelle combinaison dans les réglages, les raccourcis actuels ne doivent pas l intercepter
+    public void PauseHotkeys() { if (IsHandleCreated) { UnregisterHotKey(Handle, 1); UnregisterHotKey(Handle, 2); } }
     protected override void WndProc(ref Message m) { if (m.Msg == 0x0312) TogglePanel(); base.WndProc(ref m); }
 
     public string State { get { return state; } }
@@ -1067,7 +1109,7 @@ class Companion : Form {
         var d = new Dictionary<string, object> {
             { "name", Settings.Name }, { "model", Settings.Str("Model", "") }, { "scale", scalePct },
             { "showCat", Settings.Bool("ShowCat", true) }, { "topMost", TopMost }, { "autoStart", Settings.AutoStart },
-            { "prompt", Settings.Str("Prompt", "") }, { "caveman", Settings.Bool("Caveman", true) }, { "chrome", Settings.Bool("Chrome", true) }, { "postits", Settings.Bool("PostIts", true) }, { "prepare", Settings.Bool("Prepare", true) }, { "spell", Settings.Bool("SpellCheck", false) }, { "autoAllow", Settings.Str("AutoAllow", "") }, { "remindExam", Settings.Bool("RemindExam", true) }, { "remindRdv", Settings.Bool("RemindRdv", true) }, { "remindWhen", Settings.Str("RemindWhen", "both") }, { "features", Features() }, { "manual", Manual.Raw() }, { "hidden", new List<string>(Manual.Hidden()) }, { "calendars", Calendars.Config() }, { "locFilter", Settings.Str("LocFilter", "") }, { "gmailUser", Mailbox.GmailUser }, { "gmailSet", Mailbox.GmailReady }, { "outlookOn", Mailbox.OutlookOn }, { "mailStatus", Mailbox.Status }, { "mailRunning", Mailbox.Running },{ "workDir", Panel.WorkDir }, { "hasSession", SessionId.Length > 0 },
+            { "prompt", Settings.Str("Prompt", "") }, { "hotkey1", Settings.Str("Hotkey1", HotkeyDefaults[0]) }, { "hotkey2", Settings.Str("Hotkey2", HotkeyDefaults[1]) }, { "hotkeyOk", HotkeyOk }, { "stream", Settings.Bool("Stream", true) }, { "caveman", Settings.Bool("Caveman", true) }, { "chrome", Settings.Bool("Chrome", true) }, { "postits", Settings.Bool("PostIts", true) }, { "prepare", Settings.Bool("Prepare", true) }, { "spell", Settings.Bool("SpellCheck", false) }, { "autoAllow", Settings.Str("AutoAllow", "") }, { "remindExam", Settings.Bool("RemindExam", true) }, { "remindRdv", Settings.Bool("RemindRdv", true) }, { "remindWhen", Settings.Str("RemindWhen", "both") }, { "features", Features() }, { "manual", Manual.Raw() }, { "hidden", new List<string>(Manual.Hidden()) }, { "calendars", Calendars.Config() }, { "locFilter", Settings.Str("LocFilter", "") }, { "gmailUser", Mailbox.GmailUser }, { "gmailSet", Mailbox.GmailReady }, { "outlookOn", Mailbox.OutlookOn }, { "mailStatus", Mailbox.Status }, { "mailRunning", Mailbox.Running },{ "workDir", Panel.WorkDir }, { "hasSession", SessionId.Length > 0 },
             { "version", Program.Version }
         };
         return new JavaScriptSerializer().Serialize(d);
@@ -1094,6 +1136,14 @@ class Companion : Form {
                 case "showCat": SetCatVisible(Convert.ToBoolean(kv.Value)); break;
                 case "topMost": TopMost = Convert.ToBoolean(kv.Value); Settings.Set("TopMost", TopMost); break;
                 case "caveman": Settings.Set("Caveman", Convert.ToBoolean(kv.Value)); break;
+                case "stream": Settings.Set("Stream", Convert.ToBoolean(kv.Value)); break;
+                case "hotkey1": case "hotkey2": {
+                    string hk = Convert.ToString(kv.Value).Trim(); uint hm, hv;
+                    if (hk == "" || ParseHotkey(hk, out hm, out hv)) Settings.Set(kv.Key == "hotkey1" ? "Hotkey1" : "Hotkey2", hk);
+                    RegisterHotkeys(); break;
+                }
+                case "hotkeyPause": PauseHotkeys(); break;
+                case "hotkeyResume": RegisterHotkeys(); break;
                 case "chrome": Settings.Set("Chrome", Convert.ToBoolean(kv.Value)); break;
                 case "postits": Settings.Set("PostIts", Convert.ToBoolean(kv.Value)); Notes.Refresh(); Panel.Post("notes\n" + Notes.Json()); break;
                 case "prepare": Settings.Set("Prepare", Convert.ToBoolean(kv.Value)); break;
@@ -3680,7 +3730,7 @@ class ChatPanel : Form {
         // un prompt système stable garde l'historique en cache → beaucoup moins de tokens à chaque échange.
         if (Companion.LastWindow.Length > 0)
             text = "[Fenêtre active : " + Companion.LastWindow + " · pour la voir : " + ScreenCommand(Companion.LastHwnd) + "]\n" + text;
-        string args = "-p --output-format stream-json --verbose --permission-mode " + (autonomous ? "bypassPermissions" : "acceptEdits");
+        string args = "-p --output-format stream-json --verbose " + (Settings.Bool("Stream", true) ? "--include-partial-messages " : "") + "--permission-mode " + (autonomous ? "bypassPermissions" : "acceptEdits");
         // actions autorisées : celles accordées dans la conversation + celles pour lesquelles l utilisateur ne veut plus d alerte (réglages)
         // (noms simples « Bash » ou serveurs MCP « mcp__claude-in-chrome »)
         var allow = new List<string>();
@@ -3867,5 +3917,5 @@ class SettingsWindow : Form {
         catch (Exception ex) { Program.Log("Modèles", ex.ToString()); }
     }
 
-    protected override void OnFormClosed(FormClosedEventArgs e) { base.OnFormClosed(e); try { web.Dispose(); } catch { } }   // ferme = memoire rendue
+    protected override void OnFormClosed(FormClosedEventArgs e) { base.OnFormClosed(e); owner.RegisterHotkeys(); try { web.Dispose(); } catch { } }   // raccourcis remis si on fermait pendant la saisie d une combinaison   // ferme = memoire rendue
 }

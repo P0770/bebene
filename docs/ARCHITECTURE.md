@@ -106,6 +106,7 @@ Chaque message lance :
 
 ```
 claude -p --output-format stream-json --verbose
+       --include-partial-messages                              (écriture en direct, réglage Stream)
        --permission-mode acceptEdits | bypassPermissions      (mode autonome)
        --resume <session>                                      (suite de la conversation)
        --allowedTools <outils autorisés>
@@ -114,6 +115,11 @@ claude -p --output-format stream-json --verbose
 ```
 
 Le texte est envoyé sur l'entrée standard, précédé de `[Fenêtre active : …]`. Chaque ligne JSON du flux est transmise à la page, qui affiche le texte (Markdown → `marked` + `DOMPurify`), les outils utilisés, les différences de fichiers et les demandes d'autorisation (`permission_denials`).
+
+**Écriture en direct** : les événements `stream_event` / `text_delta` remplissent un aperçu (`.md.live`) révélé mot par mot à vitesse adaptative (`requestAnimationFrame`, rattrape le retard en ~7 images, Markdown re-rendu au plus toutes les 40 ms ; les blocs `bebene-*` ne s'affichent jamais, même à moitié). Le message `assistant` complet remplace ensuite l'aperçu.
+
+### Raccourcis clavier
+`RegisterHotKey` (ids 1 et 2) depuis les réglages `Hotkey1` / `Hotkey2` (texte `Ctrl+Alt+Shift+Win+Touche`, nom de touche .NET ; vide = désactivé). Pendant la saisie d'une combinaison dans les réglages, les raccourcis sont libérés (`hotkeyPause`) puis réenregistrés ; `HotkeyOk` signale une combinaison déjà prise.
 
 ### Conversations
 Stockées dans le `localStorage` de la WebView (au plus 40, les anciennes raccourcies). Un **projet** fait travailler Claude dans `ClaudeHub/projets/<nom>/`, ce qui déclenche l'archivage automatique de ClaudeHub. Le mode **Flash** n'enregistre rien et supprime la transcription `~/.claude/projects/**/<session>.jsonl`.

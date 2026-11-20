@@ -125,6 +125,15 @@ details.sec .sb > .card + .card { margin-top: 10px; }
 .step.busy { border-color: #e0b84f; }
 .step .ld { display: inline-block; width: 10px; height: 10px; border: 2px solid #e0b84f; border-right-color: transparent; border-radius: 50%; animation: spin 1s linear infinite; margin-right: 6px; vertical-align: -1px; }
 @keyframes spin { to { transform: rotate(360deg); } }
+.hkw { display: inline-flex; gap: 6px; align-items: center; }
+.hk { font: 12.5px "Segoe UI", sans-serif; min-width: 120px; padding: 7px 12px; border-radius: 9px; cursor: pointer; background: var(--raised); color: var(--text); border: 1px solid var(--line); border-bottom-width: 2px; white-space: nowrap; }
+.hk:hover { border-color: #45454d; }
+.hk.wait { border-color: var(--accent); color: var(--accent); animation: hkp 1.1s ease-in-out infinite; }
+.hk.off { color: var(--muted); font-style: italic; }
+.hk.bad { border-color: var(--danger); }
+@keyframes hkp { 50% { box-shadow: 0 0 0 3px rgba(217,119,87,.25); } }
+.hkx { background: none; border: 0; color: var(--muted); font-size: 16px; cursor: pointer; padding: 2px 4px; }
+.hkx:hover { color: var(--danger); }
 </style>
 </head>
 <body>
@@ -235,6 +244,10 @@ details.sec .sb > .card + .card { margin-top: 10px; }
     <label class="switch"><input type="checkbox" id="caveman"><span class="track"></span></label>
   </div>
   <div class="row">
+    <div class="lbl"><b>Écriture en direct</b><span>La réponse s'écrit mot par mot pendant que Claude la rédige, au lieu d'apparaître d'un bloc.</span></div>
+    <label class="switch"><input type="checkbox" id="stream"><span class="track"></span></label>
+  </div>
+  <div class="row">
     <div class="lbl"><b>Agir dans Chrome</b><span>Remplir des champs et des formulaires sur les pages ouvertes (extension Claude in Chrome).</span></div>
     <label class="switch"><input type="checkbox" id="chrome"><span class="track"></span></label>
   </div>
@@ -341,9 +354,14 @@ details.sec .sb > .card + .card { margin-top: 10px; }
     <label class="switch"><input type="checkbox" id="autoStart"><span class="track"></span></label>
   </div>
   <div class="row">
-    <div class="lbl"><b>Raccourci clavier</b><span>Ouvre ou ferme la discussion, de n'importe où.</span></div>
-    <span><kbd>Alt</kbd> + <kbd>Espace</kbd> &nbsp;ou&nbsp; <kbd>Ctrl</kbd> + <kbd>Alt</kbd> + <kbd>C</kbd></span>
+    <div class="lbl"><b>Raccourci principal</b><span id="hk1msg">Ouvre ou ferme la discussion, de n'importe où.</span></div>
+    <span class="hkw"><button class="hk" id="hk1" title="Cliquer puis taper la nouvelle combinaison"></button><button class="hkx" data-hk="1" title="Désactiver ce raccourci">×</button></span>
   </div>
+  <div class="row">
+    <div class="lbl"><b>Raccourci secondaire</b><span id="hk2msg">Même action, autre combinaison.</span></div>
+    <span class="hkw"><button class="hk" id="hk2" title="Cliquer puis taper la nouvelle combinaison"></button><button class="hkx" data-hk="2" title="Désactiver ce raccourci">×</button></span>
+  </div>
+  <div class="row"><div class="lbl"><span style="white-space:normal">Clique sur un raccourci puis tape la combinaison (ex. <kbd>Ctrl</kbd> + <kbd>Shift</kbd> + <kbd>B</kbd>). Échap annule. <a href="#" id="hkReset">Remettre les raccourcis d'origine</a></span></div></div>
   <div class="row">
     <div class="lbl"><b>Bébène</b><span id="version">Version</span></div>
     <button class="btn danger" data-act="quit">Quitter l'application</button>
@@ -464,7 +482,7 @@ function render(s) {
   $('#hname').textContent = s.name;
   if (document.activeElement !== $('#name')) $('#name').value = s.name;
   if (document.activeElement !== $('#prompt')) $('#prompt').value = s.prompt;
-  $('#showCat').checked = s.showCat; $('#topMost').checked = s.topMost; $('#autoStart').checked = s.autoStart; $('#caveman').checked = s.caveman; $('#chrome').checked = s.chrome; $('#postits').checked = s.postits; $('#prepare').checked = s.prepare; $('#spell').checked = s.spell;
+  $('#showCat').checked = s.showCat; $('#topMost').checked = s.topMost; $('#autoStart').checked = s.autoStart; $('#caveman').checked = s.caveman; $('#chrome').checked = s.chrome; $('#postits').checked = s.postits; $('#prepare').checked = s.prepare; $('#spell').checked = s.spell; $('#stream').checked = s.stream; showHotkeys(s);
   $('#model').value = s.model;
   $('#workDir').textContent = s.workDir; $('#workDir').title = s.workDir;
   $('#version').textContent = 'Version ' + s.version;
@@ -504,7 +522,7 @@ $('#mAdd').onclick = () => {
 };
 
 document.querySelectorAll('[data-act]').forEach(b => b.onclick = () => post(b.dataset.act));
-['showCat', 'topMost', 'autoStart', 'caveman', 'chrome', 'postits', 'prepare', 'spell'].forEach(id => $('#' + id).onchange = e => set({ [id]: e.target.checked }));
+['showCat', 'topMost', 'autoStart', 'caveman', 'stream', 'chrome', 'postits', 'prepare', 'spell'].forEach(id => $('#' + id).onchange = e => set({ [id]: e.target.checked }));
 $('#model').onchange = e => set({ model: e.target.value });
 $('#name').onchange = e => set({ name: e.target.value });
 $('#name').onkeydown = e => { if (e.key === 'Enter') e.target.blur(); };
@@ -628,6 +646,56 @@ post('tpl');
     });
   });
 })();
+
+// ---- raccourcis clavier configurables : clic sur le bouton, puis on tape la combinaison ----
+const HK_DEF = ['Alt+Space', 'Ctrl+Alt+C'];
+let hkWait = 0, hkVals = ['', ''];
+function hkLabel(v) { return v ? v.replace('Space', 'Espace').replace(/\bD(\d)\b/, '$1').split('+').join(' + ') : 'Désactivé'; }
+function showHotkeys(s) {
+  hkVals = [s.hotkey1 || '', s.hotkey2 || ''];
+  [1, 2].forEach(i => {
+    if (hkWait === i) return;
+    const b = $('#hk' + i), v = hkVals[i - 1], ok = s.hotkeyOk ? s.hotkeyOk[i - 1] : true;
+    b.textContent = hkLabel(v); b.className = 'hk' + (!v ? ' off' : !ok ? ' bad' : '');
+    $('#hk' + i + 'msg').textContent = v && !ok ? 'Combinaison déjà prise par une autre application : choisis-en une autre.'
+      : i === 1 ? 'Ouvre ou ferme la discussion, de n\'importe où.' : 'Même action, autre combinaison.';
+  });
+}
+// nom de touche compris par Bébène (.NET Keys) à partir de l'événement clavier
+function hkKey(e) {
+  const c = e.code;
+  if (/^Key[A-Z]$/.test(c)) return c.slice(3);
+  if (/^Digit\d$/.test(c)) return 'D' + c.slice(5);
+  if (/^Numpad\d$/.test(c)) return 'NumPad' + c.slice(6);
+  if (/^F([1-9]|1\d|2[0-4])$/.test(c)) return c;
+  return { Space: 'Space', Insert: 'Insert', Home: 'Home', End: 'End', PageUp: 'PageUp', PageDown: 'Next', Pause: 'Pause',
+           Semicolon: 'OemSemicolon', Comma: 'Oemcomma', Period: 'OemPeriod', Minus: 'OemMinus', Equal: 'Oemplus', Slash: 'OemQuestion' }[c] || '';
+}
+function hkStart(i) {
+  if (hkWait) hkStop();
+  hkWait = i; post('set\n' + JSON.stringify({ hotkeyPause: 1 }));      // les raccourcis actuels ne doivent pas avaler la frappe
+  const b = $('#hk' + i); b.className = 'hk wait'; b.textContent = 'Tape la combinaison…'; b.focus();
+}
+function hkStop(val) {
+  const i = hkWait; if (!i) return;
+  hkWait = 0;
+  if (val !== undefined) { hkVals[i - 1] = val; set({ ['hotkey' + i]: val }); }     // enregistre et réactive les raccourcis
+  else post('set\n' + JSON.stringify({ hotkeyResume: 1 }));
+  showHotkeys({ hotkey1: hkVals[0], hotkey2: hkVals[1] });
+}
+[1, 2].forEach(i => $('#hk' + i).onclick = () => hkWait === i ? hkStop() : hkStart(i));
+document.querySelectorAll('.hkx').forEach(b => b.onclick = () => { hkWait = +b.dataset.hk; hkStop(''); });
+$('#hkReset').onclick = e => { e.preventDefault(); hkStop(); set({ hotkey1: HK_DEF[0], hotkey2: HK_DEF[1] }); };
+document.addEventListener('keydown', e => {
+  if (!hkWait) return;
+  e.preventDefault(); e.stopPropagation();
+  if (e.key === 'Escape') { hkStop(); return; }
+  const k = hkKey(e); if (!k) return;                                        // encore un modificateur seul : on attend la touche
+  const mods = [e.ctrlKey && 'Ctrl', e.altKey && 'Alt', e.shiftKey && 'Shift', e.metaKey && 'Win'].filter(Boolean);
+  if (!mods.length && !/^F\d+$/.test(k)) { $('#hk' + hkWait).textContent = 'Ajoute Ctrl, Alt, Shift ou Win'; return; }
+  hkStop(mods.concat(k).join('+'));
+}, true);
+window.addEventListener('blur', () => hkStop());
 </script>
 </body>
 </html>

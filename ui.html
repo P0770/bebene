@@ -231,6 +231,10 @@ header .icon-btn { flex: none; }
 .tool { background: rgba(255,255,255,.04); border-color: rgba(255,255,255,.06); }
 pre { background: rgba(0,0,0,.35); border-color: rgba(255,255,255,.06); }
 .typing { padding: 2px 0; }
+/* écriture en direct : la réponse apparaît mot par mot, petit curseur orange qui respire au bout du texte */
+.msg.bot .md.live ~ .typing { display: none; }
+.lc { display: inline-block; width: 7px; height: 7px; margin-left: 4px; border-radius: 50%; background: #d97757; vertical-align: middle; animation: lcp 1s ease-in-out infinite; }
+@keyframes lcp { 50% { opacity: .25; transform: scale(.7); } }
 
 /* zone de saisie */
 footer { padding: 8px 12px 12px; }
@@ -826,17 +830,64 @@ function setQuota(info) {
   $('#quota').classList.toggle('on', any);
 }
 
+// ---- écriture en direct (--include-partial-messages) : les morceaux de texte arrivent pendant que Claude rédige ----
+// On les révèle mot par mot, à une vitesse qui s'adapte : douce quand Claude écrit lentement, et qui rattrape vite
+// quand il a de l'avance (jamais plus lent que Claude). Le markdown est re-rendu au plus toutes les 40 ms.
+let live = null, liveText = '', liveShown = 0, liveRaf = 0, liveLast = 0;
+// blocs spéciaux (bebene-question, bebene-pret) : jamais affichés bruts, même à moitié arrivés (« ``` », « ```beb »…)
+const liveCut = t => {
+  const i = t.indexOf('```bebene-'); if (i >= 0) return t.slice(0, i);
+  const m = t.match(/(?:^|\n)(`{1,3}[a-z-]{0,10})$/);
+  return m && '```bebene-'.startsWith(m[1]) ? t.slice(0, t.length - m[1].length) : t;
+};
+function liveStart() { if (!cur) return; live = addToCur('md live', ''); liveText = ''; liveShown = 0; }
+function liveRender() {
+  const near = log.scrollHeight - log.scrollTop - log.clientHeight < 90;   // on ne fait défiler que si on lisait déjà le bas
+  live.innerHTML = md(liveCut(liveText).slice(0, liveShown));
+  const ps = live.querySelectorAll('p,li,h1,h2,h3,h4,h5'), tgt = ps.length ? ps[ps.length - 1] : live;
+  if (!tgt.closest('pre')) tgt.insertAdjacentHTML('beforeend', '<span class="lc"></span>');
+  if (near) scroll();
+}
+function liveTick(ts) {
+  liveRaf = 0; if (!live) return;
+  const t = liveCut(liveText), rest = t.length - liveShown;
+  if (rest <= 0) return;
+  liveShown += Math.max(1, Math.ceil(rest / 7));
+  const w = t.slice(liveShown).match(/^\S*/); liveShown = Math.min(t.length, liveShown + (w ? w[0].length : 0));   // finir le mot
+  if (ts - liveLast > 40 || liveShown >= t.length) { liveLast = ts; liveRender(); }
+  if (liveShown < t.length) liveRaf = requestAnimationFrame(liveTick);
+}
+function liveDelta(s) {
+  if (!live) liveStart(); if (!live) return;
+  liveText += s; if (!liveRaf) liveRaf = requestAnimationFrame(liveTick);
+}
+// fin du bloc : le texte complet (déjà nettoyé des blocs spéciaux) remplace l'aperçu ; renvoie l'élément ou null
+function liveEnd(text) {
+  const d = live; if (!d) return null;
+  if (liveRaf) cancelAnimationFrame(liveRaf);
+  live = null; liveRaf = 0; liveText = ''; liveShown = 0;
+  if (text === undefined || !text.trim()) { d.remove(); return null; }
+  d.className = 'md'; d.innerHTML = md(text); d.dataset.raw = text; return d;
+}
+
 function onLine(l) {
   let o; try { o = JSON.parse(l); } catch { return; }
   if (o.session_id && o.session_id !== sid) setSid(o.session_id);
   if (o.type === "rate_limit_event" && o.rate_limit_info) { store.set("quota", JSON.stringify(o.rate_limit_info)); setQuota(o.rate_limit_info); }
   if (o.type === 'assistant' && o.message && o.message.usage) { const u = o.message.usage; lastCtx = (u.input_tokens || 0) + (u.cache_read_input_tokens || 0) + (u.cache_creation_input_tokens || 0); }
+  if (o.type === 'stream_event') {                                    // écriture en direct (réponse principale seulement)
+    const ev = o.event || {};
+    if (!o.parent_tool_use_id && cur && ev.type === 'content_block_delta' && ev.delta && ev.delta.type === 'text_delta') liveDelta(ev.delta.text || '');
+    return;
+  }
   if (o.type === 'assistant' && o.message && o.message.content) {
     for (const c of o.message.content) {
+      if (c.type === 'text' && !c.text.trim() && !o.parent_tool_use_id) liveEnd();
       if (c.type === 'text' && c.text.trim()) {
         const pn = projectIn(c.text); if (pn) attachProject(pn);
         const q = takeQuestion(c.text);
-        if (q.text.trim()) addToCur('md', md(q.text)).dataset.raw = q.text;
+        if (live && !o.parent_tool_use_id) liveEnd(q.text);                // l'aperçu en direct devient le message définitif
+        else if (q.text.trim()) addToCur('md', md(q.text)).dataset.raw = q.text;
         if (q.ask) pendingAsk = q.ask;
         if (q.ready) pendingReady = q.ready;
       }
@@ -857,6 +908,7 @@ function onLine(l) {
 }
 
 function finish(code, err) {
+  if (live) liveEnd(liveCut(liveText));                               // arrêté en pleine écriture : on garde ce qui est arrivé
   if (cur) {
     const t = cur.querySelector('.typing'); if (t) t.remove();
     if (code !== '0' && !gotResult)
