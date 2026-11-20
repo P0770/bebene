@@ -134,6 +134,8 @@ details.sec .sb > .card + .card { margin-top: 10px; }
 @keyframes hkp { 50% { box-shadow: 0 0 0 3px rgba(217,119,87,.25); } }
 .hkx { background: none; border: 0; color: var(--muted); font-size: 16px; cursor: pointer; padding: 2px 4px; }
 .hkx:hover { color: var(--danger); }
+.act { display: flex; align-items: center; gap: 8px; flex: none; }
+.act input { width: 150px; accent-color: var(--accent); }
 /* mode clair */
 :root { --ov: 255,255,255; --track: #3b3b42; }
 html.light { --bg: #f6f3f0; --surface: #ffffff; --raised: #ece7e3; --line: #e0d9d3; --text: #23202a; --muted: #6e6873;
@@ -301,6 +303,10 @@ html.light .hk:hover { border-color: #bdb5ae; }
     <div class="seg" id="scale">
       <button data-v="75">Petit</button><button data-v="100">Normal</button><button data-v="130">Grand</button>
     </div>
+  </div>
+  <div class="row">
+    <div class="lbl"><b>Activité</b><span id="actLbl">À gauche : il bouge peu et dort beaucoup quand tu ne t'occupes pas de lui. À droite : très remuant.</span></div>
+    <div class="act"><span>💤</span><input type="range" id="activity" min="0" max="100" step="5"><span>🐾</span></div>
   </div>
 </div>
 </div></details>
@@ -499,6 +505,7 @@ function render(s) {
   $('#resume').disabled = !s.hasSession;
   $('#resume-sub').textContent = s.hasSession ? 'Continue la conversation du chat dans Claude Code.' : 'Démarre d\'abord une conversation avec le chat.';
   document.querySelectorAll('#scale button').forEach(b => b.classList.toggle('on', +b.dataset.v === s.scale));
+  if (document.activeElement !== $('#activity')) $('#activity').value = s.activity;
 }
 
 window.chrome.webview.addEventListener('message', e => {
@@ -539,6 +546,7 @@ $('#name').onchange = e => set({ name: e.target.value });
 $('#name').onkeydown = e => { if (e.key === 'Enter') e.target.blur(); };
 $('#prompt').onchange = e => set({ prompt: e.target.value });
 document.querySelectorAll('#scale button').forEach(b => b.onclick = () => set({ scale: +b.dataset.v }));
+$('#activity').onchange = e => set({ activity: +e.target.value });
 // ---- assistant d'installation : checklist interactive ----
 const STEPS = [
   { id: 'windows', t: 'Windows et .NET', d: "Bébène fonctionne sur Windows 10 ou 11. Si tu vois cette page, c'est bon." },
