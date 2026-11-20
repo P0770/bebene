@@ -19,10 +19,10 @@ using Microsoft.Web.WebView2.WinForms;
 
 [assembly: System.Reflection.AssemblyTitle("Bébène")]
 [assembly: System.Reflection.AssemblyProduct("Bébène")]
-[assembly: System.Reflection.AssemblyVersion("1.35.0.0")]
+[assembly: System.Reflection.AssemblyVersion("1.36.0.0")]
 
 static class Program {
-    public const string Version = "1.35";
+    public const string Version = "1.36";
     public static bool OpenSetup;
     public static readonly uint Pid = (uint)Process.GetCurrentProcess().Id;   // identifiant de Bébène (lu une seule fois)   // --setup : ouvrir directement l'assistant d'installation
 

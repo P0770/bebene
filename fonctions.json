@@ -101,6 +101,9 @@
   { "cat": "Discuter", "titre": "Compactage automatique", "depuis": "1.35",
     "desc": "Quand une conversation devient longue, Bébène en résume le début (avec le modèle Haiku) : chaque message suivant coûte beaucoup moins de tokens, sans perdre l'essentiel.",
     "ex": "« ♻ Conversation compactée : 68k → 12k tokens »" },
+  { "cat": "Réglages", "titre": "Offrir un café", "depuis": "1.36",
+    "desc": "La petite tasse en haut de la discussion, à côté du crayon, ouvre la page Buy Me a Coffee de l'auteur de Bébène pour le soutenir.",
+    "ex": "☕ → buymeacoffee.com/p0770" },
   { "cat": "Réglages", "titre": "Personnaliser", "depuis": "1.1",
     "desc": "Nom, taille, modèle Claude, mode économe (Caveman), instructions personnalisées, démarrage avec Windows.",
     "ex": "Modèle → Haiku pour les petites questions (moins de tokens)" }

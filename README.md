@@ -11,6 +11,10 @@
 </p>
 
 <p align="center">
+  <a href="https://buymeacoffee.com/p0770"><img src="https://img.shields.io/badge/Buy%20me%20a%20coffee-%E2%98%95-f2c66d?style=flat-square&labelColor=1d1d22" alt="Buy me a coffee"></a>
+</p>
+
+<p align="center">
   <img src="docs/images/poses.png" width="640" alt="Les poses de Bébène">
 </p>
 
@@ -63,7 +67,7 @@ Clic sur le chat, **Alt + Espace** ou **Ctrl + Alt + C** : la discussion s'ouvre
 
 **L'en-tête**
 - l'avatar de Bébène (il pulse quand Claude réfléchit), son nom et en dessous le titre de la conversation ;
-- ✏️ **nouvelle conversation** · 📌 **épingler** (la fenêtre reste ouverte quand tu cliques ailleurs) · ⚙️ **réglages** · ✕ **fermer** (ou Échap) ;
+- ☕ **offrir un café** (ouvre la page [Buy Me a Coffee](https://buymeacoffee.com/p0770)) · ✏️ **nouvelle conversation** · 📌 **épingler** (la fenêtre reste ouverte quand tu cliques ailleurs) · ⚙️ **réglages** · ✕ **fermer** (ou Échap) ;
 - **glisse l'en-tête** pour déplacer la fenêtre : elle revient à sa place à la fermeture, sauf si elle est épinglée.
 
 **La barre de choix**, juste en dessous :
@@ -335,4 +339,4 @@ Bébène le détecte au démarrage et propose de l'installer (gratuit, Microsoft
 
 ---
 
-<p align="center"><sub>Fait avec Claude Code · 🐈‍⬛</sub></p>
+<p align="center"><sub>Fait avec Claude Code · 🐈‍⬛ · Bébène te plaît ? <a href="https://buymeacoffee.com/p0770">Offre-moi un café ☕</a></sub></p>
