@@ -1,4 +1,10 @@
 [
+  { "cat": "Discuter", "titre": "La réponse, sans le reste", "depuis": "1.55",
+    "desc": "Pendant que Claude travaille, on voit ce qu'il fait (recherches, commandes, étapes). Dès que la réponse arrive, tout ça disparaît : il ne reste que la réponse, avec au besoin une petite ligne repliée « ✏️ 2 fichiers modifiés · étapes · voir » pour retrouver le détail. Les anciennes conversations sont nettoyées de la même façon.",
+    "ex": "« Corrige le titre de mon rapport » → la réponse seule, et « ✏️ 1 fichier modifié · voir » dessous" },
+  { "cat": "Discuter", "titre": "Zone de saisie à la taille du texte", "depuis": "1.55",
+    "desc": "La zone où l'on écrit fait une ligne quand le texte tient sur une ligne, grandit avec lui jusqu'à 40 % de la fenêtre, et n'affiche une barre de défilement qu'au-delà. Elle se recalcule si on redimensionne la fenêtre.",
+    "ex": "Coller un long paragraphe : la zone s'agrandit ; l'effacer : elle revient à une ligne" },
   { "cat": "Discuter", "titre": "Ranger les conversations en les glissant", "depuis": "1.54",
     "desc": "Dans la palette, attrape une conversation et dépose-la : sur un sous-groupe, sur « Sans groupe » pour l'en sortir, sur la zone « ＋ Dépose ici » pour créer un sous-groupe (nom à taper tout de suite), ou sur la tuile d'un projet. Rester 0,6 s sur une tuile ouvre ce projet pour viser un de ses sous-groupes. « Annuler » dans la petite notification remet tout comme avant ; Échap abandonne le glisser.",
     "ex": "Glisser « Plan du chapitre 2 » sur la tuile bachelor-tb, attendre, puis la lâcher sur 📂 Rédaction" },

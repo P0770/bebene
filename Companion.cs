@@ -19,10 +19,10 @@ using Microsoft.Web.WebView2.WinForms;
 
 [assembly: System.Reflection.AssemblyTitle("Bébène")]
 [assembly: System.Reflection.AssemblyProduct("Bébène")]
-[assembly: System.Reflection.AssemblyVersion("1.54.0.0")]
+[assembly: System.Reflection.AssemblyVersion("1.55.0.0")]
 
 static class Program {
-    public const string Version = "1.54";
+    public const string Version = "1.55";
     public static bool OpenSetup;
     public static readonly uint Pid = (uint)Process.GetCurrentProcess().Id;   // identifiant de Bébène (lu une seule fois)   // --setup : ouvrir directement l'assistant d'installation
 
@@ -43,8 +43,13 @@ static class Program {
         var ui = Thread.CurrentThread;
         bool reported = false;
         new Thread(() => {
+            long prev = DateTime.UtcNow.Ticks;
             while (true) {
                 Thread.Sleep(1000);
+                long now = DateTime.UtcNow.Ticks;
+                // le chien de garde lui-même a « dormi » bien plus d'1 s : le PC sortait de veille, l'interface n'était pas bloquée
+                if (TimeSpan.FromTicks(now - prev).TotalSeconds > 5) Interlocked.Exchange(ref beat, now);
+                prev = now;
                 try { if (c.IsHandleCreated) c.BeginInvoke((Action)(() => Interlocked.Exchange(ref beat, DateTime.UtcNow.Ticks))); } catch { }
                 double late = TimeSpan.FromTicks(DateTime.UtcNow.Ticks - Interlocked.Read(ref beat)).TotalSeconds;
                 if (late < 3) { reported = false; continue; }

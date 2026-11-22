@@ -18,16 +18,6 @@ body { display: flex; flex-direction: row; }
 
 /* ---- tableau de bord ---- */
 body { background: rgba(14,14,18,.38); }            /* fenêtre en verre dépoli : le bureau se devine derrière */
-#dash, #dashbtn, #dashmenu { display: none !important; }   /* remplacé par les volets transparents à côté de la fenêtre */
-#dash { width: 330px; flex: none; border-right: 1px solid var(--line); background: rgba(var(--sunk),calc(.16 * var(--sk))); display: flex; flex-direction: column; overflow-y: auto; padding: 16px 14px 14px; gap: 6px; }
-body.nocal #secCal, body.noup #secUp { display: none; }
-body.nocal.noup #dash { display: none; }
-#dashmenu { position: fixed; z-index: 20; display: none; min-width: 230px; background: rgba(var(--pop),.92); border: 1px solid var(--line); border-radius: 12px; padding: 6px; box-shadow: 0 12px 30px rgba(0,0,0,.4); backdrop-filter: blur(12px); }
-#dashmenu.open { display: block; }
-#dashmenu label { display: flex; align-items: center; justify-content: space-between; gap: 14px; padding: 8px 10px; border-radius: 8px; cursor: pointer; font-size: 13px; }
-#dashmenu label:hover { background: var(--raised); }
-#dashmenu .switch { gap: 0; }
-#dashbtn.on { color: var(--accent-2); }
 .dh { display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px; }
 .dh b { font-size: 15px; font-weight: 600; text-transform: capitalize; }
 .dh .icon-btn { width: 28px; height: 28px; }
@@ -48,7 +38,6 @@ body.nocal.noup #dash { display: none; }
 .ev .tt { font-weight: 500; overflow-wrap: anywhere; }
 .ev .mt { color: var(--muted); font-size: 11.5px; overflow-wrap: anywhere; }
 .none { color: var(--muted); font-size: 12px; padding: 4px 2px; }
-#dash h3 { font-size: 11.5px; font-weight: 600; text-transform: uppercase; letter-spacing: .7px; color: var(--muted); margin: 12px 2px 4px; display: flex; justify-content: space-between; }
 .up { display: flex; gap: 10px; align-items: center; background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 8px 10px; }
 .up .dte { width: 42px; flex: none; text-align: center; border-radius: 9px; background: var(--raised); padding: 4px 0; line-height: 1.15; }
 .up .dte b { display: block; font-size: 16px; }
@@ -175,28 +164,10 @@ header { padding: 12px 10px 10px 14px; gap: 8px; border-bottom: 1px solid rgba(v
 #dir { display: none !important; }
 #chat { overflow: hidden; }
 header .icon-btn { flex: none; }
-.ctx { display: flex; align-items: center; gap: 8px; min-width: 0; max-width: 215px; flex: 0 1 auto; background: none; border: 0; color: var(--text); font: inherit;
-  padding: 5px 8px 5px 6px; border-radius: 10px; cursor: pointer; transition: background .15s; }
-.ctx:hover, .ctx.open { background: rgba(var(--ov),.06); }
-.ctx b { font-weight: 600; font-size: 14px; flex: none; }
-.pill { font-size: 11.5px; color: var(--muted); background: rgba(var(--ov),.06); border-radius: 999px; padding: 2px 9px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
-.pill.pr { color: var(--accent-2); background: rgba(217,119,87,.13); }
-.pill.pr::before { content: "# "; opacity: .7; }
-.pill.fl { color: #f2c66d; background: rgba(242,198,109,.12); }
 .chev { flex: none; color: var(--muted); transition: transform .2s; }
-.ctx.open .chev { transform: rotate(180deg); }
 .icon-btn { width: 30px; height: 30px; border-radius: 9px; }
 
 /* menu sobre */
-#oldmenu { position: absolute; top: 58px; left: 10px; width: 290px; max-height: calc(100% - 140px); overflow-y: auto; z-index: 30;
-  background: rgba(var(--pop),.97); border: 1px solid rgba(var(--ov),.08); border-radius: 14px; padding: 8px;
-  box-shadow: 0 18px 40px rgba(0,0,0,.45); opacity: 0; transform: translateY(-6px); pointer-events: none; transition: opacity .16s, transform .16s; }
-.mrow { display: flex; gap: 6px; margin-bottom: 4px; }
-.mbtn { flex: 1; display: flex; align-items: center; justify-content: center; gap: 7px; font: inherit; font-size: 12.5px; color: var(--text);
-  background: rgba(var(--ov),.05); border: 1px solid rgba(var(--ov),.06); border-radius: 10px; padding: 8px 6px; cursor: pointer; transition: background .15s, border-color .15s; }
-.mbtn:hover { background: rgba(var(--ov),.09); }
-.mbtn.flash { flex: .6; color: #f2c66d; }
-.mbtn.flash:hover { border-color: rgba(242,198,109,.4); }
 .msec { font-size: 10.5px; font-weight: 600; letter-spacing: .8px; text-transform: uppercase; color: #6f6f79; padding: 10px 8px 4px; }
 .mitem { display: flex; align-items: center; gap: 8px; width: 100%; text-align: left; font: inherit; font-size: 13px; color: var(--text); background: none; border: 0;
   border-radius: 8px; padding: 6px 8px; cursor: pointer; }
@@ -209,9 +180,6 @@ header .icon-btn { flex: none; }
 .mitem:hover .del { opacity: 1; }
 .mitem .del.arm { opacity: 1; width: auto; padding: 0 7px; font-size: 12px; color: #f08a85; background: rgba(240,90,90,.12); }
 .mitem .del:hover { color: #f08a85; background: rgba(240,100,100,.1); }
-.mitem .mv { opacity: 0; background: none; border: 0; color: var(--muted); font-size: 13px; cursor: pointer; border-radius: 6px; width: 22px; height: 22px; flex: none; }
-.mitem:hover .mv { opacity: 1; }
-.mitem .mv:hover { color: var(--accent-2); background: rgba(235,154,120,.12); }
 .mitem select.mvsel { flex: 1; min-width: 0; font: inherit; font-size: 12.5px; padding: 4px 6px; border-radius: 8px; border: 1px solid var(--accent); background: var(--raised); color: var(--text); }
 .mnone { font-size: 12px; color: var(--muted); padding: 4px 8px; }
 .mnewp { display: flex; gap: 4px; padding: 2px 4px; }
@@ -219,8 +187,6 @@ header .icon-btn { flex: none; }
 .mnewp input:focus { border-color: rgba(217,119,87,.5); }
 .mnewp button { background: none; border: 0; color: var(--accent-2); font-size: 16px; cursor: pointer; width: 28px; border-radius: 8px; }
 .mnewp button:hover { background: rgba(var(--ov),.06); }
-.mlink { display: block; width: 100%; text-align: left; background: none; border: 0; border-top: 1px solid rgba(var(--ov),.06); margin-top: 8px; padding: 9px 8px 4px; font: inherit; font-size: 12px; color: var(--muted); cursor: pointer; }
-.mlink:hover { color: var(--text); }
 
 /* bulles */
 #log { padding: 20px 16px 12px; gap: 14px; }
@@ -266,7 +232,6 @@ main::before { content: ""; position: absolute; top: 0; left: 18px; right: 18px;
 #pin.on { color: var(--accent-2); background: rgba(235,154,120,.16); }
 #pin.on svg { transform: rotate(-30deg); }
 .orb { box-shadow: 0 0 0 1.5px rgba(235,154,120,.30); }
-.ctx:hover, .ctx.open { background: rgba(235,154,120,.10); }
 .msg.user { background: linear-gradient(135deg, #e48a67, #c65d3c); border-radius: 20px 20px 8px 20px; }
 .msg.bot { background: rgba(var(--ov),.055); border: 1px solid rgba(var(--ov),.07); border-radius: 8px 20px 20px 20px; }
 .tool { border-radius: 999px; background: rgba(var(--ov),.05); border-color: rgba(var(--ov),.08); }
@@ -276,9 +241,7 @@ pre { border-radius: 14px; } code { border-radius: 7px; }
 kbd { border-radius: 7px; }
 .switch .track, .track { border-radius: 999px; }
 .ddmenu { border-radius: 18px; background: linear-gradient(170deg, rgba(36,28,30,.98), rgba(24,22,26,.98)); border-color: rgba(235,154,120,.18); }
-.mbtn, .mitem, .mnewp input, .mnewp button { border-radius: 12px; }
-.mbtn { background: rgba(235,154,120,.08); border-color: rgba(235,154,120,.14); }
-.mbtn:hover { background: rgba(235,154,120,.16); }
+.mitem, .mnewp input, .mnewp button { border-radius: 12px; }
 .chip { border-radius: 16px; background: rgba(var(--ov),.05); border-color: rgba(var(--ov),.08); }
 .chip:hover { border-color: rgba(235,154,120,.5); }
 .approve, .err { border-radius: 16px; }
@@ -317,12 +280,10 @@ body.flash #sub { color: #f2c66d; }
 .ddbtn:hover, .dd.open .ddbtn { background: rgba(235,154,120,.10); border-color: rgba(235,154,120,.28); color: var(--text); }
 .ddbtn.has { color: var(--text); }
 #projLabel { flex: 1; min-width: 0; text-align: left; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.ddbtn .hash { color: var(--accent-2); font-weight: 700; }
-.ddbtn.icon-only { padding: 6px 9px 6px 10px; gap: 4px; }
 .dd.open .chev { transform: rotate(180deg); }
 .ddmenu { position: absolute; top: calc(100% + 6px); left: 0; width: 280px; max-height: 400px; overflow-y: auto; z-index: 30; padding: 8px;
   box-shadow: 0 18px 40px rgba(0,0,0,.5); opacity: 0; transform: translateY(-6px); pointer-events: none; transition: opacity .16s, transform .16s; }
-.ddmenu.right, #ddP .ddmenu { left: auto; right: 0; } .ddmenu.right { width: 310px; }
+
 .dd.open .ddmenu { opacity: 1; transform: none; pointer-events: auto; }
 main::before { left: 22px; right: 22px; }
 #log { padding: 22px 20px 14px; gap: 18px; }
@@ -484,9 +445,6 @@ html.light ::-webkit-scrollbar-thumb { background: rgba(40,30,35,.18); }
 #toast.open { opacity: 1; transform: translate(-50%, 0); pointer-events: auto; }
 #toast.err { border-color: rgba(240,90,90,.5); }
 /* recherche dans l'historique */
-.msearch { padding: 2px 8px 6px; }
-.msearch input { width: 100%; font: inherit; font-size: 12.5px; padding: 6px 10px; border-radius: 9px; border: 1px solid var(--line); background: rgba(var(--sunk),.18); color: var(--text); outline: none; }
-.msearch input:focus { border-color: var(--accent); }
 .mitem small.snip { white-space: normal; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; margin-top: 2px; }
 .mitem small.snip mark { background: rgba(217,119,87,.3); color: var(--text); border-radius: 3px; padding: 0 1px; }
 /* rappel programmé dans la conversation */
@@ -638,24 +596,20 @@ body.dragging .mgrp.loose { padding: 8px; border-radius: 8px; }
 @keyframes spring { from { transform: scaleX(0); } to { transform: scaleX(1); } }
 .ptile.view:not(.on) { border-style: dashed; border-color: hsla(var(--h), 70%, 65%, .7); }
 .ptile.none.view:not(.on) { border-color: rgba(235,154,120,.6); }
+/* ---- réponse arrivée : détails du travail repliés en une ligne ---- */
+details.acts { margin-top: 8px; font-size: 12px; }
+details.acts > summary { list-style: none; display: inline-flex; align-items: center; gap: 8px; color: var(--muted); cursor: pointer; padding: 3px 10px; border-radius: 999px; background: rgba(var(--ov),.05); border: 1px solid rgba(var(--ov),.07); }
+details.acts > summary::-webkit-details-marker { display: none; }
+details.acts > summary em { font-style: normal; color: var(--accent-2); opacity: .8; }
+details.acts > summary:hover { color: var(--text); border-color: rgba(235,154,120,.35); }
+details.acts[open] > summary em { opacity: 0; }
+details.acts[open] > summary { margin-bottom: 8px; }
+details.acts .plan { margin: 0 0 8px; }
+/* ---- zone de saisie : grandit avec le texte, sans barre tant que tout tient ---- */
+textarea#input { overflow-y: hidden; line-height: 1.5; min-height: 0; height: 31px; max-height: none; scrollbar-width: thin; }
 </style>
 </head>
 <body>
-<aside id="dash">
-  <div id="secCal">
-  <div class="dh">
-    <b id="mtitle"></b>
-    <span><button class="icon-btn" id="mprev" title="Mois précédent">‹</button><button class="icon-btn" id="mnext" title="Mois suivant">›</button></span>
-  </div>
-  <div class="cal" id="cal"></div>
-  <div class="day" id="dayev"></div>
-  </div>
-  <div id="secUp">
-  <h3><span>Examens & rendez-vous</span></h3>
-  <div id="upcoming" style="display:flex;flex-direction:column;gap:6px"></div>
-  <div class="cstat" id="cstat"></div>
-  </div>
-</aside>
 <div id="chat">
 <header>
   <!-- le rond = Bébène ; au survol, ⚙ apparaît dessus : clic = réglages. La pastille (mise à jour) est un bouton à part. -->
@@ -765,10 +719,6 @@ body.dragging .mgrp.loose { padding: 8px; border-radius: 8px; }
 </footer>
 </div>
 
-<div id="dashmenu">
-  <label>Calendrier<span class="switch"><input type="checkbox" id="tgCal"><span class="track"></span></span></label>
-  <label>Examens & rendez-vous<span class="switch"><input type="checkbox" id="tgUp"><span class="track"></span></span></label>
-</div>
 <script>
 const $ = s => document.querySelector(s);
 let log = $('#log'); const input = $('#input'), send = $('#send'), auto = $('#auto');   // log : le fil de la conversation affichée (chaque tâche a le sien)
@@ -805,8 +755,14 @@ if (FILES) {
   if (!convs.length) { try { const old = JSON.parse(store.get('convs', '[]')) || []; if (old.length) { convs = old; migrate = true; } } catch { } }   // 1re fois : reprise de l'ancien stockage
   else try { localStorage.removeItem('convs'); } catch { }                                                                                     // déjà dans les fichiers : place libérée
 }
-const sent = new Map();                    // dernier état enregistré de chaque conversation : on n'écrit que ce qui a changé
-if (FILES && !migrate) convs.forEach(c => sent.set(c.id, JSON.stringify(c)));
+const sent = new Map();                    // dernier état enregistré de chaque conversation (copie superficielle) : on n'écrit que ce qui a changé
+const snapOf = c => { const s = {}; for (const k in c) s[k] = Array.isArray(c[k]) ? c[k].slice() : c[k]; return s; };
+function convChanged(c) {                  // comparaison champ par champ : pas de JSON.stringify de tout l'historique à chaque sauvegarde
+  const s = sent.get(c.id); if (!s) return true;
+  const ks = Object.keys(c); if (ks.length !== Object.keys(s).length) return true;
+  return ks.some(k => { const a = c[k], b = s[k]; return Array.isArray(a) ? !Array.isArray(b) || a.length !== b.length || a.some((x, i) => x !== b[i]) : a !== b; });
+}
+if (FILES && !migrate) convs.forEach(c => sent.set(c.id, snapOf(c)));
 let SEL = '';                              // texte sélectionné dans une autre appli (raccourci « Demander sur la sélection »)
 // ---- projet annoncé par Claude (« 📁 Projet : <nom> », celui qui déclenche l'archivage) ----
 function projName(s) {
@@ -875,6 +831,7 @@ function park() {                                      // la conversation affich
 function viewOf(c) { return Object.values(VIEWS).find(v => v.conv === c || v.rkey === c.id); }
 auto.checked = store.get('auto', '0') === '1';
 log.innerHTML = conv ? conv.hist || '' : '';
+tidyAll();                                                             // anciennes conversations : traces de travail retirées aussi
 log.querySelectorAll('.approve .ab').forEach(b => b.outerHTML = '<div style="color:var(--muted)">Demande expirée.</div>');
 reviveAsks();
 refresh();
@@ -886,7 +843,7 @@ function persist() {
   if (FILES) {                                                       // fichiers : seulement les conversations modifiées, ajoutées ou supprimées
     if (convs.length > 500) convs.length = 500;
     const ids = new Set();
-    convs.forEach(c => { ids.add(c.id); const j = JSON.stringify(c); if (sent.get(c.id) !== j) { sent.set(c.id, j); post('convsave\n' + c.id + '\n' + j); } });
+    convs.forEach(c => { ids.add(c.id); if (convChanged(c)) { sent.set(c.id, snapOf(c)); post('convsave\n' + c.id + '\n' + JSON.stringify(c)); } });
     [...sent.keys()].forEach(id => { if (!ids.has(id)) { sent.delete(id); post('convdel\n' + id); } });
     return;
   }
@@ -1067,7 +1024,7 @@ function attachProject(n) {
   project = n;
   if (!projects.includes(n)) { projects.push(n); projects.sort(); post('ensureproject\n' + n); }
   if (conv) conv.project = n;
-  if (cur) addToCur('tool', '<i></i><span>📁 Conversation rattachée au projet · ' + esc(n) + '</span>');
+  if (cur) addToCur('tool keep', '<i></i><span>📁 Conversation rattachée au projet · ' + esc(n) + '</span>');
   applyMode();
 }
 // déplacer une conversation de l'historique vers un projet (ou « aucun projet »)
@@ -1300,12 +1257,31 @@ function onLine(l) {
   }
 }
 
+// Réponse arrivée : on ne garde que la réponse. Lignes d'outils, de recherche et la réponse rapide disparaissent ;
+// les étapes et les fichiers modifiés sont regroupés dans une seule ligne dépliable, sous la réponse.
+function tidyTurn(m) {
+  if (!m || !m.querySelector(':scope > .md:not(.live)')) return;
+  m.querySelectorAll(':scope > .srch, :scope > .tool:not(.keep), :scope > .typing').forEach(x => x.remove());
+  const ds = [...m.children].filter(x => x.matches('details.diff') || (!x.className && x.querySelector(':scope > details.diff'))), pl = m.querySelector(':scope > .plan');
+  if (!ds.length && !pl) return;
+  const files = new Set(ds.map(d => (d.querySelector('summary span') || d).textContent.replace(/^[^·]*·\s*/, '')));
+  const parts = [];
+  if (files.size) parts.push('✏️ ' + files.size + ' fichier' + (files.size > 1 ? 's' : '') + ' modifié' + (files.size > 1 ? 's' : ''));
+  if (pl) parts.push('☑ étapes');
+  const box = document.createElement('details'); box.className = 'acts';
+  box.innerHTML = '<summary>' + esc(parts.join(' · ')) + '<em>voir</em></summary>';
+  if (pl) box.appendChild(pl);
+  ds.forEach(d => box.appendChild(d));
+  m.appendChild(box);
+}
+function tidyAll() { log.querySelectorAll('.msg.bot').forEach(m => { if (m !== cur) tidyTurn(m); }); }
 function finish(code, err) {
   if (live) liveEnd(liveCut(liveText));                               // arrêté en pleine écriture : on garde ce qui est arrivé
   const lastTxt = cur ? textOf(cur) : '';
   if (cur) {
     const t = cur.querySelector('.typing'); if (t) t.remove();
     cur.querySelectorAll('.srch').forEach(x => x.remove());            // recherche finie : sa trace disparaît
+    if (code === '0' && !quotaStop) tidyTurn(cur);                       // réponse arrivée : la réponse seule (détails repliés)
     if (code !== '0' && !gotResult && !quotaStop)
       addToCur('err', esc(err.trim() || (code === '1' ? 'Arrêté.' : 'Erreur (code ' + code + ').')));
     if (!cur.children.length) cur.remove();
@@ -1349,7 +1325,7 @@ function openConv(c) {
   if (v) { delete VIEWS[v.rkey]; showLog(v.log); restore(v); }        // tâche en fond (ou finie en fond) : on reprend sa vue telle quelle
   else {
     flash = false; conv = c; sid = c.sid || ''; project = c.project || ''; granted = new Set(c.granted || []); autoAll = !!c.autoAll; rkey = c.id;
-    log.innerHTML = c.hist || ''; log.querySelectorAll('.approve .ab').forEach(b => b.outerHTML = '<div style="color:var(--muted)">Demande expirée.</div>'); reviveAsks();
+    log.innerHTML = c.hist || ''; tidyAll(); log.querySelectorAll('.approve .ab').forEach(b => b.outerHTML = '<div style="color:var(--muted)">Demande expirée.</div>'); reviveAsks();
   }
   c.attn = ''; persist();
   store.set('cur', c.id); post('sid\n' + sid);
@@ -1574,7 +1550,6 @@ $('#mConvs').addEventListener('click', e => {
   if (t.closest('[data-start]')) { newChat({ project: menuScope() }); return; }   // ＋ Nouvelle conversation (ferme la palette)
   const row = t.closest('[data-c]'); if (!row) return;
   if (t.dataset.rn) { cEdit = t.dataset.rn; gEdit = null; renderMenuNow(); return; }
-  if (t.dataset.mv) { askMove(row, t.dataset.mv); return; }
   if (t.dataset.del) {                                                  // 1er clic : « Sûr ? » ; 2e clic : supprimée (le menu reste ouvert)
     const id = t.dataset.del;
     if (convArm !== id) { convArm = id; renderMenuNow(); setTimeout(() => { if (convArm === id) { convArm = ''; renderMenu(); } }, 4000); return; }
@@ -1746,7 +1721,17 @@ $('#mFolder').onclick = () => { closeMenu(); newChat({ project: '' }); post('fol
 $('#mProjAdd').onclick = () => { const n = $('#mProjName').value.trim(); if (n) { post('newproject\n' + n); $('#mProjName').value = ''; } };
 $('#mProjName').onkeydown = e => { if (e.key === 'Enter') $('#mProjAdd').click(); };
 
-function autosize() { input.style.height = 'auto'; input.style.height = Math.min(input.scrollHeight, 150) + 'px'; refresh(); listHint(); }
+// zone de saisie : exactement la hauteur du texte (1 ligne au minimum), jusqu'à 40 % de la fenêtre ; la barre de défilement
+// n'apparaît que si le texte dépasse ce maximum
+function autosize() {
+  const max = Math.max(120, Math.round(innerHeight * 0.4));
+  input.style.height = '0px';
+  const need = input.scrollHeight, h = Math.min(need, max);
+  input.style.height = h + 'px';
+  input.style.overflowY = need > max + 1 ? 'auto' : 'hidden';
+  refresh(); listHint();
+}
+{ let lastW = innerWidth, lastH = innerHeight; addEventListener('resize', () => { if (innerWidth !== lastW || innerHeight !== lastH) { lastW = innerWidth; lastH = innerHeight; autosize(); } }); }   // fenêtre redimensionnée : retours à la ligne et maximum changent
 
 // ---- fenêtres flottantes de la discussion (menus #, historique, post-it, mise à jour, clic droit) :
 // une seule ouverte à la fois ; clic dehors ou Échap = fermée ; un clic dedans ne la ferme jamais.
@@ -2025,12 +2010,9 @@ window.chrome.webview.addEventListener('message', e => {
   else if (k === 'new') newChat();
   else if (k === 'focus') input.focus();
   else if (k === 'pinned') { $('#pin').classList.toggle('on', v === '1'); }
-  else if (k === 'cal') { CAL = JSON.parse(v); renderDash(); }
-  else if (k === 'calbusy') { $('#cstat').textContent = 'Mise à jour des calendriers…'; }
   else if (k === 'quota') { try { const q = JSON.parse(v); store.set('quota', v); setQuota(q); [rkey].concat(Object.keys(VIEWS)).forEach(key => withRun(key, () => checkQuota(q))); } catch {} }
   else if (k === 'saved') toast('⬇ Enregistré dans Téléchargements : <b>' + esc(v.split(/[\\/]/).pop()) + '</b> · <u>Afficher</u>', () => post('reveal\n' + v));
   else if (k === 'saveerr') toast('Impossible d\'enregistrer le fichier : ' + esc(v), null, true);
-  else if (k === 'dash') { const p = v.split('\n'); applyDash(p[0] === '1', p[1] === '1'); }
   else if (k === 'name') { $('#name').textContent = v; document.title = v; applyMode(); }
   else if (k === 'theme') { document.documentElement.classList.toggle('light', v === 'light'); store.set('theme', v); }
   else if (k === 'projects') { try { const o = JSON.parse(v); projects = Array.isArray(o) ? o : o.all || []; ARCH = new Set(o.arch || []); } catch { projects = []; } renderMenu(); }
@@ -2094,81 +2076,6 @@ $('#dir').onclick = () => post('folder');
 auto.onchange = () => store.set('auto', auto.checked ? '1' : '0');
 document.querySelectorAll('.chip').forEach(b => b.onclick = () => submit(b.dataset.q));
 document.addEventListener('click', e => { const a = e.target.closest('a'); if (a) { e.preventDefault(); window.open(a.href); } });
-// ---- tableau de bord : calendrier + examens & rendez-vous ----
-let CAL = { events: [], status: '', filter: '', count: 0 }, mOff = 0, selDay = null;
-const norm = s => (s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
-const key = d => d.getFullYear() + '-' + d.getMonth() + '-' + d.getDate();
-const fmtT = d => d.toLocaleTimeString('fr-CH', { hour: '2-digit', minute: '2-digit' });
-function evs() { return CAL.events.map(e => Object.assign({}, e, { S: new Date(e.s), E: new Date(e.e) })); }
-function onDay(list, d) {                       // événements qui touchent ce jour
-  const a = new Date(d.getFullYear(), d.getMonth(), d.getDate()), b = new Date(a); b.setDate(b.getDate() + 1);
-  return list.filter(e => e.S < b && (e.E > a || +e.S === +a));
-}
-function evHtml(e) {
-  const time = e.a ? 'Toute la journée' : fmtT(e.S) + '–' + fmtT(e.E);
-  return '<div class="ev"><i class="bar" style="background:' + e.col + '"></i><div><div class="tt">' + esc(e.t || '(sans titre)') + '</div>'
-    + '<div class="mt">' + time + (e.l ? ' · ' + esc(e.l) : '') + '</div></div></div>';
-}
-function renderDash() {
-  const list = evs(), now = new Date();
-  const m = new Date(now.getFullYear(), now.getMonth() + mOff, 1);
-  $('#mtitle').textContent = m.toLocaleDateString('fr-CH', { month: 'long', year: 'numeric' });
-  const first = new Date(m); first.setDate(1 - ((m.getDay() + 6) % 7));
-  let h = ['lu', 'ma', 'me', 'je', 've', 'sa', 'di'].map(x => '<div class="wd">' + x + '</div>').join('');
-  if (!selDay) selDay = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-  for (let i = 0; i < 42; i++) {
-    const d = new Date(first); d.setDate(first.getDate() + i);
-    const de = onDay(list, d), cls = ['d'];
-    if (d.getMonth() !== m.getMonth()) cls.push('out');
-    if (key(d) === key(now)) cls.push('today');
-    if (key(d) === key(selDay)) cls.push('sel');
-    if (de.some(e => e.k === 'exam' && e.u)) cls.push('exam');
-    const cols = [...new Set(de.map(e => e.col))].slice(0, 3).map(c => '<i style="background:' + c + '"></i>').join('');
-    h += '<div class="' + cls.join(' ') + '" data-d="' + d.toISOString() + '">' + d.getDate() + (cols ? '<span class="dots">' + cols + '</span>' : '') + '</div>';
-  }
-  $('#cal').innerHTML = h;
-  $('#cal').querySelectorAll('.d').forEach(el => el.onclick = () => { const d = new Date(el.dataset.d); selDay = new Date(d.getFullYear(), d.getMonth(), d.getDate()); renderDash(); });
-  const de = onDay(list, selDay);
-  $('#dayev').innerHTML = '<div class="dt">' + selDay.toLocaleDateString('fr-CH', { weekday: 'long', day: 'numeric', month: 'long' }) + '</div>'
-    + (de.length ? de.map(evHtml).join('') : '<div class="none">Rien de prévu.</div>');
-
-  // prochains examens & rendez-vous
-  const f = norm(CAL.filter);
-  const up = list.filter(e => e.u && e.k && e.E >= now && (!f || norm(e.l).includes(f) || norm(e.t).includes(f))).slice(0, 8);
-  if (!CAL.count) {
-    $('#upcoming').innerHTML = '<div class="empty-cal">Ajoute tes calendriers (liens webcal ou .ics) pour voir tes examens et rendez-vous ici.<br><button id="addcal">Ajouter un calendrier</button></div>';
-    $('#addcal').onclick = () => post('settings');
-  } else {
-    $('#upcoming').innerHTML = up.length ? up.map(e => {
-      const days = Math.round((new Date(e.S.getFullYear(), e.S.getMonth(), e.S.getDate()) - new Date(now.getFullYear(), now.getMonth(), now.getDate())) / 864e5);
-      const soon = days <= 0 ? "aujourd'hui" : days === 1 ? 'demain' : 'dans ' + days + ' j';
-      return '<div class="up"><div class="dte"><b>' + e.S.getDate() + '</b><span>' + e.S.toLocaleDateString('fr-CH', { month: 'short' }).replace('.', '') + '</span></div>'
-        + '<div class="inf"><div class="tt"><span class="tag ' + e.k + '">' + (e.k === 'exam' ? 'Examen' : 'RDV') + '</span>' + esc(e.t) + '</div>'
-        + '<div class="mt">' + (e.a ? 'Toute la journée' : fmtT(e.S)) + (e.l ? ' · ' + esc(e.l) : '') + '</div></div>'
-        + '<span class="soon">' + soon + '</span></div>';
-    }).join('') : '<div class="none">Aucun examen ni rendez-vous à venir' + (f ? ' à « ' + esc(CAL.filter) + ' »' : '') + '.</div>';
-  }
-  $('#cstat').innerHTML = (CAL.status ? esc(CAL.status) + ' · ' : '') + (CAL.count ? '<a id="calref">Actualiser</a>' : '');
-  const r = $('#calref'); if (r) r.onclick = () => post('calrefresh');
-}
-$('#mprev').onclick = () => { mOff--; renderDash(); };
-$('#mnext').onclick = () => { mOff++; renderDash(); };
-// ---- bouton « tableau de bord » : un interrupteur par élément ----
-function applyDash(c, u) {
-  $('#tgCal').checked = c; $('#tgUp').checked = u;
-  document.body.classList.toggle('nocal', !c); document.body.classList.toggle('noup', !u);
-
-}
-function sendDash() { applyDash($('#tgCal').checked, $('#tgUp').checked); post('dash\n' + ($('#tgCal').checked ? 1 : 0) + '\n' + ($('#tgUp').checked ? 1 : 0)); }
-$('#tgCal').onchange = sendDash; $('#tgUp').onchange = sendDash;
-if ($('#dashbtn')) $('#dashbtn').onclick = e => {
-  e.stopPropagation();
-  const m = $('#dashmenu'), r = $('#dashbtn').getBoundingClientRect();
-  m.classList.toggle('open');
-  m.style.top = (r.bottom + 6) + 'px'; m.style.left = Math.max(8, Math.min(r.right - 230, innerWidth - 240)) + 'px';
-};
-document.addEventListener('click', e => { if (!inside(e, '#dashmenu')) $('#dashmenu').classList.remove('open'); });
-renderDash();
 
 post('ready');
 post('sid\n' + sid);

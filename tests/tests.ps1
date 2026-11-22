@@ -110,6 +110,19 @@ else {
         'send("rline\n"+k+"\n"+tu("Edit",{file_path:"C:/a/cv.md",old_string:"a",new_string:"b"}));send("rline\n"+k+"\n"+asst("Voici :\n```js\nls()\n```"));send("rdone\n"+k+"\n0\n");' +
         'var gone=!$("#log .srch")&&!/Grep|Recherche/.test($("#log").textContent)&&!!$("#log .diff summary span")&&!!$("#log .md pre");' +
         'document.title="R:"+one+gone+JSON.stringify(__err)') 'R:truetrue[]'
+    PageTest 'réponse seule une fois arrivée' 'ui.html' ($sim +
+        'input.value="Range";submit();const k=rkey;send("rline\n"+k+"\n"+tu("Bash",{command:"npm run build"}));send("rline\n"+k+"\n"+tu("TodoWrite",{todos:[{content:"A",status:"completed"}]}));' +
+        'send("rline\n"+k+"\n"+tu("Write",{file_path:"C:/a/x.md",content:"x"}));send("rline\n"+k+"\n"+tu("Edit",{file_path:"C:/a/x.md",old_string:"x",new_string:"y"}));' +
+        'var during=!!$("#log .tool");send("rline\n"+k+"\n"+asst("Fini."));send("rdone\n"+k+"\n0\n");' +
+        'const m=$("#log .msg.bot");var a=during&&!m.querySelector(":scope > .tool, :scope > .srch, :scope > .plan, :scope > .diff")&&!!m.querySelector(":scope > details.acts .plan")&&m.querySelectorAll("details.acts .diff").length===2;' +
+        'var b=/1 fichier modifié/.test(m.querySelector("details.acts summary").textContent);' +
+        'log.innerHTML="<div class=\"msg bot\"><div class=\"tool\"><i></i><span>Lire · x</span></div><div class=\"srch\">s</div><div class=\"md\">ok</div></div>";tidyAll();var c=!$("#log .tool")&&!$("#log .srch");' +
+        'document.title="R:"+a+b+c+JSON.stringify(__err)') 'R:truetruetrue[]'
+    PageTest 'zone de saisie à la taille du texte' 'ui.html' (
+        'input.value="";autosize();var h1=input.offsetHeight,a=input.scrollHeight<=input.clientHeight+1&&getComputedStyle(input).overflowY==="hidden";' +
+        'input.value="a\nb\nc";autosize();var h3=input.offsetHeight,b=h3>h1&&getComputedStyle(input).overflowY==="hidden";' +
+        'input.value="x\n".repeat(80);autosize();var c=getComputedStyle(input).overflowY==="auto"&&input.offsetHeight<=Math.max(120,innerHeight*0.4)+1;' +
+        'input.value="";autosize();var d=input.offsetHeight===h1;document.title="R:"+a+b+c+d+JSON.stringify(__err)') 'R:truetruetruetrue[]'
     PageTest 'pause avant la fin du quota' 'ui.html' ($sim +
         'input.value="Refais le rapport";submit();const k=rkey;send("rline\n"+k+"\n"+tu("TodoWrite",{todos:[{content:"Lire",status:"completed"},{content:"Écrire",status:"in_progress"}]}));' +
         'send("rline\n"+k+"\n"+tu("Write",{file_path:"C:/a/r.md",content:"x"}));' +

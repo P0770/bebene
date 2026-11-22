@@ -66,6 +66,12 @@ Clic sur le chat, **Alt + Espace** ou **Ctrl + Alt + C** (raccourcis modifiables
   <img src="docs/images/discussion-conv.png" width="300" alt="Une conversation">
 </p>
 
+**Nouveautés 1.55**
+- **La réponse, sans le reste** : pendant le travail, on voit les recherches, commandes et étapes ; dès que la réponse arrive, il ne reste qu'elle, avec au besoin une ligne repliée « ✏️ 2 fichiers modifiés · étapes · voir ».
+- **Zone de saisie à la taille du texte** : une ligne au départ, elle grandit avec le texte (jusqu'à 40 % de la fenêtre) ; la barre de défilement n'apparaît qu'au-delà.
+- **Aucun fichier non demandé** : Bébène ne produit ni résumé, ni copie, ni extraction de tes documents sans ton accord ; il le propose en une phrase. Seule la mémoire du projet (`NOTES.md`, quelques lignes) est tenue à jour d'office.
+- **Plus léger** : sauvegarde de l'historique bien plus rapide (seules les conversations modifiées sont comparées), ancien tableau de bord caché retiré de la page, plus de fausses alertes de blocage après une mise en veille.
+
 **Nouveautés 1.52 → 1.54**
 - **Palette projets et conversations** (**Ctrl + K**) : un seul panneau remplace les menus # et Historique : recherche, projets en tuiles colorées, conversations du projet choisi, tout au clavier.
 - **Ranger en glissant** : attrape une conversation et dépose-la sur un sous-groupe, « Sans groupe », un autre projet, ou sur « ＋ Dépose ici » pour créer un sous-groupe.
