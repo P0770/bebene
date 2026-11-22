@@ -1,0 +1,28 @@
+Bébène pour Mac
+================
+
+Installer
+1. Glisse Bebene.app dans le dossier Applications.
+2. Premier lancement : clic droit sur Bebene.app, puis « Ouvrir », puis « Ouvrir » encore.
+   (L'app n'est pas signée par Apple : macOS demande cette confirmation une seule fois.)
+   Si macOS refuse quand même, ouvre le Terminal et tape :
+   xattr -dr com.apple.quarantine /Applications/Bebene.app
+3. L'assistant d'installation s'ouvre : il vérifie Claude Code, ta connexion et la mémoire ClaudeHub.
+
+Il faut :
+- macOS 13 Ventura ou plus récent (Mac Apple Silicon ou Intel) ;
+- Claude Code installé et connecté (l'assistant t'aide à le faire) ;
+- un abonnement Claude Pro ou Max.
+
+Au quotidien
+- Le chat vit en bas de l'écran, au-dessus du Dock. Clic sur lui : la discussion. Attrape-le pour le déplacer.
+- ⌥ Espace (Option + Espace) : ouvre la discussion. Depuis le Finder, joint les fichiers sélectionnés.
+- La patte dans la barre des menus (en haut à droite) : discussion, réglages, Claude Code, quitter.
+
+Autorisations que macOS peut demander
+- Automatisation › Finder : pour joindre les fichiers sélectionnés avec ⌥ Espace.
+- Automatisation › Terminal : pour « Continuer dans Claude Code ».
+- Enregistrement de l'écran : quand tu demandes à Bébène de regarder ce que tu as devant toi.
+- Notifications : pour être prévenu quand une tâche est finie.
+
+Pas encore sur Mac : correcteur d'orthographe, mails Outlook et Gmail, calendriers, post-it, mises à jour automatiques.

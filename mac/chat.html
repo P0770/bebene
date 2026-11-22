@@ -1,0 +1,483 @@
+<!doctype html>
+<html><head><meta charset="utf-8">
+<title>Bébène</title>
+<style>
+  html, body { margin: 0; padding: 0; background: transparent; overflow: hidden; user-select: none; -webkit-user-select: none; cursor: default; }
+  canvas { display: block; image-rendering: pixelated; }
+</style></head>
+<body>
+<canvas id="c"></canvas>
+<script>
+// Bébène, le chat de bureau : port fidèle du dessin et du comportement de Companion.cs (Windows).
+// Le natif (CatWindow.swift) appelle __tick(...) 30 fois par seconde avec la souris et l'écran ;
+// la page calcule le chat, dessine, et renvoie la position de la fenêtre (« pos »), la zone cliquable (« hit ») et les clics.
+'use strict';
+const CW = 64, CH = 52;
+const send = m => { if (window.__preview) return window.__preview(m); try { window.webkit.messageHandlers.bebene.postMessage(m); } catch (e) { } };
+
+// ---- poses (mêmes valeurs que Windows) ----
+const FIELDS = 'bx by bw bh ba hx hy ht eye eyeShift haunch fhx fhy ffx ffy ffx2 ffy2 bhx bhy fbx fby fbx2 fby2 tbx tby ta tc tf'.split(' ');
+function Pose(...v) { const p = {}; FIELDS.forEach((f, i) => p[f] = i < v.length ? v[i] : 0); return p; }
+const clone = p => Object.assign({}, p);
+const lerp = (a, b, k) => { for (const f of FIELDS) a[f] += (b[f] - a[f]) * k; };
+const dist = (a, b) => { let m = 0; for (const f of FIELDS) m = Math.max(m, Math.abs(b[f] - a[f])); return m; };
+const SIT     = Pose(31, 40, 15, 18, 0,   32, 25, 0, 1, 0, 8,      33, 36, 34, 50, 30, 50,   27, 44, 26, 50, 37, 50,   25, 48, 180, 12);
+const STAND   = Pose(30, 36, 26, 11, 0,   44, 27, 0, 1, 0.6, 0,    38, 39, 39, 50, 36, 50,   22, 39, 22, 50, 19, 50,   17, 33, 230, 6);
+const LIE     = Pose(30, 45, 28, 10, 0,   43, 40, 8, 0, 1, 6,      40, 47, 48, 50, 46, 50,   22, 47, 24, 50, 21, 50,   17, 47, 185, -2);
+const GROOM   = Pose(31, 40, 15, 18, 0,   31, 26, -12, 0, 0, 8,    33, 36, 36, 31, 30, 50,   27, 44, 26, 50, 37, 50,   25, 48, 180, 12);
+const LICK    = Pose(31, 40, 15, 18, 0,   25, 33, -38, 0, 0, 8,    33, 36, 34, 50, 30, 50,   27, 44, 26, 50, 37, 50,   25, 48, 180, 12, 0);
+const SCRATCH = Pose(31, 40, 15, 18, 0,   32, 26, 14, 0, 0, 6,     33, 36, 34, 50, 30, 50,   30, 40, 47, 20, 37, 50,   25, 48, 180, 12, 0);
+const STRETCH = Pose(30, 40, 28, 10, 12,  46, 38, 10, 1, 0.6, 0,   40, 43, 50, 50, 47, 50,   21, 35, 21, 50, 18, 50,   17, 31, 250, 2);
+const HANG    = Pose(32, 30, 12, 20, 0,   32, 14, 0, 1, 0, 0,      33, 25, 34, 36, 30, 36,   32, 38, 35, 46, 29, 46,   32, 40, 95, 3);
+const FALL    = Pose(32, 30, 12, 20, 0,   32, 14, 0, 1, 0, 0,      33, 25, 40, 34, 24, 34,   32, 38, 40, 46, 24, 46,   32, 40, 270, 4);
+const CURL    = Pose(31, 46, 24, 13, 0,   40, 43, 25, 0, 0, 0,     36, 47, 38, 50, 35, 50,   24, 47, 22, 50, 26, 50,   20, 50, 10, -10, 1);
+const SPRAWL  = Pose(30, 46, 30, 9, 0,    46, 43, 50, 0, 0, 0,     38, 46, 50, 47, 49, 49,   22, 46, 12, 47, 11, 49,   17, 46, 170, 3, 0);
+const LOAF    = Pose(30, 44, 26, 13, 0,   41, 36, 0, 0, 0.5, 0,    36, 47, 37, 50, 39, 50,   24, 47, 25, 50, 22, 50,   22, 50, 0, -2, 1);
+const SLEEPS = [LIE, CURL, SPRAWL, LOAF];
+
+// ---- couleurs ----
+const rgb = (r, g, b, a = 255) => [r, g, b, a];
+const FUR = rgb(24, 24, 32), FAR = rgb(13, 13, 19), HI = rgb(58, 60, 88), OUT = rgb(48, 50, 80), EYE = rgb(112, 214, 96), EYEDK = rgb(46, 140, 64),
+  INNER = rgb(112, 58, 80), NOSE = rgb(236, 140, 160), COLLAR = rgb(217, 96, 70), WHISK = rgb(118, 120, 150), HEART = rgb(238, 92, 116),
+  FISH = rgb(170, 205, 235), FIN = rgb(120, 160, 205), FISHDK = rgb(30, 40, 60), LIGHT = rgb(186, 246, 160), PUP = rgb(10, 8, 14), WHITE = rgb(255, 255, 255),
+  BLUSH = rgb(214, 96, 128, 150), MOUTH = rgb(70, 70, 96), YAWN = rgb(70, 24, 40);
+const css = c => `rgba(${c[0]},${c[1]},${c[2]},${(c[3] / 255).toFixed(3)})`;
+const BODY_PAL = [FUR, FAR, INNER, COLLAR, WHISK, FISH, FIN, FISHDK];
+const FACE_PAL = [EYE, EYEDK, LIGHT, PUP, WHITE, BLUSH, NOSE, MOUTH, YAWN];
+
+// ---- état ----
+let Px = 3, W = CW * Px, H = CH * Px, scalePct = 100, activity = 50;
+let state = 'idle', act = 'sit', handKind = 'souris';
+let t = 0, happyT = 0, readyT = 0, askT = 0, actT = 0, actDur = 4, targetX = 0, vy = 0, phase = 0, walkAmp = 0, landT = 0, jumpT = -1, petT = 0, heartT = 0, lookX = 0, lookY = 0, earBack = 0;
+let face = 1, blink = 0, earTw = 0, down = false, moved = false, held = false, falling = false, run = false;
+let progDone = 0, progTotal = 0, peekT = 0, peekCur = [0, 0], lastTouch = Date.now();
+let swing = 0, swingV = 0, stretch = 0, stretchV = 0, prevVx = 0, prevVy = 0, prevHand = [0, 0];
+let sleepPose = LIE, cur = clone(SIT), goal = SIT;
+const tang = new Array(9).fill(0).map((_, i) => SIT.ta + SIT.tc * i);
+let Left = 0, Top = 0, placed = false;
+// données du natif (coordonnées écran, origine en haut à gauche, en points)
+let cursor = [0, 0], wa = [0, 0, 1440, 900], panelVisible = false, panelBounds = null, button = false, prevButton = false, bubble = null;
+const rnd = n => Math.floor(Math.random() * n);
+
+function setScale(pct) {
+  scalePct = Math.max(60, Math.min(160, pct));
+  Px = scalePct <= 80 ? 2 : scalePct >= 120 ? 4 : 3;
+  W = CW * Px; H = CH * Px;
+  big.style.width = W + 'px'; big.style.height = H + 'px';
+  big.width = W * devicePixelRatio; big.height = H * devicePixelRatio;
+  send('size\n' + W + '\n' + H);
+}
+function setState(s) { state = s; happyT = 0; readyT = 0; askT = 0; if (s === 'happy' || s === 'ready') { jumpT = 0; heartT = 1.4; } }
+function setAct(a, dur) { act = a; actT = 0; actDur = dur; }
+function sleep(dur) { sleepPose = SLEEPS[rnd(SLEEPS.length)]; setAct('lie', dur); }
+
+// ---- comportement ----
+function next() {
+  const c = cursor, near = Math.abs(c[0] - (Left + W / 2)) < 450 && c[1] > wa[3] - 260;
+  const idle = (Date.now() - lastTouch) / 60000, a = activity / 100;
+  const move = 0.08 + 1.84 * a, lazy = 1.6 - 1.2 * a;
+  if (idle > 0.5 + 5 * a && rnd(100) < 85 - 60 * a) { sleep((25 + rnd(40)) * lazy); return; }
+  const w = [near ? 14 * move : 0, 30 * move, 8, 8, Math.max(3, 15 * (2.2 - 2.4 * a)), 7, 6, 5, 7 * lazy];
+  let r = Math.random() * w.reduce((s, x) => s + x, 0), k = 0;
+  while (k < w.length - 1 && r >= w[k]) { r -= w[k]; k++; }
+  switch (k) {
+    case 0: setAct('chase', 6); return;
+    case 1: { const reach = 120 + 1600 * a, lo = Math.max(wa[0], Left - reach), hi = Math.min(wa[2] - W, Left + reach);
+      targetX = lo + Math.random() * Math.max(1, hi - lo); setAct(rnd(5) === 0 && a > 0.2 ? 'run' : 'walk', 99); return; }
+    case 2: setAct('groom', 3 + rnd(4)); return;
+    case 3: setAct('lick', 3 + rnd(4)); return;
+    case 4: sleep((12 + rnd(25)) * lazy); return;
+    case 5: setAct('stretch', 2.4); return;
+    case 6: setAct('scratch', 1.6 + Math.random() * 1.5); return;
+    case 7: setAct('rub', 3 + rnd(3)); return;
+  }
+  setAct('sit', (3 + rnd(6)) * lazy);
+}
+
+function tick() {
+  const dt = 0.033;
+  t += dt; actT += dt;
+  if (blink > 0) blink--; else if (rnd(110) === 0) blink = 4;
+  if (earTw > 0) earTw--; else if (rnd(160) === 0) earTw = 5;
+  if (landT > 0) landT -= dt;
+  if (jumpT >= 0) { jumpT += dt; if (jumpT > 1.6) jumpT = -1; }
+  if (petT > 0) petT -= dt;
+  if (heartT > 0) heartT -= dt;
+  if (state === 'happy') { happyT += dt; if (happyT > 1.6) state = 'idle'; }
+  if (state === 'ready') { readyT += dt; if (readyT > 3.5) { readyT = 0; jumpT = 0; heartT = 1.4; } }
+  if (state === 'question') { askT += dt; if (askT > 4.5) { askT = 0; if (!held && !falling) setAct('scratch', 1.1); earTw = 5; } }
+
+  const groundTop = wa[3] - 51 * Px;
+  const busy = state === 'thinking' || state === 'ready' || state === 'question' || state === 'hand' || panelVisible;
+  if (state === 'hand') { askT += dt; if (askT > 5) { askT = 0; if (!held && !falling) jumpT = 0; earTw = 5; } }
+  let tgt = SIT, dx = 0;
+
+  if (held) tgt = HANG;
+  else if (falling) {
+    vy += 0.9 * Px; let ny = Top + vy;
+    if (ny >= groundTop) { ny = groundTop; falling = false; vy = 0; landT = 0.25; setAct('sit', 3); }
+    Top = ny; tgt = FALL;
+  } else {
+    Top = groundTop;
+    if (Left < wa[0] - W / 2 || Left > wa[2] - W / 2) Left = Math.max(wa[0], Math.min(wa[2] - W, Left));
+    if (busy && act !== 'sit' && act !== 'groom' && act !== 'lick' && !(state === 'question' && act === 'scratch')) setAct('sit', 2);
+    if (panelVisible && panelBounds) face = panelBounds[0] < Left ? -1 : 1;
+    switch (act) {
+      case 'groom': tgt = GROOM; if (actT > actDur) setAct('sit', 2 + rnd(4)); break;
+      case 'scratch': tgt = SCRATCH; if (actT > actDur) setAct('sit', 2 + rnd(4)); break;
+      case 'lick': tgt = LICK; if (actT > actDur) setAct('sit', 2 + rnd(4)); break;
+      case 'rub': tgt = SIT; if (heartT <= 0 && rnd(70) === 0) heartT = 1.4; if (actT > actDur && petT <= 0) setAct('sit', 2 + rnd(4)); break;
+      case 'lie':
+        tgt = sleepPose;
+        if (actT > 5 && rnd(450) === 0 && peekT <= 0) sleepPose = SLEEPS[rnd(SLEEPS.length)];
+        if (peekT > 0) peekT -= dt;
+        else if ((sleepPose === CURL || sleepPose === LOAF) && actT > 3) {
+          const moving = Math.abs(cursor[0] - peekCur[0]) + Math.abs(cursor[1] - peekCur[1]) > 25; peekCur = cursor.slice();
+          if (rnd(moving ? 90 : 700) === 0) peekT = 1.6 + Math.random() * 1.4;
+        }
+        if (!busy && actT > actDur) setAct('stretch', 1.8); break;
+      case 'stretch': tgt = STRETCH; if (actT > actDur) setAct('sit', 2 + rnd(4)); break;
+      case 'walk': case 'run': case 'chase': {
+        tgt = STAND; run = act !== 'walk';
+        if (act === 'chase') targetX = cursor[0] - W / 2;
+        targetX = Math.max(wa[0], Math.min(wa[2] - W, targetX));
+        const sp = (run ? 4.2 : 1.6) * Px / 3, d = targetX - Left;
+        if (Math.abs(d) <= sp * 2) setAct('sit', 3 + rnd(5));
+        else { face = d > 0 ? 1 : -1; dx = face * sp; Left += dx; }
+        if (act === 'chase' && actT > 6) setAct('sit', 3);
+        break; }
+      default: tgt = SIT; if (!busy && actT > actDur) next(); break;
+    }
+  }
+  phase += Math.abs(dx) / (6 * Px) * Math.PI;
+  walkAmp += ((dx !== 0 ? 1 : 0) - walkAmp) * 0.25;
+  lerp(cur, tgt, held || falling ? 0.4 : 0.12); goal = tgt;
+
+  // regard vers la souris
+  const hsx = Left + (face > 0 ? cur.hx : CW - cur.hx) * Px, hsy = Top + cur.hy * Px;
+  let lx = Math.max(-0.9, Math.min(0.9, (cursor[0] - hsx) / 150)) * face, ly = Math.max(-1, Math.min(1, (cursor[1] - hsy) / 150));
+  if (state === 'question' && !held) { lx = Math.sin(t * 1.4) * 0.9; ly = -0.7; }
+  lookX += (lx - lookX) * 0.2; lookY += (ly - lookY) * 0.2;
+  earBack += (((held || falling) ? 2.5 : petT > 0 ? 1.2 : 0) - earBack) * 0.2;
+
+  // pendule quand on le tient par la peau du cou
+  const hand = cursor;
+  if (held) {
+    const vx = (hand[0] - prevHand[0]) / Px, vy2 = (hand[1] - prevHand[1]) / Px, ax = vx - prevVx, ay = vy2 - prevVy;
+    prevVx = vx; prevVy = vy2; swingV += ax * 1.15; stretchV += -ay * 0.35;
+  } else { prevVx = prevVy = 0; }
+  prevHand = hand.slice();
+  swingV += -swing * (held ? 0.11 : 0.2); swingV *= held ? 0.86 : 0.75;
+  swing = Math.max(-50, Math.min(50, swing + swingV));
+  stretchV += -stretch * 0.25; stretchV *= 0.78;
+  stretch = Math.max(-3.5, Math.min(5, stretch + stretchV));
+
+  // queue : chaîne avec inertie
+  const amp = state === 'thinking' ? 24 : state === 'ready' ? 20 : state === 'question' || state === 'hand' ? 14 : act === 'lie' ? 4 : held ? 16 : walkAmp > 0.3 ? 7 : 10;
+  const freq = state === 'thinking' ? 6 : state === 'ready' ? 4.5 : 1.8;
+  for (let i = 0; i < tang.length; i++) {
+    const target = cur.ta + cur.tc * i + amp * Math.sin(t * freq - i * 0.55) * (i + 1) / tang.length;
+    tang[i] += (target - tang[i]) * Math.max(0.06, 0.3 - i * 0.025);
+  }
+}
+
+// ---- dessin : toile 64×52 en vrais pixels, puis agrandie sans lissage ----
+const small = document.createElement('canvas'); small.width = CW; small.height = CH;
+const sg = small.getContext('2d', { willReadFrequently: true });
+const layer = document.createElement('canvas'); layer.width = CW; layer.height = CH;
+const lg = layer.getContext('2d', { willReadFrequently: true });
+const big = document.getElementById('c'), bg = big.getContext('2d');
+
+function frame(g, f, jumpY) {
+  g.setTransform(1, 0, 0, 1, 0, 0);
+  if (Math.abs(swing) > 0.3) { g.translate(32, 19); g.rotate(swing * Math.PI / 180); g.translate(-32, -19); }
+  if (f < 0) g.transform(-1, 0, 0, 1, CW, 0);
+  g.translate(0, -jumpY);
+}
+const ell = (g, c, x, y, w, h) => { g.fillStyle = css(c); g.beginPath(); g.ellipse(x + w / 2, y + h / 2, Math.abs(w / 2), Math.abs(h / 2), 0, 0, Math.PI * 2); g.fill(); };
+const line = (g, c, w, x1, y1, x2, y2) => { g.strokeStyle = css(c); g.lineWidth = w; g.lineCap = 'round'; g.beginPath(); g.moveTo(x1, y1); g.lineTo(x2, y2); g.stroke(); };
+const poly = (g, c, pts) => { g.fillStyle = css(c); g.beginPath(); g.moveTo(pts[0], pts[1]); for (let i = 2; i < pts.length; i += 2) g.lineTo(pts[i], pts[i + 1]); g.closePath(); g.fill(); };
+const rect = (g, c, x, y, w, h) => { g.fillStyle = css(c); g.fillRect(x, y, w, h); };
+function leg(g, c, hx, hy, fx, fy, w) { line(g, c, w, hx, hy, fx, fy - 1.5); ell(g, c, fx - 2, fy - 3, 5, 3); }
+
+// Canvas lisse toujours ses formes : on « pixellise » (alpha seuillé, couleur ramenée à la palette) = rendu GDI+ sans lissage de Windows
+function snap(g, pal, cut) {
+  const im = g.getImageData(0, 0, CW, CH), d = im.data;
+  for (let i = 0; i < d.length; i += 4) {
+    if (d[i + 3] < cut) { d[i + 3] = 0; continue; }
+    let best = pal[0], bd = 1e9;
+    for (const c of pal) { const e = (d[i] - c[0]) ** 2 + (d[i + 1] - c[1]) ** 2 + (d[i + 2] - c[2]) ** 2; if (e < bd) { bd = e; best = c; } }
+    d[i] = best[0]; d[i + 1] = best[1]; d[i + 2] = best[2]; d[i + 3] = best[3];
+  }
+  g.putImageData(im, 0, 0);
+}
+// contour d'un pixel + reflet sur le dessus du pelage (style pixel art)
+function pixelPass(g) {
+  const im = g.getImageData(0, 0, CW, CH), px = new Uint8ClampedArray(im.data), o = im.data, w = CW, h = CH;
+  const is = (i, c) => px[i * 4] === c[0] && px[i * 4 + 1] === c[1] && px[i * 4 + 2] === c[2] && px[i * 4 + 3] === 255;
+  const fur = i => is(i, FUR) || is(i, FAR), clear = i => px[i * 4 + 3] === 0;
+  const put = (i, c) => { o[i * 4] = c[0]; o[i * 4 + 1] = c[1]; o[i * 4 + 2] = c[2]; o[i * 4 + 3] = 255; };
+  for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+    const i = y * w + x;
+    if (clear(i)) { if ((x > 0 && fur(i - 1)) || (x < w - 1 && fur(i + 1)) || (y > 0 && fur(i - w)) || (y < h - 1 && fur(i + w))) put(i, OUT); }
+    else if (is(i, FUR) && y > 0 && clear(i - w)) put(i, HI);
+  }
+  g.putImageData(im, 0, 0);
+}
+
+function drawHead(g, p, faceOnly) {
+  g.save(); g.translate(p.hx, p.hy); g.rotate(p.ht * Math.PI / 180);
+  if (faceOnly) { drawFace(g, p); g.restore(); return; }
+  const eb = earBack, tw = earTw > 0 ? 2 : 0;
+  poly(g, FUR, [-8, -1, -8.1 + eb, -14.3 + eb * 3.5 + tw, -0.9, -5.2]);
+  poly(g, FUR, [8, -1.2, 6.9 - eb, -13.4 + eb * 3.3, 1.1, -5]);
+  poly(g, INNER, [-6.3, -3.8, -6.8 + eb, -11.1 + eb * 2.9 + tw, -3, -5.8]);
+  poly(g, INNER, [6.2, -3.7, 5.9 - eb, -10.3 + eb * 2.7, 3.2, -5.6]);
+  ell(g, FUR, -8, -6.5, 16, 13);
+  ell(g, FUR, -9.5, -1, 6, 5.5); ell(g, FUR, 3.5, -1, 6, 5.5);
+  rect(g, COLLAR, -4.5, 5.5, 9, 1.6);
+  rect(g, FISH, -2, 7, 3, 2); rect(g, FIN, 1, 6.5, 1, 1); rect(g, FIN, 1, 8.5, 1, 1); rect(g, FISHDK, -2, 7, 1, 1);
+  for (const s of [-1, 1]) { line(g, WHISK, 1, s * 6, 2.5, s * 10.5, 1.5); line(g, WHISK, 1, s * 6, 4, s * 10.5, 4.5); }
+  g.restore();
+}
+
+function drawFace(g, p) {
+  const yawn = act === 'stretch' && !held && !falling ? Math.sin(Math.min(1, actT / Math.max(0.1, actDur)) * Math.PI) : 0;
+  const happyEyes = petT > 0 || state === 'happy' || state === 'ready' || act === 'rub' || act === 'scratch';
+  const dilated = held || falling || state === 'thinking' || act === 'chase';
+  const es = p.eyeShift + lookX, open = blink > 0 ? 0 : p.eye;
+  const peek = peekT > 0.25 && act === 'lie' && !held && !falling;
+  const shift = Math.round(es), lx = Math.max(-1, Math.min(1, Math.round(lookX * 1.2))), ly = Math.max(-1, Math.min(1, Math.round(lookY)));
+  for (const s of [-1, 1]) {
+    const ex = s * 4 + shift, ey = -1, R = (c, x, y, w, h) => rect(g, c, ex + x, ey + y, w, h);
+    if (peek && s === 1) { R(EYEDK, -2, -1, 5, 1); R(EYE, -2, 0, 5, 1); R(PUP, lx, 0, 1, 1); }
+    else if (happyEyes) { R(EYE, -2, 0, 1, 1); R(EYE, -1, -1, 3, 1); R(EYE, 2, 0, 1, 1); }
+    else if (open < 0.5 || yawn > 0.3) { R(EYEDK, -2, 0, 1, 1); R(EYEDK, -1, 1, 3, 1); R(EYEDK, 2, 0, 1, 1); }
+    else {
+      R(EYEDK, -1, -3, 3, 1); R(EYE, -2, -2, 5, 3); R(LIGHT, -2, 1, 5, 1); R(LIGHT, -1, 2, 3, 1);
+      const pw = dilated ? 3 : 1, px0 = -Math.trunc(pw / 2) + lx;
+      R(PUP, px0, -2 + Math.max(0, ly), pw, 3); R(WHITE, -2 + Math.max(0, lx), -2, 1, 1);
+    }
+    R(BLUSH, s > 0 ? 3 : -4, 3, 2, 1);
+  }
+  ell(g, NOSE, -0.9 + es * 0.5, 2.9, 1.8, 1.1);
+  if ((act === 'groom' && Math.sin(t * 11) > 0) || (act === 'lick' && Math.sin(t * 9) > 0.2)) ell(g, NOSE, -0.5 + es * 0.5, 4.4, 1, 1.3);
+  const mx = Math.round(es * 0.5);
+  if (yawn > 0.15) { const mh = 1 + Math.round(yawn * 2.4); rect(g, YAWN, mx - 1, 4, 3, mh); rect(g, NOSE, mx, 3 + mh, 1, 1); }
+  else {
+    g.strokeStyle = css(MOUTH); g.lineWidth = 0.8;
+    g.beginPath(); g.ellipse(-1.4 + es * 0.5 + 0.7, 4.15, 0.7, 0.55, 0, 0, Math.PI); g.stroke();
+    g.beginPath(); g.ellipse(es * 0.5 + 0.7, 4.15, 0.7, 0.55, 0, 0, Math.PI); g.stroke();
+  }
+}
+
+function renderSmall(p, f, jumpY) {
+  // 1) corps
+  lg.setTransform(1, 0, 0, 1, 0, 0); lg.clearRect(0, 0, CW, CH);
+  frame(lg, f, jumpY);
+  leg(lg, FAR, p.fhx - 1, p.fhy, p.ffx2, p.ffy2, 3);
+  leg(lg, FAR, p.bhx - 1, p.bhy, p.fbx2, p.fby2, 3);
+  const pts = [[p.tbx, p.tby]];
+  for (let i = 0; i < tang.length; i++) { const a = tang[i] * Math.PI / 180; pts.push([pts[i][0] + Math.cos(a) * 2.3, pts[i][1] + Math.sin(a) * 2.3]); }
+  const stroke = (c, extra) => { for (let i = 0; i < tang.length; i++) line(lg, c, 3.4 - i * 0.17 + extra, pts[i][0], pts[i][1], pts[i + 1][0], pts[i + 1][1]); };
+  const tail = () => { if (p.tf >= 0.5) stroke(OUT, 1.2); stroke(FUR, 0); };
+  if (p.tf < 0.5) tail();
+  lg.save(); lg.translate(p.bx, p.by); lg.rotate(p.ba * Math.PI / 180); ell(lg, FUR, -p.bw / 2, -p.bh / 2, p.bw, p.bh); lg.restore();
+  if (p.tf >= 0.5) tail();
+  if (p.haunch > 1.5) ell(lg, FUR, p.bhx - p.haunch / 2, p.bhy - p.haunch * 0.55, p.haunch, p.haunch * 0.95);
+  leg(lg, FUR, p.fhx, p.fhy, p.ffx, p.ffy, 3.4);
+  leg(lg, FUR, p.bhx, p.bhy, p.fbx, p.fby, 3.4);
+  drawHead(lg, p, false);
+  lg.setTransform(1, 0, 0, 1, 0, 0);
+  snap(lg, BODY_PAL.concat([OUT]), 110);
+  pixelPass(lg);
+  sg.setTransform(1, 0, 0, 1, 0, 0); sg.clearRect(0, 0, CW, CH); sg.drawImage(layer, 0, 0);
+  // 2) visage, à la même résolution, par-dessus le contour
+  lg.clearRect(0, 0, CW, CH);
+  frame(lg, f, jumpY); drawHead(lg, p, true);
+  lg.setTransform(1, 0, 0, 1, 0, 0);
+  snap(lg, FACE_PAL, 70);
+  sg.drawImage(layer, 0, 0);
+}
+
+// petits chiffres 3×5 pour la progression
+const DIGITS = ['XXXX.XX.XX.XXXX', '.X.XX..X..X.XXX', 'XXX..XXXXX..XXX', 'XXX..XXXX..XXXX', 'X.XX.XXXX..X..X', 'XXXX..XXX..XXXX', 'XXXX..XXXX.XXXX', 'XXX..X..X..X..X', 'XXXX.XXXXX.XXXX', 'XXXX.XXXX..XXXX'];
+function pixText(g, c, s, x, y) {
+  for (const ch of s) {
+    const m = ch === '/' ? '..X..X.X.X..X..' : ch >= '0' && ch <= '9' ? DIGITS[+ch] : null;
+    if (m) for (let i = 0; i < 15; i++) if (m[i] === 'X') rect(g, c, x + i % 3, y + Math.trunc(i / 3), 1, 1);
+    x += 4;
+  }
+}
+function sprite(g, rows, x0, y0, flip, X, O) {
+  const n = rows[0].length;
+  for (let r = 0; r < rows.length; r++) for (let c = 0; c < n; c++) {
+    const ch = rows[r][flip ? n - 1 - c : c];
+    if (ch === 'X') rect(g, X, x0 + c, y0 + r, 1, 1); else if (ch === 'O') rect(g, O, x0 + c, y0 + r, 1, 1);
+  }
+}
+const BW = rgb(240, 238, 245, 245), BO = rgb(217, 119, 87);
+function drawExtras(g, p, f, jumpY) {
+  g.setTransform(1, 0, 0, 1, 0, 0);
+  const hx = f > 0 ? p.hx : CW - p.hx, hy = p.hy - jumpY, dir = hx > CW / 2 + 8 ? -1 : 1;
+  if (state === 'thinking') {
+    const k = Math.trunc(t * 3) % 4;
+    let ux = dir * 0.8, uy = -0.6;
+    if (panelVisible && panelBounds) {
+      const sx = Left + hx * Px, sy = Top + hy * Px, to = panelBounds;
+      const tx = Math.max(to[0], Math.min(to[2], sx)), ty = Math.max(to[1], Math.min(to[3], sy)), vx = tx - sx, vy = ty - sy, n = Math.hypot(vx, vy);
+      if (n > 1) { ux = vx / n; uy = vy / n; if (uy > -0.35) { uy = -0.35; ux = Math.sign(vx === 0 ? dir : vx) * 0.94; } }
+    }
+    for (let i = 0; i < Math.min(k, 3); i++) {
+      const sz = i + 1, d = 7 + i * 4.5;
+      rect(g, rgb(235, 235, 245, 240), Math.trunc(Math.max(0, Math.min(CW - sz, hx + ux * d - sz / 2))), Math.trunc(Math.max(0, Math.min(CH - sz, hy - 4 + uy * d - sz / 2))), sz, sz);
+    }
+    if (progTotal > 0) {
+      const txt = Math.min(progDone, 99) + '/' + Math.min(progTotal, 99), w = txt.length * 4 - 1, x0 = Math.trunc(hx) - Math.trunc(w / 2), y0 = Math.trunc(Math.max(0, hy - 22));
+      rect(g, rgb(30, 30, 36, 235), x0 - 2, y0 - 2, w + 4, 9); pixText(g, rgb(235, 154, 120), txt, x0, y0);
+    }
+  }
+  if (state === 'hand') {
+    const bob = Math.trunc(t * 3) % 2;
+    const rows = handKind === 'ecran'
+      ? ['.XXXXXXXXX.', 'XXXXXXXXXXX', 'XXXOOOOOXXX', 'XXOXXOXXOXX', 'XOXXOOOXXOX', 'XXOXXOXXOXX', 'XXXOOOOOXXX', 'XXXXXXXXXXX', '.XXXXXXXXX.', '..XX.......', '.X.........']
+      : ['.XXXXXXXXX.', 'XXXXOOOXXXX', 'XXXOXOXOXXX', 'XXXOXOXOXXX', 'XXXOOOOOXXX', 'XXXOXXXOXXX', 'XXXOXXXOXXX', 'XXXXOOOXXXX', '.XXXXXXXXX.', '..XX.......', '.X.........'];
+    sprite(g, rows, Math.trunc(hx + dir * (held ? 14 : 10)) - (dir > 0 ? 1 : 10), (held ? Math.trunc(Math.max(0, hy - 10)) : Math.trunc(Math.max(0, hy - 26))) - bob, dir < 0, BW, BO);
+  }
+  if (state === 'ready') {
+    const bob = Math.trunc(t * 2.5) % 2;
+    const rows = ['.XXXXXXX.', 'XXXXOXXXX', 'XXXXOXXXX', 'XXXXOXXXX', 'XXXXXXXXX', 'XXXXOXXXX', '.XXXXXXX.', '..XX.....', '.X.......'];
+    sprite(g, rows, Math.trunc(hx + dir * (held ? 14 : 10)) - (dir > 0 ? 1 : 8), (held ? Math.trunc(Math.max(0, hy - 9)) : Math.trunc(Math.max(0, hy - 24))) - bob, dir < 0, BW, BO);
+  }
+  if (state === 'question') {
+    const side = (Math.trunc(t / 1.6) % 2 === 0) ? dir : -dir, bob = Math.trunc(t * 2.5) % 2;
+    const rows = ['.XXXXXXX.', 'XXXOOOXXX', 'XXOXXXOXX', 'XXXXXOXXX', 'XXXXOXXXX', 'XXXXXXXXX', 'XXXXOXXXX', '.XXXXXXX.', '..XX.....', '.X.......'];
+    sprite(g, rows, Math.trunc(hx + side * (held ? 14 : 10)) - (side > 0 ? 1 : 8), (held ? Math.trunc(Math.max(0, hy - 10)) : Math.trunc(Math.max(0, hy - 25))) - bob, side < 0, BW, BO);
+    const ph = (t * 0.6) % 1, qx = Math.trunc(hx - side * (7 + ph * 4)), qy = Math.trunc(hy - 9 - ph * 12), qa = Math.trunc(230 * (1 - ph));
+    const q = ['XXX', '..X', '.X.', '...', '.X.'];
+    for (let r = 0; r < q.length; r++) for (let c = 0; c < 3; c++) if (q[r][c] === 'X') rect(g, rgb(240, 238, 245, qa), qx + c, Math.max(0, qy + r), 1, 1);
+  }
+  if (act === 'lie' && actT > 2.5 && !held && !falling) {
+    for (let i = 0; i < 3; i++) {
+      const ph = (t * 0.5 + i / 3) % 1, zx = Math.trunc(hx + dir * (6 + ph * 7)), zy = Math.trunc(hy - 8 - ph * 14), c = rgb(220, 225, 255, Math.trunc(255 * (1 - ph)));
+      rect(g, c, zx, zy, 3, 1); rect(g, c, zx + 1, zy + 1, 1, 1); rect(g, c, zx, zy + 2, 3, 1);
+    }
+  }
+  if ((petT > 0 || act === 'rub') && !held && !falling) {
+    const bx = f > 0 ? p.bx : CW - p.bx, side = -dir, k = Math.trunc(t * 12) % 2, c = rgb(225, 225, 240, 200);
+    for (let i = 0; i < 3; i++) {
+      const ox = Math.trunc(bx + side * (11 + i * 3)) + (k === 0 ? 0 : side), oy = Math.trunc(p.by - 4 - jumpY) + i;
+      rect(g, c, ox, oy, 1, 1); rect(g, c, ox + side, oy + 1, 1, 2); rect(g, c, ox, oy + 3, 1, 1);
+    }
+  }
+  if (heartT > 0) {
+    const rise = (1.4 - heartT) * 6, x0 = Math.trunc(hx + (state === 'ready' ? -dir : dir) * 9) - 2, y0 = Math.trunc(hy - 11 - rise);
+    const rows = ['.X.X.', 'XXXXX', '.XXX.', '..X..'], c = rgb(HEART[0], HEART[1], HEART[2], Math.trunc(255 * Math.min(1, heartT)));
+    for (let r = 0; r < rows.length; r++) for (let cc = 0; cc < 5; cc++) if (rows[r][cc] === 'X') rect(g, c, x0 + cc, y0 + r, 1, 1);
+  }
+}
+
+function buildPose() {
+  const p = clone(cur);
+  const br = Math.sin(t * (act === 'lie' ? 1.6 : 2.4)) * 0.6;
+  p.bh += br; p.by -= br / 2;
+  if (landT > 0) { p.bh *= 0.85; p.bw *= 1.12; p.by += 1.5; p.hy += 2; }
+  if (walkAmp > 0.01) {
+    const A = (run ? 5 : 3.5) * walkAmp, L = 2.5 * walkAmp;
+    const step = (kx, ky, ph) => { p[kx] += Math.sin(ph) * A; p[ky] -= Math.max(0, Math.cos(ph)) * L; };
+    step('ffx', 'ffy', phase); step('ffx2', 'ffy2', phase + Math.PI); step('fbx', 'fby', phase + Math.PI); step('fbx2', 'fby2', phase);
+    const bob = Math.abs(Math.sin(phase)) * 0.9 * walkAmp;
+    p.by -= bob; p.hy -= bob * 0.7; p.fhy -= bob; p.bhy -= bob;
+    if (run) p.ba += Math.sin(phase) * 4;
+  }
+  const free = !held && !falling;
+  if (act === 'groom' && free) { p.ffy += Math.sin(t * 11) * 1.3; p.ht += Math.sin(t * 11) * 3; }
+  if (act === 'lick' && free) { const lk = Math.sin(t * 9); p.hy += Math.max(0, lk) * 1.2; p.ht += lk * 5; p.hx += lk * 0.5; }
+  if (act === 'scratch' && free) { const sc = Math.sin(t * 22); p.fbx += sc * 1.3; p.fby += Math.cos(t * 22) * 1.3; p.ht += sc * 2.5; }
+  if (act === 'rub' && free) { const rb = Math.sin(t * 3.2); p.ht += rb * 14; p.hx += rb * 1.5; p.ba += rb * 4; p.eyeShift += rb * 0.6; }
+  if (state === 'hand' && free && act !== 'lie') { const k = Math.max(0, Math.sin(t * 6)); p.ffy -= 4 * k; p.ffx += 1.5 * k; }
+  const jumpY = jumpT >= 0 && jumpT < 0.5 ? Math.sin(jumpT / 0.5 * Math.PI) * 9 : 0;
+  if (held || falling || Math.abs(stretch) > 0.05 || Math.abs(swingV) > 0.05) {
+    p.bh += stretch; p.by += stretch * 0.5; p.fby += stretch; p.fby2 += stretch; p.ffy += stretch * 0.6; p.ffy2 += stretch * 0.6;
+    const lag = Math.max(-3, Math.min(3, -swingV * 0.35)) * face;
+    p.ffx += lag; p.ffx2 += lag; p.fbx += lag * 1.4; p.fbx2 += lag * 1.4;
+  }
+  return [p, jumpY];
+}
+
+function draw() {
+  const [p, jumpY] = buildPose();
+  renderSmall(p, face, jumpY);
+  drawExtras(sg, p, face, jumpY);
+  bg.setTransform(1, 0, 0, 1, 0, 0);
+  bg.imageSmoothingEnabled = false;
+  bg.clearRect(0, 0, big.width, big.height);
+  bg.drawImage(small, 0, 0, big.width, big.height);
+}
+
+// pixel opaque sous la souris ? (le reste de la fenêtre laisse passer les clics)
+function opaqueAt(sx, sy) {
+  const x = Math.floor((sx - Left) / Px), y = Math.floor((sy - Top) / Px);
+  if (x < 0 || y < 0 || x >= CW || y >= CH) return false;
+  // marge d'un pixel : plus facile à attraper
+  for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) {
+    const xx = x + dx, yy = y + dy;
+    if (xx >= 0 && yy >= 0 && xx < CW && yy < CH && sg.getImageData(xx, yy, 1, 1).data[3] > 0) return true;
+  }
+  return false;
+}
+
+let lastPos = '', lastHit = null, lastCursor = [0, 0];
+// appelé par le natif : o = {cx, cy, wa:[l,t,r,b], btn, pv, pb:[l,t,r,b] | null}
+window.__tick = function (o) {
+  cursor = [o.cx, o.cy]; wa = o.wa; button = !!o.btn; panelVisible = !!o.pv; panelBounds = o.pb || null;
+  if (!placed) { Left = Math.min(Math.max(o.x != null ? o.x : wa[2] - W - 40, wa[0]), wa[2] - W); Top = wa[3] - 51 * Px; placed = true; }
+  const over = opaqueAt(cursor[0], cursor[1]);
+  // souris : appui sur le chat, glisser = l'attraper, relâcher = il tombe ; clic simple = discussion ; survol = caresse
+  if (button && !prevButton && over) { down = true; moved = false; lastTouch = Date.now(); grabAt = cursor.slice(); }
+  if (down && button) {
+    if (!moved && Math.abs(cursor[0] - grabAt[0]) + Math.abs(cursor[1] - grabAt[1]) > 5) { moved = true; held = true; falling = false; }
+    if (held) { Left = cursor[0] - 32 * Px; Top = cursor[1] - 19 * Px; }
+  }
+  if (down && !button) {
+    down = false;
+    if (moved) { held = false; falling = true; vy = 0; send('x\n' + Math.round(Left)); }
+    else { if (act === 'lie') setAct('stretch', 1.5); send('click'); }
+  }
+  if (!button && over && (cursor[0] !== lastCursor[0] || cursor[1] !== lastCursor[1])) {
+    if (petT <= 0 && heartT <= 0) heartT = 1.4;
+    petT = 0.8; lastTouch = Date.now();
+    if ((act === 'sit' || act === 'groom') && !held && !falling) setAct('rub', 2.5);
+  }
+  prevButton = button; lastCursor = cursor.slice();
+  tick(); draw();
+  const pos = Math.round(Left) + '\n' + Math.round(Top);
+  if (pos !== lastPos) { lastPos = pos; send('pos\n' + pos); }
+  const hit = over || down;
+  if (hit !== lastHit) { lastHit = hit; send('hit\n' + (hit ? 1 : 0)); }
+};
+let grabAt = [0, 0];
+window.__state = (s, d, tt, kind) => {
+  progDone = d || 0; progTotal = tt || 0;
+  if (s === 'hand') { handKind = kind === 'ecran' ? 'ecran' : 'souris'; if (state !== 'hand') { setState('hand'); jumpT = 0; } }
+  else if (s && s !== state) setState(s);
+};
+window.__settings = o => { activity = o.activity != null ? o.activity : activity; if (o.scale != null && o.scale !== scalePct) setScale(o.scale); };
+window.__drop = () => { heartT = 1.4; jumpT = 0; };
+setScale(100);
+send('ready');
+
+// aperçu dans un navigateur (sans le natif) : souris de la page, sol en bas de la fenêtre
+if (!window.webkit) {
+  document.body.style.background = '#2b2f38';
+  big.style.position = 'absolute';
+  let mx = 0, my = 0, mb = 0;
+  addEventListener('mousemove', e => { mx = e.clientX; my = e.clientY; });
+  addEventListener('mousedown', () => mb = 1); addEventListener('mouseup', () => mb = 0);
+  window.webkit = undefined;
+  const sendPreview = m => { if (m.startsWith('pos\n')) { const [, x, y] = m.split('\n'); big.style.left = x + 'px'; big.style.top = y + 'px'; } };
+  window.__preview = sendPreview;
+  setInterval(() => window.__tick({ cx: mx, cy: my, btn: mb, wa: [0, 0, innerWidth, innerHeight], pv: 0 }), 33);
+}
+</script>
+</body></html>

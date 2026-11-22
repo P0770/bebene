@@ -6,3 +6,4 @@ paquets/
 *.pdb
 .astro/
 node_modules/
+mac/build/
