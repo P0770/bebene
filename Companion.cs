@@ -118,6 +118,7 @@ static class Program {
             } finally { Settings.Set("ManualEvents", bm); Settings.Set("HiddenEvents", bh); }
             return;
         }
+        if (args.Length == 2 && args[0] == "--bench") { new Companion(false).Bench(args[1]); return; }   // test : temps de rendu d une image du chat
         if (args.Length == 2 && args[0] == "--swingtest") { new Companion(false).SwingTest(args[1]); return; }
         if (args.Length == 3 && args[0] == "--remindtest") {   // test : quels rappels partiraient maintenant + rendu de la carte
             Calendars.TestIcs = args[1];
@@ -373,6 +374,23 @@ class Companion : Form {
     [DllImport("gdi32.dll")] static extern bool DeleteDC(IntPtr dc);
     [DllImport("gdi32.dll")] static extern IntPtr SelectObject(IntPtr dc, IntPtr o);
     [DllImport("gdi32.dll")] static extern bool DeleteObject(IntPtr o);
+    [DllImport("gdi32.dll")] static extern IntPtr CreateDIBSection(IntPtr dc, ref BITMAPINFOHEADER bi, uint usage, out IntPtr bits, IntPtr sec, uint off);
+    [StructLayout(LayoutKind.Sequential)] struct BITMAPINFOHEADER { public int Size, Width, Height; public short Planes, BitCount; public int Compression, SizeImage, XPels, YPels, ClrUsed, ClrImportant; }
+
+    // Pinceaux et stylos du dessin, créés une seule fois (avant : ~40 objets GDI+ créés puis détruits à chaque image, 30 fois par seconde).
+    // Uniquement sur le fil de l'interface, et jamais dans un using (ils sont partagés).
+    static readonly Dictionary<int, SolidBrush> brushes = new Dictionary<int, SolidBrush>();
+    static readonly Dictionary<long, Pen> pens = new Dictionary<long, Pen>();
+    static SolidBrush Br(Color c) {
+        SolidBrush b; int k = c.ToArgb();
+        if (!brushes.TryGetValue(k, out b)) brushes[k] = b = new SolidBrush(c);
+        return b;
+    }
+    static Pen Pn(Color c, float w, bool round = false) {
+        Pen p; long k = ((long)c.ToArgb() << 32) ^ ((long)BitConverter.ToInt32(BitConverter.GetBytes(w), 0) & 0x7fffffff) ^ (round ? 1L << 31 : 0);
+        if (!pens.TryGetValue(k, out p)) { p = new Pen(c, w); if (round) { p.StartCap = LineCap.Round; p.EndCap = LineCap.Round; } pens[k] = p; }
+        return p;
+    }
 
     // Toile en "vrais" pixels, agrandie sans lissage (Px = taille d'un pixel à l'écran)
     const int CW = 64, CH = 52;
@@ -773,14 +791,14 @@ class Companion : Form {
     public void ForceRedraw() { lastFrame = null; }
     void Draw() {
         using (var img = BuildImage()) {
-            var bd = img.LockBits(new Rectangle(0, 0, img.Width, img.Height), ImageLockMode.ReadOnly, PixelFormat.Format32bppArgb);
+            var bd = img.LockBits(new Rectangle(0, 0, img.Width, img.Height), ImageLockMode.ReadOnly, PixelFormat.Format32bppPArgb);   // prémultiplié = format de UpdateLayeredWindow
             int n = Math.Abs(bd.Stride) * img.Height;
             if (curFrame == null || curFrame.Length != n) curFrame = new byte[n];
             Marshal.Copy(bd.Scan0, curFrame, 0, n);
             img.UnlockBits(bd);
             if (lastFrame != null && lastFrame.Length == n && SameBytes(lastFrame, curFrame)) return;
             var tmp = lastFrame; lastFrame = curFrame; curFrame = tmp;
-            Push(img);
+            Push(lastFrame, img.Width, img.Height);
         }
     }
     static unsafe bool SameBytes(byte[] a, byte[] b) {
@@ -833,6 +851,24 @@ class Companion : Form {
     Point prevHand; public Point? FakeHand;   // FakeHand : tests uniquement
 
     // test : on tient le chat, la main file vers la droite puis s'arrête → planche d'images
+    // mesure : temps moyen pour calculer + dessiner une image du chat (sans l envoyer à l écran), par activité
+    public void Bench(string path) {
+        tray.Visible = false; var sb = new StringBuilder(); var sw = new System.Diagnostics.Stopwatch();
+        foreach (var a in new[] { "sit", "walk", "lie", "groom" }) {
+            SetAct(a, 999); if (a == "walk") targetX = Left - 2000;
+            for (int i = 0; i < 30; i++) { Tick(); using (BuildImage()) { } }
+            int gc = GC.CollectionCount(0); sw.Restart();
+            for (int i = 0; i < 400; i++) { Tick(); using (BuildImage()) { } SetAct(a, 999); }
+            sw.Stop();
+            sb.AppendLine(a + " " + (sw.Elapsed.TotalMilliseconds / 400).ToString("0.000", System.Globalization.CultureInfo.InvariantCulture) + " ms/image, GC0 " + (GC.CollectionCount(0) - gc));
+        }
+        // image complète comme en vrai : calcul + comparaison + envoi à l écran (si elle a changé)
+        SetAct("sit", 999); var h = Handle; pushes = 0; sw.Restart();
+        for (int i = 0; i < 400; i++) { Tick(); Draw(); SetAct("sit", 999); }
+        sw.Stop();
+        sb.AppendLine("draw " + (sw.Elapsed.TotalMilliseconds / 400).ToString("0.000", System.Globalization.CultureInfo.InvariantCulture) + " ms/tick, envois " + pushes + "/400");
+        File.WriteAllText(path, sb.ToString());
+    }
     public void SwingTest(string path) {
         tray.Visible = false; held = true; cur = HANG.Clone(); face = 1;
         FakeHand = new Point(500, 500); Tick();
@@ -859,19 +895,22 @@ class Companion : Form {
         fx += (float)Math.Sin(ph) * A; fy -= (float)Math.Max(0, Math.Cos(ph)) * L;
     }
 
+    static readonly int[] Sides = { -1, 1 };
     static void Leg(Graphics g, Color c, float hx, float hy, float fx, float fy, float w) {
-        using (var pen = new Pen(c, w) { StartCap = LineCap.Round, EndCap = LineCap.Round }) g.DrawLine(pen, hx, hy, fx, fy - 1.5f);
-        using (var b = new SolidBrush(c)) g.FillEllipse(b, fx - 2f, fy - 3f, 5f, 3f);
+        g.DrawLine(Pn(c, w, true), hx, hy, fx, fy - 1.5f);
+        g.FillEllipse(Br(c), fx - 2f, fy - 3f, 5f, 3f);
     }
 
+    Bitmap small;
     Bitmap RenderSmall(Pose p, int f, float jumpY, bool extras) {
         // 1) corps en vrai 8 bits (1 pixel du dessin = Px pixels à l'écran)
-        var bmp = new Bitmap(CW, CH, PixelFormat.Format32bppArgb);
+        if (small == null) small = new Bitmap(CW, CH, PixelFormat.Format32bppArgb);   // réutilisé d'une image à l'autre
+        var bmp = small;
         using (var g = Graphics.FromImage(bmp)) {
             g.SmoothingMode = SmoothingMode.None; g.PixelOffsetMode = PixelOffsetMode.Half;
             g.Clear(Color.Transparent);
             Frame(g, f, jumpY);
-            using (var fur = new SolidBrush(FUR)) {
+            { var fur = Br(FUR);
                 Leg(g, FAR, p.fhx - 1, p.fhy, p.ffx2, p.ffy2, 3f);
                 Leg(g, FAR, p.bhx - 1, p.bhy, p.fbx2, p.fby2, 3f);
                 var pts = new PointF[tang.Length + 1];
@@ -882,8 +921,7 @@ class Companion : Form {
                 }
                 Action<Color, float> stroke = (c, extra) => {   // queue continue, qui s'affine vers le bout
                     for (int i = 0; i < tang.Length; i++)
-                        using (var pen = new Pen(c, 3.4f - i * 0.17f + extra) { StartCap = LineCap.Round, EndCap = LineCap.Round })
-                            g.DrawLine(pen, pts[i], pts[i + 1]);
+                        g.DrawLine(Pn(c, 3.4f - i * 0.17f + extra, true), pts[i], pts[i + 1]);
                 };
                 Action tail = () => { if (p.tf >= 0.5f) stroke(OUT, 1.2f); stroke(FUR, 0); };
                 if (p.tf < 0.5f) tail();
@@ -911,7 +949,6 @@ class Companion : Form {
             g.InterpolationMode = InterpolationMode.NearestNeighbor; g.PixelOffsetMode = PixelOffsetMode.Half;
             g.DrawImage(bmp, new Rectangle(0, 0, W, H));
         }
-        bmp.Dispose();
         if (extras) DrawExtras(big, p, f, jumpY);
         return big;
     }
@@ -921,7 +958,7 @@ class Companion : Form {
         g.TranslateTransform(p.hx, p.hy); g.RotateTransform(p.ht);
         if (face) { DrawFace(g, p); g.Restore(st); return; }
         float eb = earBack, tw = earTw > 0 ? 2f : 0f;
-        using (var fur = new SolidBrush(FUR)) using (var inner = new SolidBrush(INNER)) {
+        { var fur = Br(FUR); var inner = Br(INNER);
             // grandes oreilles dressées, volontairement un peu différentes (moins symétrique = plus vivant) :
             // la gauche un peu plus haute et ouverte vers l'extérieur, la droite un peu plus courte et penchée vers l'intérieur
             g.FillPolygon(fur, new[] { new PointF(-8f, -1), new PointF(-8.1f + eb, -14.3f + eb * 3.5f + tw), new PointF(-0.9f, -5.2f) });
@@ -931,15 +968,16 @@ class Companion : Form {
             g.FillEllipse(fur, -8, -6.5f, 16, 13);
             g.FillEllipse(fur, -9.5f, -1, 6, 5.5f); g.FillEllipse(fur, 3.5f, -1, 6, 5.5f);
         }
-        using (var b = new SolidBrush(COLLAR)) g.FillRectangle(b, -4.5f, 5.5f, 9, 1.6f);
+        g.FillRectangle(Br(COLLAR), -4.5f, 5.5f, 9, 1.6f);
         // médaillon : un petit poisson argenté sur le collier
-        using (var fish = new SolidBrush(Color.FromArgb(255, 170, 205, 235))) using (var fin = new SolidBrush(Color.FromArgb(255, 120, 160, 205))) {
+        { var fish = Br(Color.FromArgb(255, 170, 205, 235)); var fin = Br(Color.FromArgb(255, 120, 160, 205));
             g.FillRectangle(fish, -2, 7, 3, 2);                  // corps
             g.FillRectangle(fin, 1, 6.5f, 1, 1); g.FillRectangle(fin, 1, 8.5f, 1, 1);   // queue en V
-            using (var eyeB = new SolidBrush(Color.FromArgb(255, 30, 40, 60))) g.FillRectangle(eyeB, -2, 7, 1, 1);
+            g.FillRectangle(Br(Color.FromArgb(255, 30, 40, 60)), -2, 7, 1, 1);
         }
-        using (var wp = new Pen(WHISK, 1f))
-            foreach (int s in new[] { -1, 1 }) { g.DrawLine(wp, s * 6f, 2.5f, s * 10.5f, 1.5f); g.DrawLine(wp, s * 6f, 4f, s * 10.5f, 4.5f); }
+        { var wp = Pn(WHISK, 1f);
+            foreach (int s in Sides) { g.DrawLine(wp, s * 6f, 2.5f, s * 10.5f, 1.5f); g.DrawLine(wp, s * 6f, 4f, s * 10.5f, 4.5f); }
+        }
         g.Restore(st);
     }
 
@@ -950,14 +988,12 @@ class Companion : Form {
         bool dilated = held || falling || state == "thinking" || act == "chase";
         float es = p.eyeShift + lookX, open = blink > 0 ? 0 : p.eye;
         bool peek = peekT > 0.25f && act == "lie" && !held && !falling;     // 0,25 s de marge : l œil se referme avant la fin
-        using (var eye = new SolidBrush(EYE)) using (var ep = new Pen(EYE, 0.9f)) using (var dk = new Pen(EYEDK, 0.8f))
-        using (var dkB = new SolidBrush(EYEDK)) using (var light = new SolidBrush(Color.FromArgb(255, 186, 246, 160)))
-        using (var pup = new SolidBrush(Color.FromArgb(255, 10, 8, 14))) using (var w = new SolidBrush(Color.White))
-        using (var blush = new SolidBrush(Color.FromArgb(150, 214, 96, 128))) {
+        { var eye = Br(EYE); var dkB = Br(EYEDK); var light = Br(Color.FromArgb(255, 186, 246, 160));
+          var pup = Br(Color.FromArgb(255, 10, 8, 14)); var w = Br(Color.White); var blush = Br(Color.FromArgb(150, 214, 96, 128));
             // Yeux = petit sprite fixe de 5×6 pixels, posé sur des positions ENTIÈRES :
             // les deux yeux sont toujours identiques (avant, des ovales à virgule déformaient l'œil droit).
             int shift = (int)Math.Round(es), lx = Math.Max(-1, Math.Min(1, (int)Math.Round(lookX * 1.2f))), ly = Math.Max(-1, Math.Min(1, (int)Math.Round(lookY)));
-            foreach (int s in new[] { -1, 1 }) {
+            foreach (int s in Sides) {
                 int ex = s * 4 + shift, ey = -1;                         // centre de l'œil
                 Action<Brush, int, int, int, int> R = (b, x, y, ww, hh) => g.FillRectangle(b, ex + x, ey + y, ww, hh);
                 if (peek && s == 1) {                                 // un seul œil entrouvert, paupière lourde, pupille vers la souris
@@ -978,27 +1014,29 @@ class Companion : Form {
                 R(blush, s > 0 ? 3 : -4, 3, 2, 1);                       // joues roses
             }
         }
-        using (var b = new SolidBrush(NOSE)) {
+        { var b = Br(NOSE);
             g.FillEllipse(b, -0.9f + es * 0.5f, 2.9f, 1.8f, 1.1f);
             if ((act == "groom" && Math.Sin(t * 11) > 0) || (act == "lick" && Math.Sin(t * 9) > 0.2)) g.FillEllipse(b, -0.5f + es * 0.5f, 4.4f, 1, 1.3f);   // langue
         }
         int mx = (int)Math.Round(es * 0.5f);
         if (yawn > 0.15f) {                                                   // grande bouche ouverte qui bâille, petite langue rose
             int mh = 1 + (int)Math.Round(yawn * 2.4f);
-            using (var m = new SolidBrush(Color.FromArgb(255, 70, 24, 40))) g.FillRectangle(m, mx - 1, 4, 3, mh);
-            using (var tg = new SolidBrush(NOSE)) g.FillRectangle(tg, mx, 3 + mh, 1, 1);
-        } else using (var mp = new Pen(Color.FromArgb(255, 70, 70, 96), 0.4f)) {   // petite bouche en « w »
+            g.FillRectangle(Br(Color.FromArgb(255, 70, 24, 40)), mx - 1, 4, 3, mh);
+            g.FillRectangle(Br(NOSE), mx, 3 + mh, 1, 1);
+        } else { var mp = Pn(Color.FromArgb(255, 70, 70, 96), 0.4f);   // petite bouche en « w »
             g.DrawArc(mp, -1.4f + es * 0.5f, 3.6f, 1.4f, 1.1f, 0, 180);
             g.DrawArc(mp, 0f + es * 0.5f, 3.6f, 1.4f, 1.1f, 0, 180);
         }
     }
 
     // Contour d'un pixel + reflet sur le dessus du pelage (style pixel art)
+    static int[] ppIn, ppOut;
     static void PixelPass(Bitmap b) {
         int w = b.Width, h = b.Height, n = w * h;
         var d = b.LockBits(new Rectangle(0, 0, w, h), ImageLockMode.ReadWrite, PixelFormat.Format32bppArgb);
-        var px = new int[n]; Marshal.Copy(d.Scan0, px, 0, n);
-        var o = (int[])px.Clone();
+        if (ppIn == null || ppIn.Length != n) { ppIn = new int[n]; ppOut = new int[n]; }
+        var px = ppIn; var o = ppOut;
+        Marshal.Copy(d.Scan0, px, 0, n); Array.Copy(px, o, n);
         int fur = FUR.ToArgb(), far = FAR.ToArgb(), hi = HI.ToArgb(), outl = OUT.ToArgb();
         for (int y = 0; y < h; y++) for (int x = 0; x < w; x++) {
             int i = y * w + x, c = px[i];
@@ -1117,13 +1155,29 @@ class Companion : Form {
         }
     }
 
-    void Push(Bitmap bmp) {
-        IntPtr screen = GetDC(IntPtr.Zero), mem = CreateCompatibleDC(screen), hb = bmp.GetHbitmap(Color.FromArgb(0)), old = SelectObject(mem, hb);
-        var size = new Size(W, H); var src = Point.Empty; var pos = Location;
+    int pushes;
+    // Surface GDI gardée d'une image à l'autre (avant : GetHbitmap créait et copiait un nouveau bitmap à chaque envoi).
+    // On y copie directement les octets déjà lus dans Draw (BGRA prémultiplié, lignes de haut en bas).
+    IntPtr dibDC, dib, dibOld, dibBits; int dibW, dibH;
+    void Push(byte[] frame, int w, int h) {
+        pushes++;
+        if (dib == IntPtr.Zero || dibW != w || dibH != h) {
+            FreeDib();
+            var bi = new BITMAPINFOHEADER { Size = 40, Width = w, Height = -h, Planes = 1, BitCount = 32 };   // hauteur négative = de haut en bas
+            dibDC = CreateCompatibleDC(IntPtr.Zero);
+            dib = CreateDIBSection(dibDC, ref bi, 0, out dibBits, IntPtr.Zero, 0);
+            dibOld = SelectObject(dibDC, dib); dibW = w; dibH = h;
+        }
+        Marshal.Copy(frame, 0, dibBits, Math.Min(frame.Length, w * h * 4));
+        var size = new Size(w, h); var src = Point.Empty; var pos = Location;
         var bl = new BLEND { Op = 0, Flags = 0, Alpha = 255, Format = 1 };
-        UpdateLayeredWindow(Handle, screen, ref pos, ref size, mem, ref src, 0, ref bl, 2);
-        SelectObject(mem, old); DeleteObject(hb); DeleteDC(mem); ReleaseDC(IntPtr.Zero, screen);
+        UpdateLayeredWindow(Handle, IntPtr.Zero, ref pos, ref size, dibDC, ref src, 0, ref bl, 2);
     }
+    void FreeDib() {
+        if (dib == IntPtr.Zero) return;
+        SelectObject(dibDC, dibOld); DeleteObject(dib); DeleteDC(dibDC); dib = dibDC = IntPtr.Zero;
+    }
+    protected override void OnFormClosed(FormClosedEventArgs e) { FreeDib(); base.OnFormClosed(e); }
 
     // Avatar (fenêtres HTML) et icône de notification tirés du sprite
     // icône de l app (bebene.ico, plusieurs tailles) à la taille voulue

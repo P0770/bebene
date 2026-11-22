@@ -11,6 +11,7 @@
 </p>
 
 <p align="center">
+  <a href="https://github.com/P0770/bebene/actions/workflows/ci.yml"><img src="https://github.com/P0770/bebene/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
   <a href="https://buymeacoffee.com/p0770"><img src="https://img.shields.io/badge/Buy%20me%20a%20coffee-%E2%98%95-f2c66d?style=flat-square&labelColor=1d1d22" alt="Buy me a coffee"></a>
 </p>
 

@@ -1,11 +1,14 @@
 ﻿# Compile Claude Companion (Minuit) depuis ce dossier vers le dossier d'installation local.
 #   -Install : crée aussi le raccourci du menu Démarrer, le lancement au démarrage, et lance l'app
-param([string]$Out = "$HOME\ClaudeCompanion", [switch]$Install)
+#   -NoStart : compile seulement, sans lancer Bébène (intégration continue, mesures)
+param([string]$Out = "$HOME\ClaudeCompanion", [switch]$Install, [switch]$NoStart)
 $ErrorActionPreference = 'Stop'
 Add-Type -AssemblyName System.Drawing
 $src = $PSScriptRoot
 New-Item -ItemType Directory -Force $Out | Out-Null
-Get-Process ClaudeCompanion -ErrorAction SilentlyContinue | Stop-Process -Force
+$Out = (Resolve-Path $Out).Path
+# arrête seulement la copie de Bébène qu'on remplace (pas celle installée quand on compile ailleurs)
+Get-Process ClaudeCompanion -ErrorAction SilentlyContinue | Where-Object { $_.Path -and $_.Path.StartsWith($Out, [StringComparison]::OrdinalIgnoreCase) } | Stop-Process -Force
 Start-Sleep -Milliseconds 500
 
 # WebView2 (téléchargé une fois, gardé en local)
@@ -73,5 +76,5 @@ if ($Install) {
     $sh.TargetPath = "$Out\ClaudeCompanion.exe"; $sh.IconLocation = "$Out\bebene.ico,0"; $sh.WorkingDirectory = $Out; $sh.Description = 'Ton compagnon Claude'; $sh.Save()
     Set-ItemProperty HKCU:\Software\Microsoft\Windows\CurrentVersion\Run ClaudeCompanion "`"$Out\ClaudeCompanion.exe`" --background"
 }
-Start-Process "$Out\ClaudeCompanion.exe" -ArgumentList '--background'
+if (-not $NoStart) { Start-Process "$Out\ClaudeCompanion.exe" -ArgumentList '--background' }
 "OK"
