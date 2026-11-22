@@ -19,7 +19,7 @@ using Microsoft.Web.WebView2.WinForms;
 
 [assembly: System.Reflection.AssemblyTitle("Bébène")]
 [assembly: System.Reflection.AssemblyProduct("Bébène")]
-[assembly: System.Reflection.AssemblyVersion("1.53.0.0")]
+[assembly: System.Reflection.AssemblyVersion("1.54.0.0")]
 
 static class Program {
     public const string Version = "1.54";
