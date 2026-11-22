@@ -26,3 +26,9 @@ projets = ShowSettings(section)), Terminal ; utilisable aussi en Flash ; ARCHIVE
 - WebView2 1.0.2903.40, téléchargé depuis NuGet par `build.ps1`.
 
 - Dépôt GitHub (public) : https://github.com/P0770/bebene — après une évolution : `git add -A; git commit -m "..."; git push`.
+
+## Temps et messages (mesuré le 2026-11-22, sessions Claude Code dans ~/.claude/projects, pauses > 30 min exclues)
+- Du 19 au 22 novembre 2026 : 6 sessions de travail, environ 13 h 30 de travail actif.
+- Environ 100 messages de Mattéo et 500 réponses de Claude ; ~2 000 actions d'outils dont ~600 modifications de fichiers.
+- Non compté : la session du 22.11 au soir (transcription absente, ~1 h estimée d'après les horodatages), le temps passé hors Claude Code, et l'usage de Bébène lui-même.
+- Script : compter les lignes user (texte tapé) / assistant (texte) des .jsonl qui citent claude-companion > 300 fois.
