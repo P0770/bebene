@@ -1,0 +1,55 @@
+# Un seul automatisme GitHub pour Bebene :
+#   - a chaque envoi sur main et a chaque pull request : compilation + tests sur une machine Windows propre ;
+#   - sur main, si le numero de version (Companion.cs) n'a jamais ete publie : zip + Release publiee
+#     (les installations existantes la recoivent par la mise a jour auto). Tests en echec = rien publie.
+# Blocs run en ASCII : Windows PowerShell 5 lit mal les accents sans BOM (le travail est dans les .ps1).
+name: Bebene
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: bebene-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  bebene:
+    name: Compiler, tester, publier si nouvelle version
+    runs-on: windows-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/cache@v4
+        with:
+          path: ~\AppData\Local\BebeneBuild
+          key: webview2-1.0.2903.40
+
+      - name: Compiler
+        shell: powershell
+        run: .\build.ps1 -NoStart
+
+      - name: Tests
+        shell: powershell
+        run: .\tests\tests.ps1
+
+      - name: Images des tests (en cas d echec)
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: resultats-tests
+          path: ~\AppData\Local\Temp\BebeneTests
+          if-no-files-found: ignore
+
+      - name: Publier la version si elle est nouvelle
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        shell: powershell
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: .\ci\publier-release.ps1

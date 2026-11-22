@@ -11,7 +11,7 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/P0770/bebene/actions/workflows/ci.yml"><img src="https://github.com/P0770/bebene/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
+  <a href="https://github.com/P0770/bebene/actions/workflows/bebene.yml"><img src="https://github.com/P0770/bebene/actions/workflows/bebene.yml/badge.svg" alt="Tests"></a>
   <a href="https://buymeacoffee.com/p0770"><img src="https://img.shields.io/badge/Buy%20me%20a%20coffee-%E2%98%95-f2c66d?style=flat-square&labelColor=1d1d22" alt="Buy me a coffee"></a>
 </p>
 
@@ -276,7 +276,7 @@ En résumé : **modifier → tester → double-clic sur `Publier sur GitHub.cmd`
 1. Fais tes modifications avec Claude Code dans ce dossier (Bébène ne peut pas se modifier lui-même).
 2. Teste : `.\build.ps1` compile et relance l'app.
 3. Pour une **nouvelle version téléchargeable**, augmente le numéro dans `Companion.cs` (`Version` **et** `AssemblyVersion`) et ajoute les nouveautés dans `fonctions.json` avec `"depuis": "<nouvelle version>"`.
-4. Double-clic sur **`Publier sur GitHub.cmd`** : il compile, te demande une phrase de description, envoie le code, puis crée la *Release* GitHub avec le zip et les notes de version (tirées de `fonctions.json`).
+4. Double-clic sur **`Publier sur GitHub.cmd`** : il te demande une phrase de description et envoie le code. GitHub compile et lance les tests ; si le numéro de version est nouveau et que tout passe, il publie lui-même la *Release* (zip + notes tirées de `fonctions.json`).
 
 Tout est expliqué pas à pas dans **[docs/MISE-A-JOUR.md](docs/MISE-A-JOUR.md)**.
 
@@ -297,7 +297,10 @@ bebene/
 ├── fonctions.json               catalogue des fonctions (affiché dans les réglages + notes de version)
 ├── build.ps1                    compilation, icône, installation
 ├── creer-paquet.ps1             crée le zip à partager           ← « Créer le paquet Bébène.cmd »
-├── publier-version.ps1          publie sur GitHub (code + release) ← « Publier sur GitHub.cmd » (propriétaire uniquement)
+├── publier-version.ps1          envoie le code sur GitHub          ← « Publier sur GitHub.cmd » (propriétaire uniquement)
+├── .github/workflows/bebene.yml GitHub : compile + teste à chaque envoi, publie la Release si version nouvelle
+├── ci/publier-release.ps1       (utilisé par GitHub) zip + Release
+├── hub-modele/                  modèle de mémoire livré dans le zip (copie de ClaudeHub/outils et skills)
 ├── CONTRIBUTING.md              utiliser, modifier, proposer des changements
 ├── assets/
 │   ├── icone-bebene.png         icône source (pixel art 32×32)

@@ -14,7 +14,7 @@ Ce guide explique comment modifier Bébène, tester, puis mettre à jour le dép
 | **Envoyer le code** (*commit + push*) | Le code du dépôt est mis à jour sur GitHub. | À chaque avancée, même petite. |
 | **Publier une version** (*Release*) | En plus, une page « Bébène 1.31 » est créée dans **Releases**, avec le zip prêt à installer et la liste des nouveautés. | Quand une nouvelle version est prête à être utilisée ou partagée. |
 
-Le script **`Publier sur GitHub.cmd`** fait les deux : il envoie toujours le code, et crée la Release **seulement si le numéro de version est nouveau**.
+Un seul geste pour les deux : **`Publier sur GitHub.cmd`** envoie le code ; GitHub le compile, le teste, et crée la Release **seulement si le numéro de version est nouveau** (et si les tests passent).
 
 ---
 
@@ -91,14 +91,15 @@ Cette entrée sert à trois endroits :
 
 Double-clic sur **`Publier sur GitHub.cmd`**. Le script :
 
-1. **compile** (`build.ps1`), pour que le zip corresponde exactement au code ;
-2. demande **« Qu'est-ce qui a changé ? »** : une phrase, qui sert de message de commit et d'introduction aux notes ;
-3. **enregistre et envoie** le code (`git add -A`, `git commit`, `git push`) ;
-4. si la version n'existe pas encore sur GitHub :
-   - crée le zip (`creer-paquet.ps1` : app compilée + modèle de mémoire sans tes infos personnelles + LISEZMOI),
-   - crée la **Release** `v1.31` avec le zip en pièce jointe et les nouveautés.
+1. demande **« Qu'est-ce qui a changé ? »** : une phrase, qui sert de message de commit et d'introduction aux notes ;
+2. **enregistre et envoie** le code (`git add -A`, `git commit`, `git push`).
 
-Si la version existe déjà, seul le code est envoyé, et le script te rappelle d'augmenter le numéro.
+Puis GitHub (onglet **Actions**, 3 à 5 min) :
+
+1. **compile et teste** sur une machine Windows propre ;
+2. si la version n'existe pas encore : crée le zip (app + modèle de mémoire sans tes infos personnelles + LISEZMOI) et publie la **Release** `v1.31` avec les nouveautés.
+
+Tests en échec = rien n'est publié (GitHub t'envoie un mail). La première fois, le script demande une autorisation GitHub (droit « workflow ») : Entrée, code collé dans le navigateur, valider.
 
 Équivalent en ligne de commande :
 

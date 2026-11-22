@@ -1,69 +1,38 @@
-﻿# Publie la version actuelle de Bébène sur GitHub, en une fois :
-#   1. compile l'app (build.ps1) pour que le zip corresponde au code
-#   2. enregistre les changements (commit) et les envoie (push)
-#   3. si la version (Companion.cs) n a jamais été publiée : envoie le tag vX.Y ; GitHub Actions (release.yml) compile, teste,
-#      crée le zip et publie la « Release »
-#      avec, en notes, les nouveautés tirées de fonctions.json
-# Lancé par « Publier sur GitHub.cmd » (double-clic). Option : -Message "texte du commit"
+﻿# Double-clic sur « Publier sur GitHub.cmd » : envoie le code sur GitHub. C'est tout.
+# GitHub fait le reste (.github/workflows/bebene.yml) : il compile et teste ; si le numéro de version
+# (Companion.cs) est nouveau, il publie aussi la version téléchargeable (Release). Tests en échec = rien publié.
+# Option : -Message "texte du commit"
 param([string]$Message)
 $ErrorActionPreference = 'Stop'
-$src = $PSScriptRoot
-Set-Location $src
+Set-Location $PSScriptRoot
+$owner = 'P0770'
 
-$gh = (Get-Command gh -ErrorAction SilentlyContinue)
+$gh = Get-Command gh -ErrorAction SilentlyContinue
 $gh = if ($gh) { $gh.Source } else { Join-Path $env:ProgramFiles 'GitHub CLI\gh.exe' }
 if (-not (Test-Path $gh)) { throw "GitHub CLI introuvable : installe-le avec  winget install GitHub.cli  puis  gh auth login" }
 
-# Seul le propriétaire du dépôt officiel publie. Quelqu'un qui a copié (fork / clone) le projet ne peut pas
-# toucher aux versions officielles : GitHub refuse de toute façon, ce contrôle donne juste un message clair.
-$owner = 'P0770'
+# Seul le propriétaire envoie sur le dépôt officiel (GitHub refuserait de toute façon : ceci donne un message clair).
 $ErrorActionPreference = 'Continue'
-$me = (& $gh api user --jq .login 2>$null)
-$origin = (git remote get-url origin 2>$null)
+$me = & $gh api user --jq .login 2>$null
+$origin = git remote get-url origin 2>$null
+$scopes = & $gh auth status 2>&1 | Out-String
 $ErrorActionPreference = 'Stop'
 if ($me -ne $owner -or $origin -notmatch "github\.com[/:]$owner/bebene") {
-    Write-Host "Publication réservée au propriétaire du dépôt officiel ($owner/bebene)." -ForegroundColor Yellow
-    Write-Host "Pour proposer tes modifications : fork sur GitHub puis « pull request » (voir CONTRIBUTING.md)." -ForegroundColor Yellow
+    Write-Host "Réservé au propriétaire du dépôt officiel ($owner/bebene). Pour proposer tes modifications : fork puis pull request (CONTRIBUTING.md)." -ForegroundColor Yellow
     exit 1
 }
-
-$version = (Select-String -Path "$src\Companion.cs" -Pattern 'public const string Version = "([^"]+)"').Matches[0].Groups[1].Value
-Write-Host "Bébène $version" -ForegroundColor Cyan
-
-# 1. compiler
-Write-Host "`n[1/3] Compilation…" -ForegroundColor Yellow
-& "$src\build.ps1"
-
-# 2. commit + push
-Write-Host "`n[2/3] Envoi du code sur GitHub…" -ForegroundColor Yellow
-if (-not $Message) {
-    $Message = Read-Host "Qu'est-ce qui a changé ? (Entrée = « Bébène $version »)"
-    if (-not $Message) { $Message = "Bébène $version" }
+# GitHub exige le droit « workflow » pour envoyer les fichiers .github/workflows : demandé une seule fois
+if ($scopes -notmatch "'workflow'") {
+    Write-Host "Une autorisation GitHub manque (une seule fois) : appuie sur Entrée, colle le code dans le navigateur, valide." -ForegroundColor Yellow
+    & $gh auth refresh -h github.com -s workflow
 }
+
+if (-not $Message) { $Message = Read-Host "Qu'est-ce qui a changé ? (Entrée = « Mise à jour »)" }
+if (-not $Message) { $Message = 'Mise à jour' }
 git add -A
 git diff --cached --quiet
-if ($LASTEXITCODE -ne 0) { git commit -q -m $Message; Write-Host "Changements enregistrés." } else { Write-Host "Aucun changement de code." }
+if ($LASTEXITCODE -ne 0) { git commit -q -m $Message }
 git push -q
 if ($LASTEXITCODE -ne 0) { throw "Envoi refusé par GitHub (connexion ? lance  gh auth login)" }
 
-# 3. release : un tag vX.Y est envoyé, et GitHub fait le reste (.github/workflows/release.yml) :
-#    compilation et tests sur une machine propre, zip, notes tirées de fonctions.json, Release publiée.
-Write-Host "`n[3/3] Version téléchargeable…" -ForegroundColor Yellow
-$tag = "v$version"
-$ErrorActionPreference = 'Continue'                   # « release not found » arrive sur stderr : ce n'est pas une erreur ici
-& $gh release view $tag 2>&1 | Out-Null
-$exists = $LASTEXITCODE -eq 0
-git ls-remote --exit-code --tags origin $tag 2>&1 | Out-Null
-$tagged = $LASTEXITCODE -eq 0
-$ErrorActionPreference = 'Stop'
-if ($exists -or $tagged) {
-    Write-Host "La version $version existe déjà sur GitHub : seul le code a été mis à jour." -ForegroundColor DarkYellow
-    Write-Host "Pour une nouvelle version téléchargeable, augmente le numéro dans Companion.cs (Version + AssemblyVersion)." -ForegroundColor DarkYellow
-    exit 0
-}
-git tag -a $tag -m $Message
-git push -q origin $tag
-if ($LASTEXITCODE -ne 0) { throw "Tag refusé par GitHub" }
-Write-Host "`nTag $tag envoyé : GitHub compile, teste et publie la version (3 à 5 min)." -ForegroundColor Green
-Write-Host "Suivi : https://github.com/$owner/bebene/actions" -ForegroundColor Green
-Write-Host "Si les tests échouent, rien n'est publié : corrige, puis supprime le tag (git push origin :$tag ; git tag -d $tag) et relance." -ForegroundColor DarkGray
+Write-Host "`nEnvoyé. GitHub teste (et publie si la version est nouvelle) : https://github.com/$owner/bebene/actions" -ForegroundColor Green
