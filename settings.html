@@ -93,6 +93,14 @@ details.sec[open] > summary { border-bottom: 1px solid var(--line); }
 details.sec .sb { padding: 10px; }
 details.sec .sb > .card { background: var(--bg); }
 details.sec .sb > .card + .card { margin-top: 10px; }
+/* ---- mes projets ---- */
+.pcap { font-size: 11px; font-weight: 600; letter-spacing: .6px; text-transform: uppercase; color: var(--muted); margin: 14px 4px 6px; }
+.pcap span { text-transform: none; letter-spacing: 0; font-weight: 400; }
+.pcap:first-of-type { margin-top: 0; }
+.prow { padding: 9px 12px 9px 16px; }
+.prow .btn { padding: 5px 12px; font-size: 12.5px; }
+.pdot { width: 10px; height: 10px; border-radius: 3px; flex: none; background: hsl(var(--h) 62% 62%); box-shadow: 0 0 8px hsla(var(--h), 62%, 62%, .45); }
+#pArch .pdot { filter: grayscale(.7); opacity: .6; }
 /* ---- assistant d'installation ---- */
 .setupcard { display: flex; align-items: center; gap: 14px; width: 100%; margin-top: 10px; text-align: left; font: inherit; color: var(--text); cursor: pointer;
   background: linear-gradient(135deg, rgba(217,119,87,.14), rgba(217,119,87,.04)); border: 1px solid rgba(235,154,120,.3); border-radius: 14px; padding: 14px 16px; transition: border-color .15s, transform .15s; }
@@ -175,6 +183,14 @@ html.light .hk:hover { border-color: #bdb5ae; }
   <span class="st"><b>Mes modèles de référence</b><span id="tplSub">Rapport, présentation, Word, Excel, code : Bébène reprend leur format et ton style</span></span>
   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6l6 6-6 6"/></svg>
 </button>
+
+<details class="sec" id="projets"><summary><span class="st"><b>Mes projets</b><span id="pCount">Archiver ceux qu'on ne veut plus dans le menu</span></span><svg class="chev" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg></summary><div class="sb">
+<input type="text" id="pFilter" placeholder="Filtrer les projets…" style="width:100%;margin-bottom:10px" maxlength="40">
+<div class="pcap">Dans le menu de la discussion</div>
+<div class="card" id="pActive"></div>
+<div class="pcap">Archivés <span>· cachés du menu ; dossier, notes et conversations gardés</span></div>
+<div class="card" id="pArch"></div>
+</div></details>
 
 <details class="sec" id="manual"><summary><span class="st"><b>Mes examens et rendez-vous</b><span>Ajouter, retirer, retrouver</span></span><svg class="chev" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg></summary><div class="sb">
 <div class="card">
@@ -525,6 +541,27 @@ window.chrome.webview.addEventListener('message', e => {
   if (d.slice(0, i) === 'settings') render(JSON.parse(d.slice(i + 1)));
   if (d.slice(0, i) === 'goto') { const el = document.getElementById(d.slice(i + 1)); if (el) { if (el.tagName === 'DETAILS') el.open = true; el.scrollIntoView({ behavior: 'smooth', block: 'start' }); const f = $('#mTitle'); if (f && el.id === 'manual') setTimeout(() => f.focus(), 400); } }
 });
+
+// ---- projets : archiver = caché du menu rapide de la discussion (dossier, notes et conversations gardés) ----
+let PROJ = { all: [], arch: [] };
+const hueOf = s => { let h = 0; for (const c of String(s)) h = (h * 31 + c.charCodeAt(0)) % 360; return h; };   // même couleur que dans la palette
+function renderProj() {
+  const arch = new Set(PROJ.arch), q = $('#pFilter').value.trim().toLowerCase();
+  const row = (p, a) => '<div class="row prow"><span class="pdot" style="--h:' + hueOf(p) + '"></span><div class="lbl"><b>' + escH(p) + '</b></div>'
+    + '<button class="btn' + (a ? ' primary' : '') + '" data-parch="' + escH(p) + '" data-a="' + (a ? 0 : 1) + '">' + (a ? 'Remettre dans le menu' : 'Archiver') + '</button></div>';
+  const act = PROJ.all.filter(p => !arch.has(p) && p.includes(q)), ar = PROJ.all.filter(p => arch.has(p) && p.includes(q));
+  $('#pActive').innerHTML = act.length ? act.map(p => row(p, false)).join('') : '<div class="row"><div class="lbl"><span>' + (q ? 'Aucun projet actif ne correspond.' : 'Aucun projet actif.') + '</span></div></div>';
+  $('#pArch').innerHTML = ar.length ? ar.map(p => row(p, true)).join('') : '<div class="row"><div class="lbl"><span>' + (q ? 'Aucun projet archivé ne correspond.' : 'Aucun projet archivé. « Archiver » cache un projet terminé du menu, sans rien effacer.') + '</span></div></div>';
+  $('#pCount').textContent = PROJ.all.length - PROJ.arch.length + ' dans le menu · ' + PROJ.arch.length + ' archivé' + (PROJ.arch.length > 1 ? 's' : '');
+}
+$('#pFilter').addEventListener('input', renderProj);
+document.addEventListener('click', e => { const b = e.target.closest('[data-parch]'); if (b) post('projarch\n' + b.dataset.parch + '\n' + b.dataset.a); });
+window.chrome.webview.addEventListener('message', e => {
+  const d = String(e.data), i = d.indexOf('\n');
+  if (d.slice(0, i) === 'projlist') { try { PROJ = JSON.parse(d.slice(i + 1)); renderProj(); } catch (x) { } }
+});
+$('#projets').addEventListener('toggle', () => { if ($('#projets').open) post('projlist'); });
+post('projlist');
 
 // ---- examens et rendez-vous ajoutés / retirés à la main ----
 function renderManual(s) {

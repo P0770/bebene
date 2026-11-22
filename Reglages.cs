@@ -27,8 +27,9 @@ class SettingsWindow : Form {
         Text = "Bébène";
         Icon = Companion.AppIcon(new Size(32, 32));
         StartPosition = FormStartPosition.CenterScreen;
-        Size = new Size(620, 760);
-        MinimumSize = new Size(480, 520);
+        float k = Util.ScaleAt(Cursor.Position);              // zoom Windows de l écran : même taille apparente partout
+        Size = new Size((int)(620 * k), (int)(760 * k));
+        MinimumSize = new Size((int)(480 * k), (int)(520 * k));
         BackColor = Color.FromArgb(24, 24, 27);
         web = new WebView2 { Dock = DockStyle.Fill, DefaultBackgroundColor = BackColor };
         Controls.Add(web);
@@ -123,6 +124,14 @@ class SettingsWindow : Form {
                 break;
             case "tplanalyze": if (Templates.Valid(v)) Templates.Analyze(v, PostTemplates); break;
             case "tplclear": if (Templates.Valid(v)) { Templates.Clear(v); PostTemplates(); } break;
+            case "projlist": Post("projlist\n" + ChatPanel.ProjectsJson()); break;
+            case "projarch": {                                                // projarch\n<nom>\n1 (archiver) | 0 (désarchiver)
+                var p = v.Split('\n');
+                ChatPanel.SetArchived(p[0], p.Length > 1 && p[1] == "1");
+                Post("projlist\n" + ChatPanel.ProjectsJson());
+                try { owner.Panel.PostProjects(); } catch { }                 // le menu de la discussion suit tout de suite
+                break;
+            }
         }
     }
     void PostTemplates() {

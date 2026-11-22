@@ -31,7 +31,7 @@ class ChatPanel : Form {
         ShowInTaskbar = false;
         TopMost = true;
         StartPosition = FormStartPosition.Manual;
-        Size = SavedSize(); MinimumSize = new Size(ChatW, ChatH);
+        Sc = Util.ScaleAt(Cursor.Position); var s0 = SavedSize(); Size = new Size((int)(s0.Width * Sc), (int)(s0.Height * Sc)); MinimumSize = new Size((int)(ChatW * Sc), (int)(ChatH * Sc));
         calTimer.Tick += (s, e) => RefreshCalendars();                 // rafraîchit les calendriers toutes les 30 min
         calTimer.Start();
         InitSide(); InitRunners();
@@ -78,6 +78,17 @@ class ChatPanel : Form {
         Post("brief\n" + Brief.Json());
     }
 
+    // glissée sur un écran avec un autre zoom : Windows propose la nouvelle taille, la page WebView2 se met à l échelle seule
+    protected override void WndProc(ref Message m) {
+        if (m.Msg == 0x02E0) {   // WM_DPICHANGED
+            var r = (RECT)Marshal.PtrToStructure(m.LParam, typeof(RECT));
+            Sc = (m.WParam.ToInt64() & 0xFFFF) / 96f;
+            MinimumSize = Size.Empty; Bounds = Rectangle.FromLTRB(r.L, r.T, r.R, r.B);
+            MinimumSize = new Size((int)(ChatW * Sc), (int)(ChatH * Sc)); LayoutSide(); return;
+        }
+        base.WndProc(ref m);
+    }
+    [StructLayout(LayoutKind.Sequential)] struct RECT { public int L, T, R, B; }
     protected override void OnHandleCreated(EventArgs e) { base.OnHandleCreated(e); Util.DarkWindow(Handle, true); Util.Glass(Handle); }
 
     // ---- clic ailleurs = la discussion se ferme (sauf si elle est épinglée, ou si on clique sur Bébène / ses fenêtres) ----
@@ -139,6 +150,28 @@ class ChatPanel : Form {
         try { foreach (var d in Directory.GetDirectories(ProjectsDir)) { string n = Path.GetFileName(d); if (n != "claude-companion") r.Add(n); } } catch { }   // Bébène lui-même se gère dans le terminal
         r.Sort(); return r;
     }
+    // projets archivés : cachés du menu rapide (le dossier, les notes et les conversations restent intacts).
+    // Liste dans projets/.archives (un nom par ligne) : suit le hub sur OneDrive, donc la même sur tous les PC.
+    static string ArchFile { get { return Path.Combine(ProjectsDir, ".archives"); } }
+    static HashSet<string> Archived() {
+        var r = new HashSet<string>();
+        try { if (File.Exists(ArchFile)) foreach (var l in File.ReadAllLines(ArchFile, Encoding.UTF8)) { string n = l.Trim(); if (n.Length > 0) r.Add(n); } } catch { }
+        return r;
+    }
+    public static void SetArchived(string name, bool on) {
+        string n = SafeName(name); if (n.Length == 0) return;
+        var a = Archived();
+        if (on ? !a.Add(n) : !a.Remove(n)) return;                              // déjà dans cet état : rien à écrire
+        var l = new List<string>(a); l.Sort();
+        try { File.WriteAllText(ArchFile, string.Join("\n", l.ToArray()) + (l.Count > 0 ? "\n" : ""), new UTF8Encoding(false)); }
+        catch (Exception ex) { Program.Log("Projet", ex.Message); }
+    }
+    // {all: tous les projets, arch: ceux qui sont archivés}
+    public static string ProjectsJson() {
+        var all = ListProjects(); var a = Archived();
+        return new JavaScriptSerializer().Serialize(new Dictionary<string, object> { { "all", all }, { "arch", all.FindAll(a.Contains) } });
+    }
+    public void PostProjects() { Post("projects\n" + ProjectsJson()); }
     // dossier où Claude travaille : le projet choisi, sinon le dossier des réglages
     // Claude Code range une session sous le dossier ou elle a commence (~/.claude/projects/<dossier>/<id>.jsonl) :
     // la reprendre ailleurs echoue. Le projet affiche dans l historique peut changer (rattachement, deplacement),
@@ -331,14 +364,15 @@ class ChatPanel : Form {
         rszT.Tick += (s, e) => {
             if ((Control.MouseButtons & MouseButtons.Left) == 0) {
                 rszT.Stop(); rszT.Dispose(); rszT = null;
-                Settings.Set("ChatSize", Width + "," + Height); LayoutSide(); return;
+                Settings.Set("ChatSize", (int)(Width / Sc) + "," + (int)(Height / Sc)); LayoutSide(); return;   // mémorisée en unités logiques (même taille apparente sur chaque écran)
             }
             var c = Cursor.Position; int dx = c.X - start.X, dy = c.Y - start.Y;
             int l = b0.Left, t = b0.Top, r = b0.Right, btm = b0.Bottom;
-            if (dir.Contains("w")) l = Math.Max(wa.Left, Math.Min(r - ChatW, b0.Left + dx));
-            if (dir.Contains("e")) r = Math.Min(wa.Right, Math.Max(l + ChatW, b0.Right + dx));
-            if (dir.Contains("n")) t = Math.Max(wa.Top, Math.Min(btm - ChatH, b0.Top + dy));
-            if (dir.Contains("s")) btm = Math.Min(wa.Bottom, Math.Max(t + ChatH, b0.Bottom + dy));
+            int mw = MinimumSize.Width, mh = MinimumSize.Height;                 // minimum réduit sur les petits écrans (Fit)
+            if (dir.Contains("w")) l = Math.Max(wa.Left, Math.Min(r - mw, b0.Left + dx));
+            if (dir.Contains("e")) r = Math.Min(wa.Right, Math.Max(l + mw, b0.Right + dx));
+            if (dir.Contains("n")) t = Math.Max(wa.Top, Math.Min(btm - mh, b0.Top + dy));
+            if (dir.Contains("s")) btm = Math.Min(wa.Bottom, Math.Max(t + mh, b0.Bottom + dy));
             var nb = Rectangle.FromLTRB(l, t, r, btm);
             if (nb != Bounds) Bounds = nb;
         };
@@ -346,6 +380,15 @@ class ChatPanel : Form {
     }
     public void PostTheme() { Post("theme\n" + (Settings.Bool("Light", false) ? "light" : "dark")); }
     public const int ChatW = 460, ChatH = 660;          // taille minimale (et par défaut) de la discussion
+    // petit écran (portable, zoom Windows 125-150 %) : la discussion ne doit jamais dépasser la zone utile, sinon la saisie passe sous la barre des tâches
+    public float Sc = 1f;                               // zoom Windows de l écran de la discussion (1,25 = 125 %)
+    public void Fit(Rectangle wa) {
+        Sc = Util.ScaleOf(wa);
+        int mw = Math.Min((int)(ChatW * Sc), wa.Width - 16), mh = Math.Min((int)(ChatH * Sc), wa.Height - 16);
+        if (MinimumSize.Width != mw || MinimumSize.Height != mh) MinimumSize = new Size(mw, mh);
+        var s = SavedSize(); var want = new Size(Math.Min((int)(s.Width * Sc), wa.Width - 16), Math.Min((int)(s.Height * Sc), wa.Height - 16));
+        if (Size != want) Size = want;
+    }
     // ---- déplacer la fenêtre par son en-tête ; elle reprend sa place à la fermeture, sauf si elle est épinglée ----
     [DllImport("user32.dll")] static extern bool ReleaseCapture();
     [DllImport("user32.dll")] static extern IntPtr SendMessage(IntPtr h, int msg, IntPtr w, IntPtr l);
@@ -377,8 +420,8 @@ class ChatPanel : Form {
         var wa = Screen.FromControl(this).WorkingArea;
         int mid = Top + Height / 2;
         tabL.Open = c; tabR.Open = u;
-        tabL.Place(new Point(Left - 30, mid - 24), redraw);
-        tabR.Place(new Point(Right + 4, mid - 24), redraw);
+        tabL.Place(new Point(Left - (int)(30 * Sc), mid - (int)(24 * Sc)), redraw);
+        tabR.Place(new Point(Right + (int)(4 * Sc), mid - (int)(24 * Sc)), redraw);
         if (c) calW.Place(calW.Moved ? calW.Location : new Point(Math.Max(wa.Left, tabL.Left - 6 - calW.Width), Math.Max(wa.Top, Math.Min(Top, wa.Bottom - calW.Height))), redraw); else calW.Hide();
         if (u) upW.Place(upW.Moved ? upW.Location : new Point(Math.Min(wa.Right - upW.Width, tabR.Right + 6), Math.Max(wa.Top, Math.Min(Top, wa.Bottom - upW.Height))), redraw); else upW.Hide();
     }
@@ -442,7 +485,7 @@ class ChatPanel : Form {
             case "pin": Pinned = parts.Length > 1 && parts[1] == "1"; Settings.Set("Pinned", Pinned); break;
             case "sid": owner.SessionId = parts.Length > 1 ? parts[1] : ""; break;
             case "terminal": owner.OpenTerminal(true); break;
-            case "settings": settingsAsked = DateTime.Now; owner.ShowSettings(); break;   // ouverts depuis la discussion : elle reste ouverte
+            case "settings": settingsAsked = DateTime.Now; owner.ShowSettings(parts.Length > 1 && parts[1].Length > 0 ? parts[1] : null); break;   // ouverts depuis la discussion : elle reste ouverte
             case "hide": Hide(); break;
             case "title": {                                                    // title\n<id conversation>\n<extrait>
                 int i1 = m.IndexOf('\n'), i2 = i1 < 0 ? -1 : m.IndexOf('\n', i1 + 1);
@@ -472,7 +515,7 @@ class ChatPanel : Form {
                 break;
             case "quotaprobe": ProbeQuota(false); break;
             case "folder": PickFolder(); break;
-            case "projects": Post("projects\n" + new JavaScriptSerializer().Serialize(ListProjects())); break;
+            case "projects": PostProjects(); break;
             case "mode":                                   // mode\n<flash 0/1>\n<projet>
                 Flash = parts.Length > 1 && parts[1] == "1";
                 Project = parts.Length > 2 ? SafeName(parts[2]) : "";
@@ -483,10 +526,11 @@ class ChatPanel : Form {
                 string d = Path.Combine(ProjectsDir, n);
                 try {
                     Directory.CreateDirectory(d);
+                    SetArchived(n, false);
                     if (!File.Exists(Path.Combine(d, "NOTES.md")))
                         File.WriteAllText(Path.Combine(d, "NOTES.md"), "# " + n + "\n\n## État\n- Créé le " + DateTime.Today.ToString("yyyy-MM-dd") + " depuis Bébène.\n", new UTF8Encoding(false));
                 } catch (Exception ex) { Program.Log("Projet", ex.ToString()); break; }
-                Post("projects\n" + new JavaScriptSerializer().Serialize(ListProjects()));
+                PostProjects();
                 Post("project\n" + n);
                 break;
             }
@@ -494,7 +538,8 @@ class ChatPanel : Form {
                 string n = SafeName(parts.Length > 1 ? parts[1] : "");
                 if (n.Length == 0 || n == "claude-companion") break;
                 try { Directory.CreateDirectory(Path.Combine(ProjectsDir, n)); } catch (Exception ex) { Program.Log("Projet", ex.Message); }
-                Post("projects\n" + new JavaScriptSerializer().Serialize(ListProjects()));
+                SetArchived(n, false);                                          // on y retravaille : il revient dans le menu
+                PostProjects();
                 break;
             }
             case "forget": Forget(parts.Length > 1 ? parts[1] : ""); break;

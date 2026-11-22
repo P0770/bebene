@@ -85,7 +85,7 @@ Des **messages texte** via `chrome.webview.postMessage` : un mot-clé, un saut d
 | `send\n<auto>\n<sid>\n<outils>\n<texte>` | lancer Claude |
 | `stop` | arrêter Claude |
 | `mode\n<flash>\n<projet>` | mode flash / projet courant |
-| `projects`, `newproject\n<nom>`, `folder` | projets ClaudeHub, dossier de travail |
+| `projects`, `newproject\n<nom>`, `folder` | projets ClaudeHub (réponse `projects\n{all, arch}`), dossier de travail |
 | `sid\n<id>`, `forget\n<id>` | session courante, effacement d'une conversation flash |
 | `pin\n0/1`, `hide`, `drag`, `settings`, `terminal` | fenêtre et navigation |
 | `quotaprobe` | redemander le quota (fenêtre de 5 h écoulée) |
@@ -135,6 +135,8 @@ Le texte est envoyé sur l'entrée standard, précédé de `[Fenêtre active : �
 
 ### Conversations
 Stockées dans le `localStorage` de la WebView (au plus 40, les anciennes raccourcies). Un **projet** fait travailler Claude dans `ClaudeHub/projets/<nom>/`, ce qui déclenche l'archivage automatique de ClaudeHub. **Sous-groupes** : `conv.group` + liste `localStorage.groups` par projet (`""` = sans projet), repliés dans `gfold`. Créer (＋ Groupe), renommer (✎), supprimer (× en 2 clics : les conversations restent, sans groupe), déplacer (⇢ ou clic droit → liste Sous-groupe / Projet). Le mode **Flash** n'enregistre rien et supprime la transcription `~/.claude/projects/**/<session>.jsonl`.
+
+**Palette** (`#ddP` / `#pal`, Ctrl+K) : un seul panneau pour les projets et l'historique. Recherche `#mSearch` (noms de projets + contenu des conversations), tuiles `.ptile` (couleur `hueOf(nom)`), conversations `#mConvs`. `palScope` = projet affiché sans y être passé (survol d'une tuile pendant un glisser) ; `menuScope()` le suit. **Glisser-déposer** en pointer events (pas HTML5 DnD) : `dropTarget()` (tuile, `.mgrp[data-g]`, `[data-dz=loose]`, `[data-dz=new]`, autre conversation), `placeIn()` + toast Annuler. **Projets archivés** : `projets/.archives` (un nom par ligne, suit OneDrive), `ChatPanel.SetArchived` ; cachés des tuiles, désarchivés par `newproject` / `ensureproject` ; gérés dans Réglages › Mes projets (`projlist`, `projarch\n<nom>\n1|0`).
 
 ### Quota
 - Pendant une réponse : lu dans l'événement `rate_limit_event` du flux.

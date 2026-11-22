@@ -66,11 +66,17 @@ Clic sur le chat, **Alt + Espace** ou **Ctrl + Alt + C** (raccourcis modifiables
   <img src="docs/images/discussion-conv.png" width="300" alt="Une conversation">
 </p>
 
+**Nouveautés 1.52 → 1.54**
+- **Palette projets et conversations** (**Ctrl + K**) : un seul panneau remplace les menus # et Historique : recherche, projets en tuiles colorées, conversations du projet choisi, tout au clavier.
+- **Ranger en glissant** : attrape une conversation et dépose-la sur un sous-groupe, « Sans groupe », un autre projet, ou sur « ＋ Dépose ici » pour créer un sous-groupe.
+- **Archiver un projet** (Réglages › Mes projets) : un projet terminé disparaît du menu, sans rien effacer ; « Remettre dans le menu » le fait revenir.
+- **Net sur tous les écrans** : Bébène suit le zoom Windows (125 %, 150 %…) de chaque écran ; la discussion s'adapte aux petits écrans.
+
 **Nouveautés 1.51**
 - **Coller une image** : Ctrl+V d'une capture d'écran (Win+Maj+S) ou d'une image copiée ; Claude la voit avec ton message.
 - **Demander sur la sélection** : sélectionne du texte dans n'importe quelle appli, puis **Ctrl + Alt + Q** : Bébène s'ouvre avec ce texte et propose Expliquer, Traduire, Corriger ou Résumer.
 - **Recherche** dans l'historique : titres et contenu de toutes les conversations, sans tenir compte des accents.
-- **Historique sans limite** : une conversation = un fichier (`%LOCALAPPDATA%ClaudeCompanionnversations`), plus de limite à 40.
+- **Historique sans limite** : une conversation = un fichier (`%LOCALAPPDATA%\ClaudeCompanion\conversations`), plus de limite à 40.
 
 **L'en-tête**
 - l'avatar de Bébène (il pulse quand Claude réfléchit), son nom et en dessous le titre de la conversation ;
@@ -82,16 +88,23 @@ Clic sur le chat, **Alt + Espace** ou **Ctrl + Alt + C** (raccourcis modifiables
 | Élément | Rôle |
 |---|---|
 | **Conversation \| ⚡ Flash** | interrupteur. *Conversation* = enregistrée dans l'historique. *Flash* = question rapide qui n'est enregistrée **nulle part** (ni historique, ni archive, et la transcription de Claude Code est effacée). |
-| **# Projet ▾** | travailler dans un projet ClaudeHub : Claude travaille dans `ClaudeHub/projets/<nom>/` et la conversation y est **archivée automatiquement**. On peut créer un projet directement depuis le menu, ou choisir n'importe quel autre dossier. |
-| **🕘 Historique ▾** | l'historique **du contexte en cours** : dans un projet, uniquement les conversations de ce projet ; sans projet, uniquement les conversations sans projet. × pour en supprimer une, « Continuer dans le terminal » pour reprendre la conversation dans Claude Code. |
+| **● projet · Ctrl K ▾** | ouvre la **palette** (voir ci-dessous). La pastille a la couleur du projet en cours. |
+
+**La palette** (clic sur le bouton du projet ou **Ctrl + K**)
+- **Recherche** en haut : filtre les projets par leur nom et cherche dans le titre et le contenu de toutes les conversations.
+- **Projets en tuiles** : chaque projet a sa couleur, son nombre de conversations, et ⏳ si une tâche y travaille. Un clic fait passer dans le projet : Claude travaille dans `ClaudeHub/projets/<nom>/` et la conversation y est **archivée automatiquement**. « ＋ Nouveau » crée un projet.
+- **Conversations du projet** : rangées en sous-groupes (＋ Groupe, ✎ renommer, × supprimer), avec « ＋ Nouvelle conversation » en tête.
+- **Glisser pour ranger** : dépose une conversation sur un sous-groupe, sur « Sans groupe », sur la zone « ＋ Dépose ici » (nouveau sous-groupe) ou sur la tuile d'un autre projet. Reste 0,6 s sur une tuile pour ouvrir ce projet et viser un de ses sous-groupes. « Annuler » dans la notification remet tout comme avant.
+- **Au clavier** : ↑ ↓ (← → dans les tuiles), Entrée pour ouvrir, Échap pour fermer.
+- **En bas** : 📂 autre dossier, 🗄 projets archivés, « Terminal › » pour reprendre la conversation dans Claude Code.
 
 <p align="center">
-  <img src="docs/images/discussion-projets.png" width="300" alt="Menu des projets">
+  <img src="docs/images/palette.png" width="320" alt="La palette : projets en tuiles et conversations">
   &nbsp;
-  <img src="docs/images/discussion-hist-projet.png" width="300" alt="Historique d'un projet">
+  <img src="docs/images/palette-glisser.png" width="320" alt="Glisser une conversation dans un sous-groupe">
 </p>
 
-> Un **projet** rassemble toutes les conversations d'un même sujet. Le menu **#** affiche combien de conversations chaque projet contient ; une fois dans un projet, l'historique ne montre que les siennes.
+> Un **projet** rassemble toutes les conversations d'un même sujet. Un projet terminé s'**archive** dans Réglages › Mes projets : il quitte la palette mais garde son dossier, ses notes et ses conversations, et reste trouvable par la recherche.
 
 **Le mode Flash** change la couleur de la zone de saisie (pointillés dorés) pour qu'on ne l'oublie pas :
 
@@ -256,7 +269,7 @@ cd bebene
 | Ouvrir / fermer la discussion | clic sur le chat, **Alt + Espace**, **Ctrl + Alt + C** (modifiables), Échap pour fermer |
 | Nouvelle conversation | ✏️ dans l'en-tête, ou clic droit sur l'icône → *Nouvelle conversation* |
 | Question rapide sans trace | interrupteur **⚡ Flash** |
-| Travailler sur un projet | **# Projet ▾** → choisir ou créer |
+| Travailler sur un projet | **Ctrl + K** → tuile du projet, ou « ＋ Nouveau » |
 | Reprendre une ancienne conversation | **🕘 ▾** |
 | Gros travail | *Continuer dans le terminal* (même conversation dans Claude Code) |
 | Joindre un fichier | glisser-déposer sur la discussion ou sur le chat |

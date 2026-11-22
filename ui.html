@@ -320,7 +320,6 @@ body.flash #sub { color: #f2c66d; }
 .ddbtn .hash { color: var(--accent-2); font-weight: 700; }
 .ddbtn.icon-only { padding: 6px 9px 6px 10px; gap: 4px; }
 .dd.open .chev { transform: rotate(180deg); }
-body.flash #ddP { opacity: .35; pointer-events: none; }
 .ddmenu { position: absolute; top: calc(100% + 6px); left: 0; width: 280px; max-height: 400px; overflow-y: auto; z-index: 30; padding: 8px;
   box-shadow: 0 18px 40px rgba(0,0,0,.5); opacity: 0; transform: translateY(-6px); pointer-events: none; transition: opacity .16s, transform .16s; }
 .ddmenu.right, #ddP .ddmenu { left: auto; right: 0; } .ddmenu.right { width: 310px; }
@@ -438,8 +437,6 @@ html.light .updot { border-color: #fff; }
 .ask .hint { color: var(--muted); font-size: 11.5px; margin-top: 6px; }
 .approve .all { color: var(--accent-2); }
 .mitem .cst { margin-right: 6px; }
-#ddHist { position: relative; }
-#ddHist.attn::after { content: ""; position: absolute; top: 3px; right: 3px; width: 8px; height: 8px; border-radius: 50%; background: var(--accent); box-shadow: 0 0 6px rgba(240,160,80,.8); }
 /* poignées de redimensionnement (invisibles, sur les bords) */
 .rsz { position: fixed; z-index: 90; }
 .rsz-n, .rsz-s { left: 10px; right: 10px; height: 5px; cursor: ns-resize; } .rsz-n { top: 0; } .rsz-s { bottom: 0; }
@@ -567,6 +564,80 @@ html.light .pause .pk { color: #8a7a52; }
 .mnone.gin { padding-left: 26px; font-size: 12px; }
 input.ren, input.gren { flex: 1; min-width: 0; font: inherit; font-size: 13px; font-weight: 400; padding: 4px 7px; border-radius: 7px; border: 1px solid var(--accent); background: var(--raised); color: var(--text); outline: none; }
 #sub { cursor: text; }
+/* ---- palette unique (Ctrl+K) : remplace les menus # Projet et Historique ---- */
+#ddP { position: static; flex: 1; }
+.modebar { position: relative; }
+#ddProj { gap: 8px; }
+#ddProj .kk { opacity: .55; }
+#ddProj.attn { position: relative; }
+#ddProj.attn::after { content: ""; position: absolute; top: 2px; right: 4px; width: 8px; height: 8px; border-radius: 50%; background: var(--accent); box-shadow: 0 0 6px rgba(240,160,80,.8); }
+.kk { font: 10.5px "Segoe UI", sans-serif; color: var(--muted); background: rgba(var(--ov),.06); border: 1px solid rgba(var(--ov),.09); border-bottom-width: 2px; border-radius: 6px; padding: 0 6px; flex: none; }
+.pdot { width: 10px; height: 10px; border-radius: 3.5px; flex: none; background: hsl(var(--h, 20) 62% 62%); box-shadow: 0 0 8px hsla(var(--h, 20), 62%, 62%, .5); }
+#projDot.none { background: none; box-shadow: none; border: 1.5px solid var(--muted); opacity: .6; }
+#ddP .ddmenu.pal { left: 12px; right: 12px; width: auto; top: calc(100% - 4px); max-height: calc(100vh - 140px); padding: 0; overflow: hidden; display: flex; flex-direction: column;
+  border: 1px solid rgba(235,154,120,.18); box-shadow: 0 24px 60px rgba(0,0,0,.55), 0 0 0 1px rgba(0,0,0,.2); transform: translateY(-8px) scale(.985); transform-origin: top center; transition: opacity .18s, transform .22s cubic-bezier(.2,.9,.3,1.2); }
+#ddP.open .ddmenu.pal { transform: none; }
+#ddP .ddmenu.pal { background: linear-gradient(170deg, rgba(34,27,30,.995), rgba(22,20,25,.995)); }
+html.light #ddP .ddmenu.pal { background: linear-gradient(170deg, rgba(255,251,248,.997), rgba(246,241,237,.997)); }
+.ptile.kb { outline: 2px solid hsla(var(--h), 70%, 65%, .9); outline-offset: 1px; }
+.ptile.none.kb { outline-color: rgba(235,154,120,.8); }
+.ptile[hidden] { display: none; }
+.psearch { display: flex; align-items: center; gap: 9px; padding: 12px 14px; border-bottom: 1px solid rgba(var(--ov),.07); color: var(--muted); }
+.psearch input { flex: 1; min-width: 0; font: inherit; font-size: 14px; color: var(--text); background: none; border: 0; outline: none; user-select: text; }
+.psearch input::-webkit-search-cancel-button { display: none; }
+.pbody { flex: 1; min-height: 0; overflow-y: auto; padding: 4px 10px 8px; }
+.psec { display: flex; align-items: center; justify-content: space-between; font-size: 10.5px; font-weight: 600; letter-spacing: .8px; text-transform: uppercase; color: #77727d; padding: 10px 4px 6px; }
+.pbody .mnewp { margin-bottom: 6px; }
+#pNewBox[hidden] { display: none; }
+.ptiles { display: grid; grid-template-columns: repeat(auto-fill, minmax(112px, 1fr)); gap: 6px; max-height: 172px; overflow-y: auto; padding: 1px; }
+.pgrid { display: contents; }
+.ptile { --h: 20; position: relative; display: flex; flex-direction: column; align-items: flex-start; gap: 2px; min-width: 0; text-align: left; font: inherit; color: var(--text); cursor: pointer;
+  padding: 9px 10px 8px; border-radius: 12px; border: 1px solid rgba(var(--ov),.07);
+  background: linear-gradient(160deg, hsla(var(--h), 60%, 60%, .13), hsla(var(--h), 60%, 50%, .03) 70%); transition: transform .14s, border-color .14s, background .14s; }
+.ptile:hover, .ptile.kb { transform: translateY(-1px); border-color: hsla(var(--h), 65%, 65%, .55); background: linear-gradient(160deg, hsla(var(--h), 60%, 60%, .22), hsla(var(--h), 60%, 50%, .06) 70%); }
+.ptile.on { border-color: hsla(var(--h), 70%, 65%, .8); box-shadow: 0 0 0 1px hsla(var(--h), 70%, 65%, .35) inset, 0 6px 18px hsla(var(--h), 60%, 40%, .25); }
+.ptile .pi { width: 22px; height: 22px; border-radius: 7px; display: grid; place-items: center; font-size: 12px; font-weight: 700; color: #fff; margin-bottom: 4px;
+  background: linear-gradient(140deg, hsl(var(--h) 62% 62%), hsl(var(--h) 55% 46%)); box-shadow: 0 3px 10px hsla(var(--h), 60%, 45%, .4); }
+.ptile .pn { font-size: 12.5px; font-weight: 600; max-width: 100%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ptile small { font-size: 11px; color: var(--muted); }
+.ptile .pst { position: absolute; top: 7px; right: 8px; font-size: 11px; }
+.ptile.arch { opacity: .6; } .ptile.arch .pi { filter: grayscale(.7); }
+.ptile.none { background: rgba(var(--ov),.035); } .ptile.none .pi { background: rgba(var(--ov),.1); color: var(--muted); box-shadow: none; }
+.ptile.none:hover, .ptile.none.kb, .ptile.none.on { border-color: rgba(235,154,120,.45); background: rgba(var(--ov),.06); }
+.pbody .mitem.kb { background: rgba(235,154,120,.14); box-shadow: inset 2px 0 0 var(--accent); }
+.mitem.start { color: var(--accent-2); font-weight: 600; }
+.mitem.start .ic { font-size: 15px; }
+.pfoot { display: flex; align-items: center; gap: 4px; padding: 7px 10px; border-top: 1px solid rgba(var(--ov),.07); background: rgba(var(--sunk),calc(.12 * var(--sk))); }
+.plink { font: inherit; font-size: 12px; color: var(--muted); background: none; border: 0; border-radius: 8px; padding: 4px 8px; cursor: pointer; white-space: nowrap; }
+.plink:hover { color: var(--text); background: rgba(var(--ov),.06); }
+.pkeys { margin-left: auto; display: flex; gap: 3px; opacity: .6; }
+.pkeys kbd { font-size: 10px; }
+html.light .ptile .pn { color: var(--text); }
+html.light .psec { color: #8a8290; }
+/* ---- glisser-déposer des conversations ---- */
+.mitem.conv { position: relative; }
+.mitem .grip { flex: none; width: 10px; margin: 0 -4px 0 -4px; color: var(--muted); font-size: 12px; opacity: 0; cursor: grab; transition: opacity .12s; }
+.mitem.conv:hover .grip { opacity: .7; }
+body.dragging, body.dragging * { cursor: grabbing !important; }
+body.dragging .mitem.conv:hover { background: none; }
+body.dragging .mitem .rn, body.dragging .mitem .del, body.dragging .mgrp .rn, body.dragging .mgrp .del { visibility: hidden; }
+.mitem.dsrc { opacity: .35; outline: 1px dashed rgba(235,154,120,.5); outline-offset: -1px; }
+#dghost { position: fixed; left: 0; top: 0; z-index: 100; pointer-events: none; max-width: 240px; padding: 7px 11px; border-radius: 11px;
+  background: rgba(var(--pop),.97); border: 1px solid rgba(var(--ov),.14); box-shadow: 0 12px 30px rgba(0,0,0,.45); transform-origin: 0 0; rotate: -2deg; }
+#dghost b { display: block; font-size: 12.5px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+#dghost small { display: block; font-size: 11px; color: var(--muted); }
+#dghost.ok { border-color: rgba(235,154,120,.6); }
+#dghost.ok small { color: var(--accent-2); }
+.dz { margin: 4px 0 6px; padding: 9px 10px; border: 1.5px dashed rgba(235,154,120,.35); border-radius: 12px; font-size: 12px; color: var(--muted); text-align: center; transition: background .12s, border-color .12s, color .12s; }
+.mgrp.dov, .dz.dov, .mgrp.loose.dov { background: rgba(235,154,120,.16) !important; color: var(--accent-2); box-shadow: inset 0 0 0 1.5px rgba(235,154,120,.65); }
+body.dragging .mgrp.loose { padding: 8px; border-radius: 8px; }
+.ptile.dov { transform: translateY(-2px) scale(1.03); border-color: hsla(var(--h), 70%, 65%, .95); }
+.ptile.none.dov { border-color: rgba(235,154,120,.8); }
+.ptile.spring::after { content: ""; position: absolute; left: 8px; right: 8px; bottom: 4px; height: 2px; border-radius: 2px; background: hsl(var(--h) 70% 65%); transform-origin: left; animation: spring .6s linear forwards; }
+.ptile.none.spring::after { background: var(--accent-2); }
+@keyframes spring { from { transform: scaleX(0); } to { transform: scaleX(1); } }
+.ptile.view:not(.on) { border-style: dashed; border-color: hsla(var(--h), 70%, 65%, .7); }
+.ptile.none.view:not(.on) { border-color: rgba(235,154,120,.6); }
 </style>
 </head>
 <body>
@@ -626,25 +697,33 @@ input.ren, input.gren { flex: 1; min-width: 0; font: inherit; font-size: 13px; f
     <button id="mFlash" title="Rien n'est enregistré : ni historique, ni archive">
       <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M13 2L4 14h7l-1 8 9-12h-7l1-8z"/></svg>Flash</button>
   </div>
+  <!-- palette unique (Ctrl+K) : recherche, projets en tuiles, conversations du projet -->
   <div class="dd" id="ddP">
-    <button class="ddbtn" id="ddProj" title="Travailler dans un projet"><span class="hash">#</span><span id="projLabel">Aucun projet</span>
+    <button class="ddbtn" id="ddProj" title="Projets et conversations (Ctrl+K)"><span class="pdot" id="projDot"></span><span id="projLabel">Aucun projet</span>
+      <kbd class="kk">Ctrl K</kbd>
       <svg class="chev" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg></button>
-    <div class="ddmenu">
-      <button class="mitem" id="mNoProj"><span class="ic">∅</span><span class="tx">Aucun projet</span></button>
-      <div id="mProjects"></div>
-      <div class="mnewp"><input id="mProjName" placeholder="Nouveau projet…" maxlength="40"><button id="mProjAdd" title="Créer le projet">＋</button></div>
-      <button class="mlink" id="mFolder">Travailler dans un autre dossier…</button>
-    </div>
-  </div>
-  <div class="dd" id="ddH">
-    <button class="ddbtn icon-only" id="ddHist" title="Historique des conversations">
-      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5"/><path d="M12 7v5l3 2"/></svg>
-      <svg class="chev" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg></button>
-    <div class="ddmenu right">
-      <div class="msec mhead"><span id="mConvTitle">Conversations récentes</span><button class="mgadd" id="mGroupAdd" title="Créer un sous-groupe pour ranger les conversations">＋ Groupe</button></div>
-      <div class="msearch"><input id="mSearch" type="search" placeholder="🔎 Rechercher dans les conversations…" autocomplete="off"></div>
-      <div id="mConvs"></div>
-      <button class="mlink" id="term">Continuer cette conversation dans le terminal ›</button>
+    <div class="ddmenu pal" id="pal">
+      <div class="psearch">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>
+        <input id="mSearch" type="search" placeholder="Chercher un projet ou une conversation…" autocomplete="off">
+        <kbd class="kk">Échap</kbd>
+      </div>
+      <div class="pbody">
+        <div class="psec"><span>Projets</span><button class="mgadd" id="pNew" title="Créer un projet">＋ Nouveau</button></div>
+        <div class="mnewp" id="pNewBox" hidden><input id="mProjName" placeholder="Nom du nouveau projet…" maxlength="40"><button id="mProjAdd" title="Créer le projet">＋</button></div>
+        <div class="ptiles">
+          <button class="ptile none" id="mNoProj" title="Conversations sans projet"><span class="pi">∅</span><span class="pn">Sans projet</span><small id="noProjCnt"></small></button>
+          <div id="mProjects" class="pgrid"></div>
+        </div>
+        <div class="psec mhead"><span id="mConvTitle">Conversations récentes</span><button class="mgadd" id="mGroupAdd" title="Créer un sous-groupe pour ranger les conversations">＋ Groupe</button></div>
+        <div id="mConvs"></div>
+      </div>
+      <div class="pfoot">
+        <button class="plink" id="mFolder" title="Travailler dans un autre dossier">📂 Autre dossier…</button>
+        <button class="plink" id="pArchived" title="Gérer les projets archivés dans les réglages" hidden></button>
+        <button class="plink" id="term" title="Continuer cette conversation dans le terminal">Terminal ›</button>
+        <span class="pkeys"><kbd>↑↓</kbd> <kbd>↵</kbd></span>
+      </div>
     </div>
   </div>
 </div>
@@ -758,6 +837,8 @@ let ptrDown = false, menuDirty = false;   // bouton de souris enfoncé ; menu à
 
 let conv = convs.find(c => c.id === store.get('cur', '')) || null;
 let flash = false, project = conv ? conv.project || '' : store.get('project', ''), projects = [];
+let ARCH = new Set();                                                 // projets archivés (cachés de la palette, gérés dans les réglages)
+const hueOf = s => { let h = 0; for (const c of String(s)) h = (h * 31 + c.charCodeAt(0)) % 360; return h; };   // couleur stable par projet
 let granted = new Set(conv && conv.granted ? conv.granted : []);   // actions autorisées pour la conversation en cours
 let lastCtx = 0, compacting = false, compactNote = null;
 let turn = null, quotaStop = null;   // tâche en cours : demande, fichiers modifiés, étapes (résumé si pause de quota)              // compactage (déclaré avant le premier refresh())
@@ -1279,7 +1360,8 @@ function applyMode() {
   post('mode\n' + (flash ? 1 : 0) + '\n' + project);
   document.body.classList.toggle('flash', flash);
   $('#mNormal').classList.toggle('on', !flash); $('#mFlash').classList.toggle('on', flash);
-  $('#projLabel').textContent = project || 'Aucun projet'; $('#ddProj').classList.toggle('has', !!project);
+  $('#projLabel').textContent = flash ? 'Projets et historique' : project || 'Sans projet'; $('#ddProj').classList.toggle('has', !!project && !flash);
+  $('#projDot').classList.toggle('none', !project || flash); $('#projDot').style.setProperty('--h', hueOf(project));
   setSub();
   input.placeholder = flash ? 'Question rapide… (non enregistrée)' : 'Écris à ' + ($('#name').textContent || 'Bébène') + '…';
   renderMenu();
@@ -1311,7 +1393,9 @@ function groupsOf(scope) {
   convs.forEach(c => { if ((c.project || '') === scope && c.group && !l.includes(c.group)) l.push(c.group); });
   return l;
 }
-function menuScope() { return flash ? '' : project; }
+// palScope : projet affiché dans la palette sans y être passé (survol d'une tuile pendant un glisser) ; null = le projet en cours
+let palScope = null, drag = null;
+function menuScope() { return palScope !== null ? palScope : flash ? '' : project; }
 // Le menu n'est pas redessiné pendant un clic (bouton enfoncé) ni pendant une saisie dedans : un élément remplacé entre
 // l'appui et le relâchement perd son clic (ex. une tâche en fond qui avance pendant qu'on clique dans l'historique).
 // ---- recherche dans l'historique : sans accents ni majuscules ; texte de chaque conversation gardé en cache tant qu'elle ne change pas ----
@@ -1338,26 +1422,34 @@ function renderMenu() {
 }
 function renderMenuNow() {
   menuDirty = false;
-  setHTML($('#mProjects'), projects.length ? projects.map(p =>
-    '<button class="mitem' + (p === project && !flash ? ' on' : '') + '" data-p="' + esc(p) + '"><span class="ic">#</span><span class="tx">' + esc(p) + '</span>' + (n => n ? '<small class="cnt">' + n + '</small>' : '')(convs.filter(c => c.project === p).length) + '</button>').join('')
-    : '<div class="mnone">Aucun projet pour l\'instant.</div>');
-  $('#mNoProj').classList.toggle('on', !project && !flash);
   // historique du contexte courant : dans un projet = ses conversations seulement ; sans projet = les conversations sans projet
   // état de chaque conversation : ⏳ travaille, 🐾 a besoin de toi, ❓ question, 🔐 accord, ⏸ en pause (quota), ✅ finie en fond (pas encore relue)
   const ST = { hand: '🐾', ask: '❓', perm: '🔐', pause: '⏸', done: '✅' };
   const stOf = c => { const vw = viewOf(c); return (c === conv && busy) || (vw && vw.busy) ? '⏳' : ST[c.attn] || ''; };
   // les tâches en cours ou qui t'attendent apparaissent toujours, quel que soit le projet
   const scope = menuScope(), mine = convs.filter(c => (c.project || '') === scope || stOf(c));
-  $('#ddHist').classList.toggle('attn', convs.some(c => c !== conv && stOf(c)));   // une tâche en fond travaille ou t'attend
+  $('#ddProj').classList.toggle('attn', convs.some(c => c !== conv && stOf(c)));   // une tâche en fond travaille ou t'attend
+  // tuiles des projets : archivés cachés (sauf celui en cours) ; en recherche, tous ceux dont le nom correspond (archivés compris)
+  const pq = fold($('#mSearch').value.trim()), cnt = p => convs.filter(c => (c.project || '') === p).length;
+  const tiles = projects.filter(p => pq ? fold(p).includes(pq) : !ARCH.has(p) || p === project);
+  const pst = p => convs.some(c => (c.project || '') === p && stOf(c) === '⏳') ? '⏳' : convs.some(c => (c.project || '') === p && c !== conv && stOf(c)) ? '●' : '';
+  setHTML($('#mProjects'), tiles.map(p => '<button class="ptile' + (p === project && !flash ? ' on' : '') + (palScope === p ? ' view' : '') + (ARCH.has(p) ? ' arch' : '') + '" data-p="' + esc(p) + '" style="--h:' + hueOf(p) + '" title="' + esc(p) + (ARCH.has(p) ? ' (archivé)' : '') + '">'
+    + '<span class="pi">' + esc(p.charAt(0).toUpperCase()) + '</span><span class="pn">' + esc(p) + '</span>'
+    + '<small>' + (ARCH.has(p) ? '🗄 archivé · ' : '') + (n => n ? n + ' conv.' : 'vide')(cnt(p)) + '</small>'
+    + (pst(p) ? '<span class="pst">' + pst(p) + '</span>' : '') + '</button>').join(''));
+  $('#mNoProj').hidden = !!pq && !fold('sans projet aucun').includes(pq);
+  $('#mNoProj').classList.toggle('on', !project && !flash);
+  $('#mNoProj').classList.toggle('view', palScope === '');
+  $('#noProjCnt').textContent = (n => n ? n + ' conv.' : '')(cnt(''));
+  const na = ARCH.size; $('#pArchived').hidden = !na; $('#pArchived').textContent = '🗄 ' + na + ' archivé' + (na > 1 ? 's' : '');
   $('#mConvTitle').textContent = scope ? 'Conversations · ' + scope : 'Conversations sans projet';
   const item = (c, ing, snip) => '<div class="mitem conv' + (ing ? ' ing' : '') + (conv && c.id === conv.id ? ' on' : '') + '" data-c="' + c.id + '">'
     + (cEdit === c.id
       ? '<input class="ren" data-ren="' + c.id + '" value="' + esc(c.title || '') + '" maxlength="60" placeholder="Titre de la conversation">'
-      : '<span class="tx">' + (stOf(c) ? '<span class="cst">' + stOf(c) + '</span>' : '') + esc(c.title || 'Conversation')
+      : '<span class="grip" title="Glisser pour ranger : sur un sous-groupe, « Sans groupe » ou un projet">⠿</span><span class="tx">' + (stOf(c) ? '<span class="cst">' + stOf(c) + '</span>' : '') + esc(c.title || 'Conversation')
         + '<small>' + ago(c.updated) + (c.project !== undefined && (c.project || '') !== scope ? ' · # ' + esc(c.project || 'sans projet') : '') + '</small>'
         + (snip ? '<small class="snip">' + snip + '</small>' : '') + '</span>'
         + '<button class="rn" data-rn="' + c.id + '" title="Renommer">✎</button>'
-        + '<button class="mv" data-mv="' + c.id + '" title="Déplacer vers un sous-groupe ou un projet…">⇢</button>'
         + '<button class="del' + (convArm === c.id ? ' arm' : '') + '" data-del="' + c.id + '" title="Supprimer">' + (convArm === c.id ? 'Sûr ?' : '×') + '</button>')
     + '</div>';
   const q = fold($('#mSearch').value.trim());
@@ -1379,17 +1471,59 @@ function renderMenuNow() {
           + '<button class="rn" data-grn="1" title="Renommer le sous-groupe">✎</button>'
           + '<button class="del' + (gArm === g ? ' arm' : '') + '" data-gdel="1" title="Supprimer le sous-groupe (ses conversations sont gardées, hors groupe)">' + (gArm === g ? 'Sûr ?' : '×') + '</button>')
       + '</div>';
-    if (open) h += list.length ? list.map(c => item(c, true)).join('') : '<div class="mnone gin">Vide : ⇢ sur une conversation pour l\'y ranger.</div>';
+    if (open) h += list.length ? list.map(c => item(c, true)).join('') : '<div class="mnone gin" data-dzg="' + esc(g) + '">Vide : glisse une conversation ici.</div>';
   });
   const loose = mine.filter(c => !(inScope(c) && c.group && gs.includes(c.group)));
-  if (gs.length && loose.length) h += '<div class="mgrp loose">Sans groupe</div>';
+  if (gs.length && (loose.length || drag)) h += '<div class="mgrp loose" data-dz="loose">Sans groupe</div>';
   h += loose.map(c => item(c, false)).join('');
   if (!mine.length && !gs.length && !h) h = '<div class="mnone">' + (scope ? 'Pas encore de conversation dans ce projet.' : 'Pas encore de conversation.') + '</div>';
+  h = '<div class="mitem start" data-start="1"><span class="ic">＋</span><span class="tx">Nouvelle conversation' + (scope ? ' · ' + esc(scope) : '') + '</span></div>' + h;
+  if (drag) h = '<div class="dz" data-dz="new">＋ Dépose ici pour créer un sous-groupe</div>' + h;
   if (setHTML($('#mConvs'), h)) { const i = $('#mConvs').querySelector('input'); if (i && document.activeElement !== i) { i.focus(); i.select(); } }
   $('#mGroupAdd').hidden = flash;
 }
 // clics dans les menus : un seul gestionnaire par liste (les éléments peuvent être redessinés sans perdre leurs actions)
-$('#mProjects').addEventListener('click', e => { const b = e.target.closest('[data-p]'); if (b) newChat({ project: b.dataset.p }); });
+// tuile = on passe dans ce projet (nouvelle conversation) et la palette reste ouverte sur ses conversations : un clic de plus pour en reprendre une
+function pickProject(p) {
+  if (!flash && p === project) { palScope = null; $('#mSearch').value = ''; renderMenuNow(); return; }
+  newChat({ project: p });
+  $('#mSearch').value = ''; $('#ddP').classList.add('open'); renderMenuNow(); kbSel(null);
+}
+$('#mProjects').addEventListener('click', e => { const b = e.target.closest('[data-p]'); if (b) pickProject(b.dataset.p); });
+$('#pNew').onclick = () => { const b = $('#pNewBox'); b.hidden = !b.hidden; if (!b.hidden) $('#mProjName').focus(); };
+$('#pArchived').onclick = () => { closeMenu(); post('settings\nprojets'); };
+// ---- palette au clavier : Ctrl+K ouvre ; ↑↓ (ou ←→ dans les tuiles) choisit ; Entrée ouvre ; taper filtre ----
+let kbEl = null;
+function kbItems() { return [...document.querySelectorAll('#pal .ptile:not([hidden]), #pal #mConvs [data-c], #pal #mConvs [data-start]')].filter(x => x.offsetParent); }
+function kbSel(el) {
+  if (kbEl) kbEl.classList.remove('kb');
+  kbEl = el; if (el) { el.classList.add('kb'); el.scrollIntoView({ block: 'nearest' }); }
+}
+$('#pal').addEventListener('keydown', e => {
+  if (e.target.matches('.ren, .gren, #mProjName, select')) return;
+  const it = kbItems(); if (!it.length) return;
+  let i = it.indexOf(kbEl && kbEl.isConnected ? kbEl : null);
+  if (e.key === 'ArrowDown' || e.key === 'ArrowUp' || ((e.key === 'ArrowRight' || e.key === 'ArrowLeft') && kbEl && kbEl.classList.contains('ptile'))) {
+    e.preventDefault();
+    const d = e.key === 'ArrowDown' || e.key === 'ArrowRight' ? 1 : -1;
+    if (kbEl && kbEl.classList.contains('ptile') && (e.key === 'ArrowDown' || e.key === 'ArrowUp')) {   // dans la grille : ligne suivante / précédente
+      const tl = it.filter(x => x.classList.contains('ptile')), cols = Math.max(1, Math.round($('.ptiles').clientWidth / (tl[0].offsetWidth + 6))), j = tl.indexOf(kbEl) + d * cols;
+      if (j >= 0 && j < tl.length) return kbSel(tl[j]);
+      if (d > 0) return kbSel(it[tl.length] || kbEl);
+      return kbSel(null), $('#mSearch').focus();
+    }
+    i = i < 0 ? (d > 0 ? 0 : it.length - 1) : i + d;
+    if (i < 0) { kbSel(null); $('#mSearch').focus(); return; }
+    kbSel(it[Math.min(i, it.length - 1)]);
+  } else if (e.key === 'Enter' && !e.target.matches('#mProjName')) {
+    const t = kbEl && kbEl.isConnected ? kbEl : $('#mSearch').value.trim() ? it.find(x => !x.dataset.start) : null;
+    if (t) { e.preventDefault(); t.dataset.c || t.dataset.start ? t.querySelector('.tx').click() : t.click(); }
+  }
+});
+$('#mSearch').addEventListener('input', () => kbSel(null));
+document.addEventListener('keydown', e => {
+  if (e.ctrlKey && !e.altKey && (e.key === 'k' || e.key === 'K')) { e.preventDefault(); if ($('#ddP').classList.contains('open')) closeMenu(); else toggleDd('#ddP'); }
+});
 $('#mGroupAdd').onclick = () => { gEdit = { name: null }; cEdit = ''; renderMenuNow(); };
 function commitEdit(inp, cancel) {
   if (!inp || !inp.isConnected || inp.__done) return; inp.__done = true;
@@ -1437,6 +1571,7 @@ $('#mConvs').addEventListener('click', e => {
     const k = scope + '\n' + g; if (!gFold.delete(k)) gFold.add(k);   // clic sur le nom : déplier / replier
     saveGroups(); renderMenuNow(); return;
   }
+  if (t.closest('[data-start]')) { newChat({ project: menuScope() }); return; }   // ＋ Nouvelle conversation (ferme la palette)
   const row = t.closest('[data-c]'); if (!row) return;
   if (t.dataset.rn) { cEdit = t.dataset.rn; gEdit = null; renderMenuNow(); return; }
   if (t.dataset.mv) { askMove(row, t.dataset.mv); return; }
@@ -1454,6 +1589,87 @@ $('#mConvs').addEventListener('contextmenu', e => {                   // clic dr
   const row = e.target.closest('[data-c]'); if (!row || e.target.closest('input, select')) return;
   e.preventDefault(); e.stopPropagation(); askMove(row, row.dataset.c);
 });
+// ---- glisser-déposer : ranger une conversation dans un sous-groupe, « Sans groupe », un autre projet ou un nouveau sous-groupe ----
+// Cibles : tuile de projet (racine du projet), en-tête de sous-groupe, « Sans groupe », zone « nouveau sous-groupe », ou une autre
+// conversation (= son groupe). Survoler une tuile 0,6 s ouvre ce projet dans la palette pour viser un de ses sous-groupes.
+let dragStart = null, dragEat = false, springT = 0, scrollT = 0;
+function dropTarget(x, y) {
+  const el = document.elementFromPoint(x, y); if (!el || !el.closest('#pal')) return null;
+  const scope = menuScope(), tile = el.closest('.ptile');
+  if (tile) return tile.id === 'mNoProj' ? { p: '', g: '', el: tile, label: '∅ Sans projet' } : { p: tile.dataset.p, g: '', el: tile, label: '# ' + tile.dataset.p };
+  const z = el.closest('[data-dz], .mgrp[data-g], [data-dzg], #mConvs [data-c]'); if (!z) return null;
+  if (z.dataset.dz === 'new') return { p: scope, g: null, el: z, label: '＋ nouveau sous-groupe' };
+  if (z.dataset.dz === 'loose') return { p: scope, g: '', el: z, label: 'Sans groupe' };
+  if (z.dataset.g !== undefined || z.dataset.dzg !== undefined) { const g = z.dataset.g !== undefined ? z.dataset.g : z.dataset.dzg; return { p: scope, g, el: z.dataset.g !== undefined ? z : z.previousElementSibling || z, label: '📂 ' + g }; }
+  const c = convs.find(x => x.id === z.dataset.c); if (!c || c.id === drag.id || (c.project || '') !== scope) return null;
+  const g = c.group && groupsOf(scope).includes(c.group) ? c.group : '';
+  const head = g ? [...document.querySelectorAll('#mConvs .mgrp[data-g]')].find(m => m.dataset.g === g) : document.querySelector('#mConvs [data-dz=loose]');
+  return { p: scope, g, el: head || z, label: g ? '📂 ' + g : 'Sans groupe' };
+}
+function placeIn(id, p, g, quiet) {
+  const c = convs.find(x => x.id === id); if (!c) return;
+  const before = { p: c.project || '', g: c.group || '' };
+  if (g === null) {                                                    // nouveau sous-groupe : nom libre, à renommer tout de suite
+    const l = GROUPS[p] = groupsOf(p); let n = 'Nouveau groupe', i = 2; while (l.includes(n)) n = 'Nouveau groupe ' + i++;
+    l.push(n); saveGroups(); g = n; gEdit = { name: n }; cEdit = '';
+  }
+  if (before.p === p && before.g === g) return;
+  c.group = g; gFold.delete(p + '\n' + g); saveGroups();
+  if (before.p !== p) moveConv(id, p); else persist();
+  renderMenuNow();
+  if (!quiet) toast('Rangée dans ' + esc(g ? '📂 ' + g : p ? '# ' + p : 'Sans projet') + (g && p !== before.p ? ' · # ' + esc(p) : '') + ' · <u>Annuler</u>', () => placeIn(id, before.p, before.g, true));
+}
+function endDrag(drop) {
+  clearTimeout(springT); clearInterval(scrollT);
+  const d = drag; drag = null; dragStart = null;
+  document.body.classList.remove('dragging');
+  document.querySelectorAll('.dov, .spring').forEach(x => x.classList.remove('dov', 'spring'));
+  const gh = $('#dghost'); if (gh) gh.remove();
+  if (d && drop && d.t) placeIn(d.id, d.t.p, d.t.g);
+  else renderMenuNow();
+}
+$('#mConvs').addEventListener('pointerdown', e => {
+  const row = e.target.closest('[data-c]');
+  if (e.button !== 0 || !row || e.target.closest('button, input, select')) return;
+  dragStart = { id: row.dataset.c, x: e.clientX, y: e.clientY };
+});
+document.addEventListener('pointermove', e => {
+  if (!dragStart) return;
+  if (!drag) {
+    if (!e.buttons) { dragStart = null; return; }
+    if (Math.hypot(e.clientX - dragStart.x, e.clientY - dragStart.y) < 6) return;   // petit tremblement = simple clic
+    const c = convs.find(x => x.id === dragStart.id); if (!c) { dragStart = null; return; }
+    drag = { id: c.id, t: null, tile: null };
+    document.body.classList.add('dragging');
+    const gh = document.createElement('div'); gh.id = 'dghost';
+    gh.innerHTML = '<b>' + esc(c.title || 'Conversation') + '</b><small>Dépose sur un sous-groupe ou un projet</small>';
+    document.body.appendChild(gh);
+    renderMenuNow();                                                   // zones « nouveau sous-groupe » et « Sans groupe » apparaissent
+    const src = document.querySelector('#mConvs [data-c="' + c.id + '"]'); if (src) src.classList.add('dsrc');
+    scrollT = setInterval(() => {                                      // près du bord haut / bas de la liste : elle défile
+      const b = $('#pal .pbody'), r = b.getBoundingClientRect(), y = drag && drag.y;
+      if (y < r.top + 28 && y > r.top - 40) b.scrollTop -= 10; else if (y > r.bottom - 28 && y < r.bottom + 40) b.scrollTop += 10;
+    }, 30);
+  }
+  e.preventDefault();
+  drag.y = e.clientY;
+  const gh = $('#dghost'); gh.style.transform = 'translate(' + (e.clientX + 14) + 'px,' + (e.clientY + 10) + 'px)';
+  const t = dropTarget(e.clientX, e.clientY);
+  document.querySelectorAll('.dov').forEach(x => { if (!t || x !== t.el) x.classList.remove('dov'); });
+  if (t) t.el.classList.add('dov');
+  drag.t = t;
+  gh.querySelector('small').textContent = t ? '→ ' + t.label : 'Dépose sur un sous-groupe ou un projet';
+  gh.classList.toggle('ok', !!t);
+  const tile = t && t.el.classList.contains('ptile') ? t.el : null, tp = tile ? t.p : null;
+  if (tp !== drag.tile) {                                             // ressort : on reste sur une tuile → la palette montre ce projet
+    clearTimeout(springT); document.querySelectorAll('.spring').forEach(x => x.classList.remove('spring'));
+    drag.tile = tp;
+    if (tile && tp !== menuScope()) { tile.classList.add('spring'); springT = setTimeout(() => { if (drag && drag.tile === tp) { palScope = tp; renderMenuNow(); const s = document.querySelector('#mConvs [data-c="' + drag.id + '"]'); if (s) s.classList.add('dsrc'); } }, 600); }
+  }
+}, { passive: false });
+document.addEventListener('pointerup', () => { if (drag) { dragEat = true; endDrag(true); setTimeout(() => { dragEat = false; }, 0); } else dragStart = null; });
+document.addEventListener('click', e => { if (dragEat) { e.stopPropagation(); e.preventDefault(); dragEat = false; } }, true);   // le relâchement n'est pas un clic
+document.addEventListener('keydown', e => { if (drag && e.key === 'Escape') { e.stopPropagation(); endDrag(false); } }, true);
 // ---- mises à jour (pastille sur l'avatar, en haut à gauche) ----
 let UPD = null, updStatus = '', updErr = false;
 function renderUpd() {
@@ -1511,11 +1727,10 @@ function renderNotes() {
 $('#notes').onclick = e => { e.stopPropagation(); const p = $('#notepop'), was = p.classList.contains('open'); closePops(); p.classList.toggle('open', !was); renderNotes(); };
 document.addEventListener('click', e => { if (!inside(e, '#notepop, #notes')) $('#notepop').classList.remove('open'); });
 post('notes');
-function closeMenu() { document.querySelectorAll('.dd.open').forEach(d => d.classList.remove('open')); }
-function toggleDd(id) { const d = $(id), was = d.classList.contains('open'); closePops(); if (!was) { if (id === '#ddH') $('#mSearch').value = ''; d.classList.add('open'); post('projects'); renderMenu(); } }
+function closeMenu() { palScope = null; document.querySelectorAll('.dd.open').forEach(d => d.classList.remove('open')); }
+function toggleDd(id) { const d = $(id), was = d.classList.contains('open'); closePops(); if (!was) { $('#mSearch').value = ''; $('#pNewBox').hidden = true; kbSel(null); d.classList.add('open'); post('projects'); renderMenuNow(); setTimeout(() => { if (!editingIn('#mConvs')) $('#mSearch').focus(); }, 30); } }
 $('#mSearch').addEventListener('input', () => renderMenuNow());
 $('#ddProj').onclick = e => { e.stopPropagation(); toggleDd('#ddP'); };
-$('#ddHist').onclick = e => { e.stopPropagation(); toggleDd('#ddH'); };
 document.addEventListener('click', e => { if (!inside(e, '.dd')) closeMenu(); });
 $('#mNormal').onclick = () => { if (flash) newChat({ project: '' }); };
 $('#mFlash').onclick = () => { if (!flash) newChat({ flash: true }); };
@@ -1557,7 +1772,7 @@ $('#sub').title = 'Double-clic pour renommer la conversation';
 $('#sub').ondblclick = () => {
   if (!conv || flash) return;
   cEdit = conv.id; gEdit = null;
-  if (!$('#ddH').classList.contains('open')) toggleDd('#ddH');
+  if (!$('#ddP').classList.contains('open')) toggleDd('#ddP');
   renderMenuNow();
 };
 
@@ -1818,7 +2033,7 @@ window.chrome.webview.addEventListener('message', e => {
   else if (k === 'dash') { const p = v.split('\n'); applyDash(p[0] === '1', p[1] === '1'); }
   else if (k === 'name') { $('#name').textContent = v; document.title = v; applyMode(); }
   else if (k === 'theme') { document.documentElement.classList.toggle('light', v === 'light'); store.set('theme', v); }
-  else if (k === 'projects') { try { projects = JSON.parse(v); } catch { projects = []; } renderMenu(); }
+  else if (k === 'projects') { try { const o = JSON.parse(v); projects = Array.isArray(o) ? o : o.all || []; ARCH = new Set(o.arch || []); } catch { projects = []; } renderMenu(); }
   else if (k === 'project') { newChat({ project: v }); }
   else if (k === 'upd') { try { UPD = JSON.parse(v); } catch { UPD = null; } renderUpd(); }
   else if (k === 'updstatus') { const j = v.indexOf('\n'), st = j < 0 ? v : v.slice(0, j), msg = j < 0 ? '' : v.slice(j + 1);

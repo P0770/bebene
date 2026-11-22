@@ -19,10 +19,10 @@ using Microsoft.Web.WebView2.WinForms;
 
 [assembly: System.Reflection.AssemblyTitle("Bébène")]
 [assembly: System.Reflection.AssemblyProduct("Bébène")]
-[assembly: System.Reflection.AssemblyVersion("1.51.0.0")]
+[assembly: System.Reflection.AssemblyVersion("1.53.0.0")]
 
 static class Program {
-    public const string Version = "1.51";
+    public const string Version = "1.54";
     public static bool OpenSetup;
     public static readonly uint Pid = (uint)Process.GetCurrentProcess().Id;   // identifiant de Bébène (lu une seule fois)   // --setup : ouvrir directement l'assistant d'installation
 
@@ -60,6 +60,7 @@ static class Program {
     }
     [STAThread]
     static void Main(string[] args) {
+        Util.DpiAware();                                   // avant toute fenêtre : sinon Windows étire Bébène (flou à 125 %, 150 %…)
         if (args.Length == 3 && args[0] == "--spelltest") { // test : --spelltest "texte" sortie.txt
             var sb = new StringBuilder();
             foreach (var x in Speller.Check(args[1])) sb.AppendLine(x.Word + " -> " + x.Repl);
@@ -70,7 +71,7 @@ static class Program {
             ChatPanel.NoActivate = true;
             var d = new Companion(false);
             d.Shown += (s, e) => {
-                d.Hide(); d.Panel.Location = new Point(30, 30); d.Panel.Show();
+                d.Hide(); d.Panel.Location = new Point(30, 30); d.Panel.Fit(Screen.FromPoint(new Point(30, 30)).WorkingArea); d.Panel.Show();
                 var t = new System.Windows.Forms.Timer { Interval = 4500 };
                 t.Tick += (s2, e2) => {
                     t.Stop();
@@ -117,6 +118,15 @@ static class Program {
                 File.WriteAllText(args[2], sb.ToString(), Encoding.UTF8);
             } finally { Settings.Set("ManualEvents", bm); Settings.Set("HiddenEvents", bh); }
             return;
+        }
+        if (args.Length == 2 && args[0] == "--fittest") {   // test : la discussion tient dans la zone utile (grand écran, portable, zoom 150 %, très petit)
+            var d = new Companion(false); var sb = new StringBuilder();
+            foreach (var wa in new[] { new Rectangle(0, 0, 1920, 1032), new Rectangle(0, 0, 1366, 728), new Rectangle(0, 0, 1280, 680), new Rectangle(0, 0, 800, 560) }) {
+                d.Panel.Fit(wa);
+                bool ok = d.Panel.Width <= wa.Width - 16 && d.Panel.Height <= wa.Height - 16 && d.Panel.MinimumSize.Height <= wa.Height - 16 && d.Panel.Width >= 300 && d.Panel.Height >= 300;
+                sb.AppendLine(wa.Width + "x" + wa.Height + " -> " + d.Panel.Width + "x" + d.Panel.Height + " min " + d.Panel.MinimumSize.Width + "x" + d.Panel.MinimumSize.Height + (ok ? " ok" : " DEBORDE"));
+            }
+            File.WriteAllText(args[1], sb.ToString(), Encoding.UTF8); return;
         }
         if (args.Length == 2 && args[0] == "--storetest") {   // test : conversations en fichiers + rappels demandés + point du jour (dossiers temporaires)
             string tmp = Path.Combine(Path.GetTempPath(), "BebeneStoreTest-" + Guid.NewGuid().ToString("N").Substring(0, 6));
@@ -267,6 +277,23 @@ static class Settings {
 }
 
 static class Util {
+    // ---- netteté : Bébène gère lui-même le zoom Windows de chaque écran (sinon Windows étire l image = flou) ----
+    [DllImport("user32.dll")] static extern bool SetProcessDpiAwarenessContext(IntPtr v);
+    [DllImport("shcore.dll")] static extern int SetProcessDpiAwareness(int v);
+    [DllImport("user32.dll")] static extern bool SetProcessDPIAware();
+    [DllImport("user32.dll")] static extern IntPtr MonitorFromPoint(Point p, int flags);
+    [DllImport("shcore.dll")] static extern int GetDpiForMonitor(IntPtr mon, int type, out uint x, out uint y);
+    public static void DpiAware() {
+        try { if (SetProcessDpiAwarenessContext((IntPtr)(-4))) return; } catch { }   // Per-Monitor V2 (Windows 10 1703+)
+        try { if (SetProcessDpiAwareness(2) == 0) return; } catch { }
+        try { SetProcessDPIAware(); } catch { }
+    }
+    // échelle de l écran qui contient ce point : 1 = 100 %, 1.25 = 125 %…
+    public static float ScaleAt(Point p) {
+        try { uint x, y; if (GetDpiForMonitor(MonitorFromPoint(p, 2), 0, out x, out y) == 0 && x > 0) return x / 96f; } catch { }
+        return 1f;
+    }
+    public static float ScaleOf(Rectangle r) { return ScaleAt(new Point(r.Left + r.Width / 2, r.Top + r.Height / 2)); }
     public static string Short(string p) { return p.Length > 40 ? "…" + p.Substring(p.Length - 39) : p; }
     // Met un argument entre guillemets selon les règles de la ligne de commande Windows
     public static string Quote(string s) {
@@ -290,6 +317,7 @@ static class Util {
             int v = 3; DwmSetWindowAttribute(h, 38, ref v, 4);   // DWMWA_SYSTEMBACKDROP_TYPE = acrylique
             v = 2; DwmSetWindowAttribute(h, 33, ref v, 4);       // coins arrondis Windows 11 (rayon natif, lissé)
             v = 0x00405A7E; DwmSetWindowAttribute(h, 34, ref v, 4); // un seul contour, orange discret (RGB 126,90,64)
+            v = -2; DwmSetWindowAttribute(h, 35, ref v, 4);         // pas de couleur de barre de titre : sinon DWM peint une bande sombre en haut, derrière la page
         } catch { }
     }
 
@@ -374,6 +402,7 @@ class DarkColors : ProfessionalColorTable {
 }
 
 // ---------- Bébène : chat noir en pixel art, animé de façon procédurale ----------
+#pragma warning disable 0649   // champs de Pose remplis par réflexion (constructeur) : pas de vrai avertissement
 class Pose {
     public float bx, by, bw, bh, ba, hx, hy, ht, eye, eyeShift, haunch;
     public float fhx, fhy, ffx, ffy, ffx2, ffy2, bhx, bhy, fbx, fby, fbx2, fby2;
@@ -382,7 +411,27 @@ class Pose {
     static readonly System.Reflection.FieldInfo[] F = typeof(Pose).GetFields();
     public Pose(params float[] v) { for (int i = 0; i < v.Length && i < F.Length; i++) F[i].SetValue(this, v[i]); }
     public Pose Clone() { return (Pose)MemberwiseClone(); }
-    public void Lerp(Pose o, float k) { foreach (var f in F) { float a = (float)f.GetValue(this); f.SetValue(this, a + ((float)f.GetValue(o) - a) * k); } }
+    // Lerp et Dist tournent à chaque tick (30/s) : compilés une fois en code direct (la réflexion allouait 2 boîtes par champ et par appel)
+    static readonly Action<Pose, Pose, float> lerp; static readonly Func<Pose, Pose, float> dist;
+    static Pose() {
+        var a = System.Linq.Expressions.Expression.Parameter(typeof(Pose), "a");
+        var b = System.Linq.Expressions.Expression.Parameter(typeof(Pose), "b");
+        var k = System.Linq.Expressions.Expression.Parameter(typeof(float), "k");
+        var sets = new List<System.Linq.Expressions.Expression>();
+        System.Linq.Expressions.Expression m = System.Linq.Expressions.Expression.Constant(0f);
+        var max = typeof(Math).GetMethod("Max", new[] { typeof(float), typeof(float) });
+        var abs = typeof(Math).GetMethod("Abs", new[] { typeof(float) });
+        foreach (var f in typeof(Pose).GetFields()) {
+            var fa = System.Linq.Expressions.Expression.Field(a, f); var fb = System.Linq.Expressions.Expression.Field(b, f);
+            var diff = System.Linq.Expressions.Expression.Subtract(fb, fa);
+            sets.Add(System.Linq.Expressions.Expression.Assign(fa, System.Linq.Expressions.Expression.Add(fa, System.Linq.Expressions.Expression.Multiply(diff, k))));
+            m = System.Linq.Expressions.Expression.Call(max, m, System.Linq.Expressions.Expression.Call(abs, diff));
+        }
+        lerp = System.Linq.Expressions.Expression.Lambda<Action<Pose, Pose, float>>(System.Linq.Expressions.Expression.Block(sets), a, b, k).Compile();
+        dist = System.Linq.Expressions.Expression.Lambda<Func<Pose, Pose, float>>(m, a, b).Compile();
+    }
+    public void Lerp(Pose o, float k) { lerp(this, o, k); }
+    public float Dist(Pose o) { return dist(this, o); }
 }
 
 class Companion : Form {
@@ -455,7 +504,7 @@ class Companion : Form {
     bool down, moved, held, falling, run;
     Point grab;
     DateTime lastTouch = DateTime.Now;
-    Pose cur = SIT.Clone();
+    Pose cur = SIT.Clone(), goal = SIT;
     readonly float[] tang = new float[9];
 
     public Companion(bool openSettings) {
@@ -465,6 +514,10 @@ class Companion : Form {
         TopMost = Settings.Bool("TopMost", true);
         SetScale(Settings.Int("Scale", 100));
         var wa = Screen.PrimaryScreen.WorkingArea;
+        if (Settings.Int("DpiV2", 0) == 0) {            // avant la 1.53, Windows étirait Bébène : position en pixels « étirés » → vrais pixels, une seule fois
+            if (Settings.Int("X", int.MinValue) != int.MinValue) Settings.Set("X", (int)(Settings.Int("X", 0) * Util.ScaleAt(new Point(1, 1))));
+            Settings.Set("DpiV2", 1);
+        }
         int x = Settings.Int("X", wa.Right - W - 40);
         if (x < SystemInformation.VirtualScreen.Left || x > SystemInformation.VirtualScreen.Right - W) x = wa.Right - W - 40;
         Location = new Point(x, wa.Bottom - 51 * Px);
@@ -512,6 +565,8 @@ class Companion : Form {
             if (files != null && files.Length > 0) { ShowPanel(); Panel.Post("paths\n" + string.Join("\n", files)); }
         };
 
+        // résolution / zoom / écran changé (portable branché sur un écran puis débranché) : la discussion se recale
+        Microsoft.Win32.SystemEvents.DisplaySettingsChanged += (s, e) => { try { BeginInvoke((Action)(() => { if (Panel != null && Panel.Visible) PlacePanel(); })); } catch { } };
         // endormi et immobile : 1 image sur 3 suffit (~10 par seconde), la respiration et les « z » restent fluides
         timer.Tick += (s, e) => { Tick(); if (Visible && (!Asleep || ++slowTick % 3 == 0)) Draw(); };
         VisibleChanged += (s, e) => ForceRedraw();                         // réaffiché : on renvoie l image même si elle n a pas changé
@@ -531,7 +586,8 @@ class Companion : Form {
 
     void SetScale(int pct) {
         scalePct = Math.Max(60, Math.Min(160, pct));
-        Px = scalePct <= 80 ? 2 : scalePct >= 120 ? 4 : 3;
+        dpiS = Util.ScaleOf(Bounds);                     // zoom Windows de l Ã©cran oÃ¹ il se trouve : pixels plus gros, toujours entiers (net)
+        Px = Math.Max(2, (int)Math.Round((scalePct <= 80 ? 2 : scalePct >= 120 ? 4 : 3) * dpiS));
         W = CW * Px; H = CH * Px;
         Size = new Size(W, H);
     }
@@ -759,7 +815,12 @@ class Companion : Form {
         if (tt.Length > 0 && tt != "Program Manager") { LastWindow = tt; LastHwnd = h.ToInt64(); }
     }
 
+    float dpiS = 1f; int dpiTick;
     void Tick() {
+        if (++dpiTick % 30 == 0 && !held) {               // passÃ© sur un Ã©cran avec un autre zoom : on garde le bas-centre
+            var sc = Util.ScaleOf(Bounds);
+            if (Math.Abs(sc - dpiS) > 0.01f) { int cx = Left + W / 2, bot = Top + H; SetScale(scalePct); Left = cx - W / 2; Top = bot - H; ForceRedraw(); }
+        }
         const float dt = 0.033f;
         t += dt; actT += dt;
         TrackForeground();
@@ -826,7 +887,7 @@ class Companion : Form {
 
         phase += Math.Abs(dx) / (6f * Px) * (float)Math.PI;
         walkAmp += ((dx != 0 ? 1f : 0f) - walkAmp) * 0.25f;
-        cur.Lerp(tgt, held || falling ? 0.4f : 0.12f);
+        cur.Lerp(tgt, held || falling ? 0.4f : 0.12f); goal = tgt;
 
         // regard vers la souris
         var cp = Cursor.Position;
@@ -868,7 +929,9 @@ class Companion : Form {
     byte[] lastFrame, curFrame;
     public void ForceRedraw() { lastFrame = null; }
     int slowTick;
-    bool Asleep { get { return act == "lie" && !held && !falling && peekT <= 0 && petT <= 0 && heartT <= 0 && jumpT < 0 && landT <= 0 && state == "idle"; } }
+    // images réduites (1 sur 3) seulement quand il dort vraiment immobile : pose atteinte, ni oreille, ni queue qui balance, ni geste en cours
+    bool Asleep { get { return act == "lie" && actT > 2 && !held && !falling && peekT <= 0 && petT <= 0 && heartT <= 0 && jumpT < 0 && landT <= 0 && earTw == 0 && state == "idle"
+        && walkAmp < 0.01f && Math.Abs(swing) < 0.5f && Math.Abs(stretch) < 0.2f && cur.Dist(goal) < 0.15f; } }
     void Draw() {
         using (var img = BuildImage()) {
             var bd = img.LockBits(new Rectangle(0, 0, img.Width, img.Height), ImageLockMode.ReadOnly, PixelFormat.Format32bppPArgb);   // prémultiplié = format de UpdateLayeredWindow
@@ -1435,11 +1498,17 @@ class Companion : Form {
     }
 
     public void PlacePanel() {
-        if (Panel.Moved) return;                         // déplacée à la main : elle reste où on l a mise
         var wa = Screen.FromControl(this).WorkingArea;
+        Panel.Fit(Panel.Moved ? Screen.FromControl(Panel).WorkingArea : wa);   // zoom et taille de l écran où elle sera affichée
+        if (Panel.Moved) {                               // déplacée à la main : elle reste où on l a mise, mais jamais hors de l écran
+            var pa = Screen.FromControl(Panel).WorkingArea;
+            Panel.Location = new Point(Math.Max(pa.Left, Math.Min(Panel.Left, pa.Right - Panel.Width)), Math.Max(pa.Top, Math.Min(Panel.Top, pa.Bottom - Panel.Height)));
+            return;
+        }
         if (!Visible) { Panel.Location = new Point(wa.Right - Panel.Width - 16, wa.Bottom - Panel.Height - 16); return; }
         int x = Left - Panel.Width + 10 * Px;
         if (x < wa.Left) x = Right - 10 * Px;
+        x = Math.Max(wa.Left, Math.Min(x, wa.Right - Panel.Width));    // petit écran : ni à gauche ni à droite elle ne déborde
         int y = Math.Max(wa.Top + 8, Math.Min(Top + 4 * Px - Panel.Height, wa.Bottom - Panel.Height - 8));
         Panel.Location = new Point(x, y);
     }

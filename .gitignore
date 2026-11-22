@@ -4,3 +4,5 @@ paquets/
 *.exe
 *.dll
 *.pdb
+.astro/
+node_modules/

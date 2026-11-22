@@ -283,8 +283,11 @@ abstract class Layered : Form {
         using (var g = Graphics.FromImage(bmp)) { g.SmoothingMode = SmoothingMode.AntiAlias; g.TextRenderingHint = System.Drawing.Text.TextRenderingHint.AntiAliasGridFit; Render(g); }
         return bmp;
     }
+    // S = zoom de l écran (1,25 à 125 %) : Measure/Render/Hit travaillent en unités logiques, la fenêtre et l image sont en vrais pixels
+    protected float S = 1f;
     void Redraw(Point p) {
-        var sz = Measure();
+        S = Util.ScaleAt(p);
+        var ls = Measure(); var sz = new Size((int)Math.Ceiling(ls.Width * S), (int)Math.Ceiling(ls.Height * S));
         if (Size != sz) Size = sz;
         Location = p;
         hits.Clear();
@@ -292,6 +295,7 @@ abstract class Layered : Form {
             using (var g = Graphics.FromImage(bmp)) {
                 g.SmoothingMode = SmoothingMode.AntiAlias; g.TextRenderingHint = System.Drawing.Text.TextRenderingHint.AntiAliasGridFit;
                 g.Clear(Color.Transparent);
+                g.ScaleTransform(S, S);
                 Render(g);
             }
             IntPtr screen = GetDC(IntPtr.Zero), mem = CreateCompatibleDC(screen), hb = bmp.GetHbitmap(Color.FromArgb(0)), old = SelectObject(mem, hb);
@@ -308,14 +312,15 @@ abstract class Layered : Form {
         if (down && Draggable && (dragging || Math.Abs(e.X - downAt.X) + Math.Abs(e.Y - downAt.Y) > 5)) {
             dragging = true; var c = Cursor.Position; Location = new Point(c.X - downAt.X, c.Y - downAt.Y); Cursor = Cursors.SizeAll; return;
         }
-        bool over = false; foreach (var h in hits) if (h.Key.Contains(e.Location)) over = true;
+        bool over = false; var lp = Logical(e.Location); foreach (var h in hits) if (h.Key.Contains(lp)) over = true;
         Cursor = over ? Cursors.Hand : Cursors.Default;
     }
     protected override void OnMouseUp(MouseEventArgs e) {
         if (e.Button != MouseButtons.Left) return;
         down = false; if (dragging) { dragging = false; Moved = true; Cursor = Cursors.Default; return; }
-        for (int i = hits.Count - 1; i >= 0; i--) if (hits[i].Key.Contains(e.Location)) { hits[i].Value(); return; }
+        var lp = Logical(e.Location); for (int i = hits.Count - 1; i >= 0; i--) if (hits[i].Key.Contains(lp)) { hits[i].Value(); return; }
     }
+    Point Logical(Point p) { return new Point((int)(p.X / S), (int)(p.Y / S)); }
 
     // ---- petits outils de dessin ----
     protected static GraphicsPath Round(RectangleF r, float rad) {

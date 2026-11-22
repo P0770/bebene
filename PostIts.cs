@@ -68,6 +68,7 @@ static class Notes {
     static Note Parse(string id, string raw) {
         var n = new Note { Id = id };
         raw = raw.Replace("\r\n", "\n");
+        bool phys = false;
         if (raw.StartsWith("---\n")) {
             int end = raw.IndexOf("\n---", 4);
             if (end > 0) {
@@ -85,8 +86,11 @@ static class Notes {
                         case "visible": n.Shown = yes; break;
                         case "reduit": case "réduit": n.Folded = yes; break;
                         case "cree": case "créé": n.Created = v; break;
+                        case "pixels": phys = v == "ecran"; break;
                     }
                 }
+                // avant la 1.53, Windows étirait Bébène : la position était en pixels « étirés » → convertie une fois en vrais pixels
+                if (!phys && n.X >= 0) { float k = Util.ScaleAt(new Point(1, 1)); n.X = (int)(n.X * k); n.Y = (int)(n.Y * k); }
                 int body = raw.IndexOf('\n', end + 1);
                 raw = body < 0 ? "" : raw.Substring(body + 1);
             }
@@ -95,7 +99,7 @@ static class Notes {
         return n;
     }
     static string Serialize(Note n) {
-        return "---\ncouleur: " + n.Color + "\nx: " + n.X + "\ny: " + n.Y + "\nw: " + n.W + "\nh: " + n.H
+        return "---\ncouleur: " + n.Color + "\nx: " + n.X + "\ny: " + n.Y + "\npixels: ecran\nw: " + n.W + "\nh: " + n.H
             + "\nepingle: " + (n.Pinned ? "oui" : "non") + "\nvisible: " + (n.Shown ? "oui" : "non") + (n.Folded ? "\nreduit: oui" : "") + "\ncree: " + n.Created + "\n---\n" + n.Text + "\n";
     }
     static void Load() {
@@ -191,7 +195,12 @@ class NoteWindow : Form {
     Note n;
     readonly RichTextBox box;
     readonly System.Windows.Forms.Timer saveT = new System.Windows.Forms.Timer { Interval = 700 };
-    const int HeadH = 28, Pad = 10;
+    // K = zoom Windows de l Ã©cran du post-it : tout est pensÃ© en unitÃ©s logiques (28 px de barre Ã  100 %) puis multipliÃ©
+    float K = 1f;
+    int HeadH { get { return (int)(28 * K); } } int Pad { get { return (int)(10 * K); } }
+    int LW { get { return (int)(ClientSize.Width / K); } }               // largeur en unitÃ©s logiques
+    Point Lg(Point p) { return new Point((int)(p.X / K), (int)(p.Y / K)); }
+    Size Sz(int w, int h) { return new Size((int)(w * K), (int)(h * K)); }
     bool applying;
     public bool Editing { get { return box.Focused || saveT.Enabled; } }
     [DllImport("dwmapi.dll")] static extern int DwmSetWindowAttribute(IntPtr h, int attr, ref int v, int size);
@@ -233,19 +242,20 @@ class NoteWindow : Form {
     // ---- réduire à la barre de titre (bouton –, double-clic sur la barre, ou clic droit) ----
     void ToggleFold() { n.Folded = !n.Folded; Notes.Save(n); FoldLayout(); }
     void FoldLayout() {
-        if (n.Folded) { box.Visible = false; MinimumSize = new Size(160, HeadH); Height = HeadH; }
-        else { MinimumSize = new Size(160, 120); if (Height < 120) Height = n.H; box.Visible = true; }
+        if (n.Folded) { box.Visible = false; MinimumSize = new Size((int)(160 * K), HeadH); Height = HeadH; }
+        else { MinimumSize = Sz(160, 120); if (Height < (int)(120 * K)) Height = (int)(n.H * K); box.Visible = true; }
         Invalidate();
     }
     void Place() {
         var wa = Screen.PrimaryScreen.WorkingArea;
-        MinimumSize = new Size(160, n.Folded ? HeadH : 120);
-        Size = new Size(n.W, n.Folded ? HeadH : n.H);
         int x = n.X, y = n.Y;
+        K = Util.ScaleAt(x >= 0 ? new Point(x + 20, y + 10) : new Point(wa.Left + 1, wa.Top + 1));
+        MinimumSize = Size.Empty; Size = new Size((int)(n.W * K), n.Folded ? HeadH : (int)(n.H * K));
+        MinimumSize = n.Folded ? new Size((int)(160 * K), HeadH) : Sz(160, 120);
         var vs = SystemInformation.VirtualScreen;
         if (x < vs.Left || y < vs.Top || x > vs.Right - 60 || y > vs.Bottom - 40) {                 // jamais placée, ou écran d un autre PC
             int k = Math.Abs(n.Id.GetHashCode()) % 6;
-            x = wa.Right - n.W - 520 - k * 26; y = wa.Top + 80 + k * 26;
+            x = wa.Right - Width - (int)((520 + k * 26) * K); y = wa.Top + 80 + k * 26;
         }
         Location = new Point(x, y);
         Layout2();
@@ -257,18 +267,19 @@ class NoteWindow : Form {
     }
 
     // ---- en-tête dessiné, sobre : + à gauche ; couleur, épingle, corbeille, –, × à droite ----
-    Rectangle BtnNew { get { return new Rectangle(6, 3, 22, 22); } }
-    Rectangle BtnClose { get { return new Rectangle(ClientSize.Width - 28, 3, 22, 22); } }
-    Rectangle BtnFold { get { return new Rectangle(ClientSize.Width - 52, 3, 22, 22); } }
-    Rectangle BtnDel { get { return new Rectangle(ClientSize.Width - 76, 3, 22, 22); } }
-    Rectangle BtnPin { get { return new Rectangle(ClientSize.Width - 100, 3, 22, 22); } }
-    Rectangle BtnColor { get { return new Rectangle(ClientSize.Width - 124, 3, 22, 22); } }
+    Rectangle BtnNew { get { return new Rectangle(6, 3, 22, 22); } }       // boutons en unitÃ©s logiques (dessin agrandi par K)
+    Rectangle BtnClose { get { return new Rectangle(LW - 28, 3, 22, 22); } }
+    Rectangle BtnFold { get { return new Rectangle(LW - 52, 3, 22, 22); } }
+    Rectangle BtnDel { get { return new Rectangle(LW - 76, 3, 22, 22); } }
+    Rectangle BtnPin { get { return new Rectangle(LW - 100, 3, 22, 22); } }
+    Rectangle BtnColor { get { return new Rectangle(LW - 124, 3, 22, 22); } }
     Rectangle[] Btns { get { return new[] { BtnNew, BtnClose, BtnFold, BtnDel, BtnPin, BtnColor }; } }
     bool OnBtn(Point p) { foreach (var r in Btns) if (r.Contains(p)) return true; return false; }
     Point hover = new Point(-1, -1);
     protected override void OnPaint(PaintEventArgs e) {
-        var g = e.Graphics; g.SmoothingMode = SmoothingMode.AntiAlias;
-        using (var hb = new SolidBrush(Notes.Head(n.Color))) g.FillRectangle(hb, 0, 0, ClientSize.Width, HeadH);
+        var g = e.Graphics; g.SmoothingMode = SmoothingMode.AntiAlias; g.TextRenderingHint = System.Drawing.Text.TextRenderingHint.AntiAliasGridFit;
+        g.ScaleTransform(K, K);
+        using (var hb = new SolidBrush(Notes.Head(n.Color))) g.FillRectangle(hb, 0, 0, LW + 1, 28);
         var ink = Color.FromArgb(120, 60, 45, 30);
         foreach (var r in Btns)
             if (r.Contains(hover)) using (var b = new SolidBrush(r == BtnDel ? Color.FromArgb(45, 190, 50, 40) : Color.FromArgb(28, 0, 0, 0))) g.FillEllipse(b, r);
@@ -298,21 +309,22 @@ class NoteWindow : Form {
             using (var sf = new StringFormat { Trimming = StringTrimming.EllipsisCharacter, FormatFlags = StringFormatFlags.NoWrap })
                 g.DrawString(n.Title, f, b, tr, sf);
         }
-        else if (box.TextLength == 0 && ClientSize.Width > 260)              // aide dans l en-tête tant que la note est vide
+        else if (box.TextLength == 0 && LW > 260)              // aide dans l en-tête tant que la note est vide
             using (var b = new SolidBrush(Color.FromArgb(120, 60, 45, 30))) using (var f = new Font("Segoe UI", 8.5f))
                 g.DrawString("« - » liste · « [] » case", f, b, 32, 7);
     }
-    protected override void OnMouseMove(MouseEventArgs e) { base.OnMouseMove(e); hover = e.Location; Invalidate(new Rectangle(0, 0, ClientSize.Width, HeadH)); }
+    protected override void OnMouseMove(MouseEventArgs e) { base.OnMouseMove(e); hover = Lg(e.Location); Invalidate(new Rectangle(0, 0, ClientSize.Width, HeadH)); }
     protected override void OnMouseLeave(EventArgs e) { base.OnMouseLeave(e); hover = new Point(-1, -1); Invalidate(new Rectangle(0, 0, ClientSize.Width, HeadH)); }
     protected override void OnMouseUp(MouseEventArgs e) {
         base.OnMouseUp(e);
         if (e.Button != MouseButtons.Left) return;
-        if (BtnNew.Contains(e.Location)) Notes.New();
-        else if (BtnClose.Contains(e.Location)) Notes.Hide(n.Id);
-        else if (BtnFold.Contains(e.Location)) ToggleFold();
-        else if (BtnDel.Contains(e.Location)) ShowConfirm();
-        else if (BtnPin.Contains(e.Location)) { n.Pinned = !n.Pinned; Notes.Save(n); Invalidate(); Notes.Refresh(); }
-        else if (BtnColor.Contains(e.Location)) { n.Color = Notes.Colors[(Array.IndexOf(Notes.Colors, n.Color) + 1) % Notes.Colors.Length]; Notes.Save(n); Apply(n); }
+        var lp = Lg(e.Location);
+        if (BtnNew.Contains(lp)) Notes.New();
+        else if (BtnClose.Contains(lp)) Notes.Hide(n.Id);
+        else if (BtnFold.Contains(lp)) ToggleFold();
+        else if (BtnDel.Contains(lp)) ShowConfirm();
+        else if (BtnPin.Contains(lp)) { n.Pinned = !n.Pinned; Notes.Save(n); Invalidate(); Notes.Refresh(); }
+        else if (BtnColor.Contains(lp)) { n.Color = Notes.Colors[(Array.IndexOf(Notes.Colors, n.Color) + 1) % Notes.Colors.Length]; Notes.Save(n); Apply(n); }
     }
 
     // glisser par l'en-tête, redimensionner par les bords ; position enregistrée à la fin
@@ -325,10 +337,10 @@ class NoteWindow : Form {
             if (t && r) { m.Result = (IntPtr)14; return; } if (t && l) { m.Result = (IntPtr)13; return; }
             if (r) { m.Result = (IntPtr)11; return; } if (l) { m.Result = (IntPtr)10; return; }
             if (bo) { m.Result = (IntPtr)15; return; } if (t) { m.Result = (IntPtr)12; return; }
-            if (p.Y < HeadH && !OnBtn(p)) { m.Result = (IntPtr)2; return; }   // HTCAPTION
+            if (p.Y < HeadH && !OnBtn(Lg(p))) { m.Result = (IntPtr)2; return; }   // HTCAPTION
         }
         if (m.Msg == 0xA3) { ToggleFold(); return; }                         // double-clic sur la barre : réduire / rouvrir
-        if (m.Msg == 0x0232) { n.X = Left; n.Y = Top; n.W = Width; if (!n.Folded) n.H = Height; Notes.Save(n); }   // WM_EXITSIZEMOVE
+        if (m.Msg == 0x0232) { n.X = Left; n.Y = Top; n.W = (int)(Width / K); if (!n.Folded) n.H = (int)(Height / K); Notes.Save(n); }   // WM_EXITSIZEMOVE
         base.WndProc(ref m);
     }
 
@@ -338,11 +350,11 @@ class NoteWindow : Form {
     void ShowConfirm() {
         CloseConfirm();
         var pop = new Form { FormBorderStyle = FormBorderStyle.None, ShowInTaskbar = false, StartPosition = FormStartPosition.Manual, TopMost = true,
-            BackColor = Color.FromArgb(255, 252, 247), Size = new Size(196, 38), KeyPreview = true };
+            BackColor = Color.FromArgb(255, 252, 247), Size = Sz(196, 38), KeyPreview = true };
         var lbl = new Label { Text = "Supprimer ?", Font = new Font("Segoe UI", 9.5f, FontStyle.Bold), ForeColor = Color.FromArgb(60, 45, 30), AutoSize = false,
-            TextAlign = ContentAlignment.MiddleLeft, Bounds = new Rectangle(10, 0, 84, 38) };
-        var yes = new Button { Text = "Oui", FlatStyle = FlatStyle.Flat, BackColor = Color.FromArgb(200, 64, 52), ForeColor = Color.White, Font = new Font("Segoe UI", 9f), Cursor = Cursors.Hand, Bounds = new Rectangle(96, 7, 44, 24) };
-        var no = new Button { Text = "Non", FlatStyle = FlatStyle.Flat, BackColor = Color.FromArgb(240, 233, 224), ForeColor = Color.FromArgb(70, 60, 50), Font = new Font("Segoe UI", 9f), Cursor = Cursors.Hand, Bounds = new Rectangle(144, 7, 44, 24) };
+            TextAlign = ContentAlignment.MiddleLeft, Bounds = new Rectangle((int)(10 * K), 0, (int)(84 * K), (int)(38 * K)) };
+        var yes = new Button { Text = "Oui", FlatStyle = FlatStyle.Flat, BackColor = Color.FromArgb(200, 64, 52), ForeColor = Color.White, Font = new Font("Segoe UI", 9f), Cursor = Cursors.Hand, Bounds = new Rectangle((int)(96 * K), (int)(7 * K), (int)(44 * K), (int)(24 * K)) };
+        var no = new Button { Text = "Non", FlatStyle = FlatStyle.Flat, BackColor = Color.FromArgb(240, 233, 224), ForeColor = Color.FromArgb(70, 60, 50), Font = new Font("Segoe UI", 9f), Cursor = Cursors.Hand, Bounds = new Rectangle((int)(144 * K), (int)(7 * K), (int)(44 * K), (int)(24 * K)) };
         yes.FlatAppearance.BorderSize = 0; no.FlatAppearance.BorderSize = 0;
         yes.Click += (s, e) => { CloseConfirm(); Notes.Delete(n.Id); };
         no.Click += (s, e) => CloseConfirm();
@@ -350,7 +362,7 @@ class NoteWindow : Form {
         pop.Deactivate += (s, e) => { if (confirm == pop) pop.BeginInvoke((Action)CloseConfirm); };   // clic ailleurs = annulé
         pop.HandleCreated += (s, e) => { try { int v = 2; DwmSetWindowAttribute(pop.Handle, 33, ref v, 4); } catch { } };   // coins arrondis + ombre Windows 11
         pop.Controls.AddRange(new Control[] { lbl, yes, no });
-        var tr = RectangleToScreen(BtnDel); var wa = Screen.FromControl(this).WorkingArea;
+        var bd = BtnDel; var tr = RectangleToScreen(new Rectangle((int)(bd.X * K), (int)(bd.Y * K), (int)(bd.Width * K), (int)(bd.Height * K))); var wa = Screen.FromControl(this).WorkingArea;
         int x = Math.Max(wa.Left + 4, Math.Min(wa.Right - pop.Width - 4, tr.Left + tr.Width / 2 - pop.Width / 2));
         int y = tr.Top - pop.Height - 6; if (y < wa.Top) y = tr.Bottom + 6;  // pas de place au-dessus : juste en dessous
         pop.Location = new Point(x, y);

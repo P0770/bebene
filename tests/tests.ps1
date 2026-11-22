@@ -45,6 +45,11 @@ Result 'gardien prêt' ($g -match 'PreToolUse' -and $g -match 'garde') "settings
 RunApp @('--screentest', "$out\screen.txt") | Out-Null
 $s = if (Test-Path "$out\screen.txt") { Get-Content "$out\screen.txt" -Raw } else { '' }
 Result 'commande de capture' ($s -match 'ecran\.ps1' -and $s -match 'BebeneEcran') "commande inattendue"
+# petits écrans : la discussion ne déborde jamais de la zone utile
+Remove-Item "$out\fit.txt" -ErrorAction SilentlyContinue
+RunApp @('--fittest', "$out\fit.txt") | Out-Null
+$ft = if (Test-Path "$out\fit.txt") { Get-Content "$out\fit.txt" -Encoding UTF8 } else { @() }
+Result 'discussion tient sur petit écran' ($ft.Count -eq 4 -and -not (($ft -join "`n") -match 'DEBORDE')) ($ft -join ' / ')
 # conversations en fichiers, rappels demandés à Bébène, point du jour (dossiers temporaires, rien de réel touché)
 Remove-Item "$out\store.txt" -ErrorAction SilentlyContinue
 RunApp @('--storetest', "$out\store.txt") | Out-Null
@@ -85,8 +90,8 @@ else {
     PageTest 'réglages se chargent' 'settings.html' 'document.title="R:"+JSON.stringify(__err)' 'R:[]'
     PageTest 'menus restent ouverts' 'ui.html' (
         'NOTES={enabled:true,notes:[{id:"a",title:"T",color:"jaune",shown:true,pinned:false}]};renderNotes();$("#notes").click();$("[data-ndel]").click();' +
-        'var a=$("#notepop").classList.contains("open");convs=[{id:"c1",title:"T",updated:Date.now(),project:""}];project="";$("#ddHist").click();$("[data-del]").click();' +
-        'var b=$("#ddH").classList.contains("open");document.body.click();document.title="R:"+a+b+!$("#notepop").classList.contains("open")+JSON.stringify(__err)') 'R:truetruetrue[]'
+        'var a=$("#notepop").classList.contains("open");convs=[{id:"c1",title:"T",updated:Date.now(),project:""}];project="";$("#ddProj").click();$("[data-del]").click();' +
+        'var b=$("#ddP").classList.contains("open");document.body.click();document.title="R:"+a+b+!$("#notepop").classList.contains("open")+JSON.stringify(__err)') 'R:truetruetrue[]'
     PageTest 'multitâche' 'ui.html' (
         'const send=m=>__h({data:m});const asst=t=>JSON.stringify({type:"assistant",message:{content:[{type:"text",text:t}]}});' +
         'input.value="Range mes fichiers";submit();const kA=__posts.filter(p=>p.startsWith("send\n")).pop().split("\n")[1];' +
@@ -117,12 +122,12 @@ else {
         'document.title="R:"+st+sum+blocked+res+JSON.stringify(__err)') 'R:truetruetruetrue[]'
     PageTest 'sous-groupes' 'ui.html' (
         'convs=[{id:"c1",title:"Un",updated:Date.now(),project:"",hist:"<div class=\"msg user\">x</div>"},{id:"c2",title:"Deux",updated:Date.now(),project:""}];project="";conv=null;' +
-        'const ent=i=>i.dispatchEvent(new KeyboardEvent("keydown",{key:"Enter",bubbles:true}));$("#ddHist").click();$("#mGroupAdd").click();' +
+        'const ent=i=>i.dispatchEvent(new KeyboardEvent("keydown",{key:"Enter",bubbles:true}));$("#ddProj").click();$("#mGroupAdd").click();' +
         'var i=$("#mConvs input.gren");i.value="Cours";ent(i);var a=JSON.stringify(GROUPS[""])==="[\"Cours\"]";' +
         'askMove($("[data-c=c1]"),"c1");var s=$("#mConvs select");s.value="g:Cours";s.onchange();var b=convs[0].group==="Cours"&&!!$(".mgrp[data-g=Cours]");' +
         '$(".mgrp[data-g=Cours] [data-grn]").click();i=$("#mConvs input.gren");i.value="Maths";ent(i);var c=convs.find(x=>x.id==="c1").group==="Maths";' +
         '$(".mgrp[data-g=Maths] [data-gdel]").click();$(".mgrp[data-g=Maths] [data-gdel]").click();var d=!$(".mgrp[data-g=Maths]")&&convs.length===2&&!convs[0].group&&!!convs.find(x=>x.id==="c1").hist;' +
-        'var open=$("#ddH").classList.contains("open");document.title="R:"+a+b+c+d+open+JSON.stringify(__err)') 'R:truetruetruetruetrue[]'
+        'var open=$("#ddP").classList.contains("open");document.title="R:"+a+b+c+d+open+JSON.stringify(__err)') 'R:truetruetruetruetrue[]'
     PageTest 'clic droit : télécharger en .txt' 'ui.html' (
         'conv={id:"c9",title:"Mon rapport",updated:Date.now(),project:""};var m=el("msg bot","<div class=\"md\">Bonjour</div>");$("#log .md").dataset.raw="Bonjour **toi**";' +
         '$("#log .md").dispatchEvent(new MouseEvent("contextmenu",{bubbles:true,cancelable:true,clientX:50,clientY:50}));var o=$("#ctxm").classList.contains("open");' +
@@ -134,8 +139,8 @@ else {
         'document.title="R:"+(convs[0].title==="Mon titre")+!__posts.some(x=>x.startsWith("title\n"))+JSON.stringify(__err)') 'R:truetrue[]'
     PageTest 'réglages dans le rond' 'ui.html' (
         '$("#cfg").click();var a=__posts.includes("settings")&&!!$("#orbw #cfg .gear");__h({data:"upd\n"+JSON.stringify({available:true,latest:"9.9",current:"1.50"})});' +
-        '$("#updot").click();var b=$("#updpop").classList.contains("open");$("#ddHist").click();var c=!$("#updpop").classList.contains("open")&&$("#ddH").classList.contains("open");' +
-        'document.dispatchEvent(new KeyboardEvent("keydown",{key:"Escape"}));var d=!$("#ddH").classList.contains("open")&&!__posts.includes("hide");' +
+        '$("#updot").click();var b=$("#updpop").classList.contains("open");$("#ddProj").click();var c=!$("#updpop").classList.contains("open")&&$("#ddP").classList.contains("open");' +
+        'document.dispatchEvent(new KeyboardEvent("keydown",{key:"Escape"}));var d=!$("#ddP").classList.contains("open")&&!__posts.includes("hide");' +
         'document.title="R:"+a+b+c+d+JSON.stringify(__err)') 'R:truetruetruetrue[]'
     # v1.51 : historique en fichiers, recherche, rappels, sélection, point du jour, image collée
     PageTest 'historique en fichiers' 'ui.html' (
@@ -146,9 +151,27 @@ else {
         '<script>window.__CONVS=[{"id":"c1","title":"Un","updated":1,"project":"","hist":"<div class=\"msg user\">x</div>"},{"id":"c2","title":"Deux","updated":2,"project":""}]</script>')
     PageTest 'recherche dans l historique' 'ui.html' (
         'convs=[{id:"c1",title:"Maths",updated:Date.now(),project:"p1",hist:"<div class=\"md\">Le courant électrique</div>"},{id:"c2",title:"Autre",updated:Date.now(),project:"",hist:"rien"}];project="";' +
-        '$("#ddHist").click();var s=$("#mSearch");s.value="ELECTRIQUE";s.dispatchEvent(new Event("input"));var r=document.querySelectorAll("#mConvs .mitem");' +
+        '$("#ddProj").click();var s=$("#mSearch");s.value="ELECTRIQUE";s.dispatchEvent(new Event("input"));var r=document.querySelectorAll("#mConvs .mitem");' +
         'var a=r.length===1&&r[0].dataset.c==="c1"&&!!r[0].querySelector("mark");s.value="zzz";s.dispatchEvent(new Event("input"));var b=/Aucune/.test($("#mConvs").textContent);' +
         'document.title="R:"+a+b+JSON.stringify(__err)') 'R:truetrue[]'
+    PageTest 'palette : projets archivés cachés, clavier' 'ui.html' (
+        'projects=["alpha","beta","gamma"];ARCH=new Set(["beta"]);convs=[{id:"c1",title:"A1",updated:Date.now(),project:"alpha"}];project="";' +
+        'document.dispatchEvent(new KeyboardEvent("keydown",{key:"k",ctrlKey:true,bubbles:true}));var a=$("#ddP").classList.contains("open");' +
+        'const tl=()=>[...document.querySelectorAll("#mProjects .ptile")].map(x=>x.dataset.p).join();var b=tl()==="alpha,gamma"&&!$("#pArchived").hidden;' +
+        'var s=$("#mSearch");s.value="bet";s.dispatchEvent(new Event("input"));var c=tl()==="beta"&&!!$("#mProjects .ptile.arch");' +
+        's.value="";s.dispatchEvent(new Event("input"));$("#mProjects [data-p=alpha]").click();' +
+        'var d=project==="alpha"&&$("#ddP").classList.contains("open")&&!!$("#mConvs [data-c=c1]")&&!!$("#mConvs [data-start]");' +
+        '$("#pal").dispatchEvent(new KeyboardEvent("keydown",{key:"ArrowDown",bubbles:true}));var e=kbEl===$("#mNoProj");var hit=[...document.querySelectorAll("#pal .ptile, #pal #mConvs [data-c]")].filter(x=>{const r=x.getBoundingClientRect();if(r.bottom>innerHeight||r.top<0)return true;const el=document.elementFromPoint(r.left+r.width/2,r.top+r.height/2);return el&&el.closest("#pal");}).length===document.querySelectorAll("#pal .ptile, #pal #mConvs [data-c]").length;e=e&&hit;' +
+        'document.title="R:"+a+b+c+d+e+JSON.stringify(__err)') 'R:truetruetruetruetrue[]'
+    PageTest 'glisser une conversation' 'ui.html' (
+        'projects=["alpha","beta"];GROUPS={alpha:["G1"]};convs=[{id:"c1",title:"Un",updated:Date.now(),project:"alpha"},{id:"c2",title:"Deux",updated:Date.now()-9,project:"alpha",group:"G1"}];project="alpha";$("#ddProj").click();' +
+        'const P=(t,el,x,y,b)=>el.dispatchEvent(new PointerEvent(t,{clientX:x,clientY:y,button:0,buttons:b,bubbles:true}));const ctr=el=>{const r=el.getBoundingClientRect();return[r.left+r.width/2,r.top+r.height/2];};' +
+        'const dragTo=(id,q)=>{const s=$("#mConvs [data-c="+id+"] .tx"),[x,y]=ctr(s);P("pointerdown",s,x,y,1);P("pointermove",document,x+20,y+20,1);const tg=typeof q==="string"?$(q):q();tg.scrollIntoView({block:"center"});const[a,b]=ctr(tg);P("pointermove",document,a,b,1);P("pointerup",document,a,b,0);};' +
+        'dragTo("c1",()=>[...document.querySelectorAll("#mConvs .mgrp[data-g]")].find(m=>m.dataset.g==="G1"));var a=convs[0].group==="G1"&&convs[0].project==="alpha";' +
+        'dragTo("c1","#mConvs [data-dz=loose]");var b=convs[0].group==="";' +
+        'dragTo("c2","#mConvs [data-dz=new]");var c=convs[1].group==="Nouveau groupe"&&GROUPS.alpha.includes("Nouveau groupe")&&!!$("#mConvs input.gren");' +
+        'commitEdit($("#mConvs input.gren"),true);dragTo("c1","#mProjects [data-p=beta]");var d=convs[0].project==="beta"&&convs[0].group===""&&!$("#dghost")&&!document.body.classList.contains("dragging");' +
+        'document.title="R:"+a+b+c+d+JSON.stringify(__err)') 'R:truetruetruetrue[]'
     PageTest 'rappel dans la réponse' 'ui.html' ($sim +
         'input.value="Rappelle-moi";submit();const k=rkey;send("rline\n"+k+"\n"+asst("C est noté.\n```bebene-rappel\n{\"quand\":\"2030-01-02T08:30\",\"quoi\":\"Sortir le linge\"}\n```"));send("rdone\n"+k+"\n0\n");' +
         'var c=$("#log .rcard");var a=!!c&&/Sortir le linge/.test(c.textContent)&&!/bebene-rappel/.test($("#log").textContent);c.querySelector(".rx").click();' +
