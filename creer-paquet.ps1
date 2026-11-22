@@ -2,10 +2,13 @@
 # Lancé par « Créer le paquet Bébène.cmd » (double-clic). Résultat : paquets\Bebene-<version>-<date>.zip
 #   Contenu : l'application compilée (dossier d'installation), un modèle de mémoire ClaudeHub SANS tes infos
 #   personnelles (outils + skills à jour, noyau générique) et un mode d'emploi.
-param([switch]$NoOpen)
+#   Options : -App = dossier de l'app compilée (défaut : installation locale) ; -NoOpen = ne pas ouvrir l'Explorateur.
+#   Le modèle de mémoire vient de hub-modele\ (dans le dépôt, pour que GitHub puisse aussi créer le paquet) ;
+#   sur le PC du propriétaire, il est d'abord resynchronisé depuis ClaudeHub\outils, skills et README.md.
+param([switch]$NoOpen, [string]$App = (Join-Path $env:USERPROFILE 'ClaudeCompanion'))
 $ErrorActionPreference = 'Stop'
 $src = $PSScriptRoot
-$app = Join-Path $env:USERPROFILE 'ClaudeCompanion'
+$app = $App
 $hub = Split-Path (Split-Path $src -Parent) -Parent          # ...\ClaudeHub
 $exe = Join-Path $app 'ClaudeCompanion.exe'
 if (-not (Test-Path $exe)) { throw "Bébène n'est pas compilé dans $app : lance d'abord build.ps1" }
@@ -20,8 +23,16 @@ Get-ChildItem $app -File | Where-Object { $_.Extension -in '.exe', '.dll', '.htm
     Copy-Item -Destination $stage
 
 # 2. modèle de mémoire ClaudeHub, sans rien de personnel
+$tpl = Join-Path $src 'hub-modele'
+if ((Test-Path "$hub\outils") -and (Test-Path "$hub\skills")) {          # PC du propriétaire : copie à jour dans le dépôt
+    if (Test-Path $tpl) { Remove-Item $tpl -Recurse -Force }
+    New-Item -ItemType Directory -Force $tpl | Out-Null
+    foreach ($sub in 'outils', 'skills') { Copy-Item "$hub\$sub" "$tpl\$sub" -Recurse }
+    if (Test-Path "$hub\README.md") { Copy-Item "$hub\README.md" "$tpl\README.md" }
+}
+if (-not (Test-Path "$tpl\skills")) { throw "Modèle de mémoire introuvable ($tpl)" }
 $m = Join-Path $stage 'hub-modele'
-foreach ($sub in 'outils', 'skills') { if (Test-Path "$hub\$sub") { Copy-Item "$hub\$sub" "$m\$sub" -Recurse } }
+foreach ($sub in 'outils', 'skills') { Copy-Item "$tpl\$sub" "$m\$sub" -Recurse }
 New-Item -ItemType Directory -Force "$m\memoire", "$m\journal", "$m\projets" | Out-Null
 [IO.File]::WriteAllText("$m\memoire\00-noyau.md", @"
 # Noyau de mémoire (chargé dans chaque session : rester court)
@@ -41,7 +52,7 @@ New-Item -ItemType Directory -Force "$m\memoire", "$m\journal", "$m\projets" | O
 - Nouveau souvenir durable → fichier dans ``memoire/`` + ligne dans ``memoire/index.md``.
 "@, $u8)
 [IO.File]::WriteAllText("$m\memoire\index.md", "# Index des souvenirs`n`n- [Noyau](00-noyau.md) : préférences et règles, chargé automatiquement`n", $u8)
-if (Test-Path "$hub\README.md") { Copy-Item "$hub\README.md" "$m\README.md" }
+if (Test-Path "$tpl\README.md") { Copy-Item "$tpl\README.md" "$m\README.md" }
 
 # 3. mode d'emploi
 [IO.File]::WriteAllText("$stage\LISEZMOI.txt", @"
@@ -61,7 +72,9 @@ $outDir = Join-Path $src 'paquets'
 New-Item -ItemType Directory -Force $outDir | Out-Null
 $zip = Join-Path $outDir ("Bebene-$version-" + (Get-Date -Format 'yyyy-MM-dd_HHmm') + '.zip')
 Add-Type -AssemblyName System.IO.Compression.FileSystem
+if (Test-Path $zip) { Remove-Item $zip -Force }                # 2e paquet dans la même minute : remplace le précédent
 [IO.Compression.ZipFile]::CreateFromDirectory($stage, $zip)
 Remove-Item $stage -Recurse -Force
 Write-Host "Paquet créé : $zip" -ForegroundColor Green
+$zip                                                          # chemin renvoyé (utilisé par ci\publier-release.ps1)
 if (-not $NoOpen) { Start-Process explorer.exe "/select,`"$zip`"" }

@@ -19,6 +19,7 @@ Compagnon de bureau Windows : un chat noir animé, et une fenêtre de discussion
 - Après une modification de la source : `build.ps1` (ajouter `-Install` sur un nouveau PC).
 
 ## Technique
+- Déploiement continu : `Publier sur GitHub.cmd` (publier-version.ps1) compile, commit/push puis envoie un tag annoté vX.Y (message = notes) ; `.github/workflows/release.yml` compile, teste puis lance `ci/publier-release.ps1` (vérifie tag = Version/AssemblyVersion, `creer-paquet.ps1 -NoOpen` renvoie le chemin du zip, notes fonctions.json, gh release create). Tests en échec = rien publié. `hub-modele/` (outils, skills, README du hub) est dans le dépôt pour GitHub ; creer-paquet le resynchronise depuis ClaudeHub en local. Les blocs run des .yml restent en ASCII (PowerShell 5 sans BOM).
 - Intégration continue : `.github/workflows/ci.yml` (GitHub Actions, windows-latest) compile (`build.ps1 -NoStart`) et lance `tests/tests.ps1` (sans `-Claude`) à chaque push sur main et pull request ; images des tests en artefact. `build.ps1 -NoStart` = compiler sans lancer ; il n arrête que la copie de Bébène située dans `-Out`.
 - Mesure du rendu : `ClaudeCompanion.exe --bench out.txt` (ms par image et par tick). 2026-11-22 : pinceaux/stylos GDI+ en cache (Br/Pn, jamais dans un using), petit bitmap et tableaux de PixelPass réutilisés, envoi via une DIB section gardée (Push(byte[]) en PArgb au lieu de GetHbitmap) → 0,50 → 0,41 ms/tick, GC0 quasi nul ; rendu identique pixel par pixel.
 - Compilé avec `csc.exe` de .NET Framework 4 (C# 5 : pas de `?.`, de `$""` ni de `nameof`), sans SDK.

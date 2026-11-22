@@ -1,0 +1,44 @@
+# Deploiement continu : quand un tag vX.Y est pousse (par "Publier sur GitHub.cmd"), GitHub compile Bebene,
+# lance les tests, cree le zip et publie la Release. Les installations existantes la recoivent par la mise a jour auto.
+# (blocs run en ASCII : Windows PowerShell 5 lit mal les accents sans BOM ; le travail est dans ci\publier-release.ps1)
+name: Release
+
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+jobs:
+  release:
+    name: Compiler, tester et publier
+    runs-on: windows-latest
+    timeout-minutes: 25
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0          # tags + message du tag annote
+
+      - uses: actions/cache@v4
+        with:
+          path: ~\AppData\Local\BebeneBuild
+          key: webview2-1.0.2903.40
+
+      - name: Compiler
+        shell: powershell
+        run: .\build.ps1 -NoStart
+
+      - name: Tests
+        shell: powershell
+        run: .\tests\tests.ps1
+
+      - name: Zip et Release
+        shell: powershell
+        run: .\ci\publier-release.ps1 -Tag $env:GITHUB_REF_NAME

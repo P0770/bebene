@@ -1,8 +1,9 @@
 ﻿# Publie la version actuelle de Bébène sur GitHub, en une fois :
 #   1. compile l'app (build.ps1) pour que le zip corresponde au code
 #   2. enregistre les changements (commit) et les envoie (push)
-#   3. si la version (Companion.cs) n'a jamais été publiée : crée une « Release » GitHub vX.Y avec le zip à télécharger
-#      et, en notes, les nouveautés tirées de fonctions.json (entrées dont « depuis » = cette version)
+#   3. si la version (Companion.cs) n a jamais été publiée : envoie le tag vX.Y ; GitHub Actions (release.yml) compile, teste,
+#      crée le zip et publie la « Release »
+#      avec, en notes, les nouveautés tirées de fonctions.json
 # Lancé par « Publier sur GitHub.cmd » (double-clic). Option : -Message "texte du commit"
 param([string]$Message)
 $ErrorActionPreference = 'Stop'
@@ -45,35 +46,24 @@ if ($LASTEXITCODE -ne 0) { git commit -q -m $Message; Write-Host "Changements en
 git push -q
 if ($LASTEXITCODE -ne 0) { throw "Envoi refusé par GitHub (connexion ? lance  gh auth login)" }
 
-# 3. release
+# 3. release : un tag vX.Y est envoyé, et GitHub fait le reste (.github/workflows/release.yml) :
+#    compilation et tests sur une machine propre, zip, notes tirées de fonctions.json, Release publiée.
 Write-Host "`n[3/3] Version téléchargeable…" -ForegroundColor Yellow
 $tag = "v$version"
 $ErrorActionPreference = 'Continue'                   # « release not found » arrive sur stderr : ce n'est pas une erreur ici
 & $gh release view $tag 2>&1 | Out-Null
 $exists = $LASTEXITCODE -eq 0
+git ls-remote --exit-code --tags origin $tag 2>&1 | Out-Null
+$tagged = $LASTEXITCODE -eq 0
 $ErrorActionPreference = 'Stop'
-if ($exists) {
+if ($exists -or $tagged) {
     Write-Host "La version $version existe déjà sur GitHub : seul le code a été mis à jour." -ForegroundColor DarkYellow
     Write-Host "Pour une nouvelle version téléchargeable, augmente le numéro dans Companion.cs (Version + AssemblyVersion)." -ForegroundColor DarkYellow
     exit 0
 }
-& "$src\creer-paquet.ps1" -NoOpen
-$zip = Get-ChildItem "$src\paquets\Bebene-$version-*.zip" | Sort-Object LastWriteTime | Select-Object -Last 1
-
-$f = [IO.File]::ReadAllText("$src\fonctions.json", [Text.Encoding]::UTF8) | ConvertFrom-Json
-# nouveautés : tout ce qui est apparu depuis la dernière Release publiée (des versions intermédiaires peuvent ne pas avoir été publiées)
-$ErrorActionPreference = 'Continue'
-$prevTag = (& $gh release list --limit 1 --json tagName --jq '.[0].tagName' 2>$null)
-$ErrorActionPreference = 'Stop'
-$prev = [version]'0.0'; try { if ($prevTag) { $prev = [version]($prevTag -replace '^v', '') } } catch { }
-$cur = [version]$version
-$new = @($f | Where-Object { try { $d = [version]$_.depuis; $d -gt $prev -and $d -le $cur } catch { $false } } |
-        Sort-Object { [version]$_.depuis } | ForEach-Object { "- **$($_.titre)** ($($_.depuis)) : $($_.desc)" })
-$notes = "$Message`n`n"
-if ($new.Count) { $notes += "### Nouveautés`n" + ($new -join "`n") + "`n`n" }
-$notes += "### Installer`nTélécharge **$($zip.Name)** ci-dessous, dézippe-le, lance ``ClaudeCompanion.exe`` et suis l'assistant d'installation.`nMise à jour : ferme Bébène (clic droit sur l'icône → Quitter), dézippe par-dessus, relance."
-$nf = Join-Path $env:TEMP "bebene-notes.md"
-[IO.File]::WriteAllText($nf, $notes, (New-Object Text.UTF8Encoding $false))
-& $gh release create $tag $zip.FullName --title "Bébène $version" --notes-file $nf
-Remove-Item $nf
-Write-Host "`nPublié : Bébène $version" -ForegroundColor Green
+git tag -a $tag -m $Message
+git push -q origin $tag
+if ($LASTEXITCODE -ne 0) { throw "Tag refusé par GitHub" }
+Write-Host "`nTag $tag envoyé : GitHub compile, teste et publie la version (3 à 5 min)." -ForegroundColor Green
+Write-Host "Suivi : https://github.com/$owner/bebene/actions" -ForegroundColor Green
+Write-Host "Si les tests échouent, rien n'est publié : corrige, puis supprime le tag (git push origin :$tag ; git tag -d $tag) et relance." -ForegroundColor DarkGray
