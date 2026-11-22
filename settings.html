@@ -719,7 +719,7 @@ post('tpl');
 
 // ---- raccourcis clavier configurables : clic sur le bouton, puis on tape la combinaison ----
 const HK_DEF = ['Alt+Space'];
-const HK_MSG = 'Ouvre la discussion de n\'importe où. Si du texte, des fichiers ou des dossiers sont sélectionnés, ils sont ajoutés à la prochaine conversation. Depuis Bébène, il la referme.';
+const HK_MSG = 'Ouvre la discussion de n\'importe où. Si des fichiers ou des dossiers sont sélectionnés dans l\'Explorateur, ils sont ajoutés à la prochaine conversation. Depuis Bébène, il la referme.';
 let hkWait = 0, hkVals = ['', '', ''];
 function hkLabel(v) { return v ? v.replace('Space', 'Espace').replace(/\bD(\d)\b/, '$1').split('+').join(' + ') : 'Désactivé'; }
 function showHotkeys(s) {

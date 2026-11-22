@@ -1,6 +1,6 @@
 [
-  { "cat": "Discuter", "titre": "Un raccourci, ta sélection en pièce jointe", "depuis": "1.56",
-    "desc": "Sélectionne du texte, des fichiers ou des dossiers (dans l'Explorateur aussi), puis Alt+Espace : Bébène s'ouvre sur une nouvelle conversation avec ta sélection en petites étiquettes. Chaque nouveau raccourci ajoute la sélection suivante. Rien n'est perdu si tu fermes la fenêtre ou relances Bébène tant que le premier message n'est pas parti. Avant d'envoyer, choisis le projet (Ctrl+K) et le sous-groupe : la conversation y est créée. Rien n'est copié dans un terminal (le Ctrl+C l'interromprait).",
+  { "cat": "Discuter", "titre": "Un raccourci, tes fichiers en pièce jointe", "depuis": "1.57",
+    "desc": "Sélectionne des fichiers ou des dossiers dans l'Explorateur ou sur le Bureau, puis Alt+Espace : Bébène s'ouvre sur une nouvelle conversation avec ta sélection en petites étiquettes. Chaque nouveau raccourci ajoute la sélection suivante. Rien n'est perdu si tu fermes la fenêtre ou relances Bébène tant que le premier message n'est pas parti. Avant d'envoyer, choisis le projet (Ctrl+K) et le sous-groupe : la conversation y est créée. Ailleurs, le raccourci ouvre simplement la discussion (le texte sélectionné n'est plus capté : pas assez fiable selon les applis).",
     "ex": "Sélectionner 2 dossiers de cours → Alt+Espace → choisir # revision-imagerie › 📂 Examen 1 → « Fais-moi un plan de révision »" },
   { "cat": "Réglages", "titre": "Notifications au choix", "depuis": "1.56",
     "desc": "Réglages › Alertes et rappels : une case par type de notification Windows (tâche terminée, question, accord demandé, besoin de ta souris, pause quota, rappels). Décoche ce dont tu ne veux pas être prévenu.",
@@ -35,9 +35,6 @@
   { "cat": "Discuter", "titre": "Rechercher dans l'historique", "depuis": "1.51",
     "desc": "Le champ en haut de la palette (Ctrl+K) cherche dans les titres ET le contenu de toutes les conversations, tous projets confondus (sans tenir compte des accents). Chaque résultat montre un extrait avec le mot surligné.",
     "ex": "« electrique » retrouve la conversation où on parlait du « courant électrique »" },
-  { "cat": "Discuter", "titre": "Demander sur la sélection", "depuis": "1.51",
-    "desc": "Sélectionne du texte dans n'importe quelle appli puis le raccourci (Alt+Espace par défaut) : Bébène s'ouvre avec ce texte et propose Expliquer, Traduire, Corriger ou Résumer, ou tu tapes ta propre question. Ton presse-papiers est remis comme avant.",
-    "ex": "Un paragraphe en anglais dans un PDF → Alt+Espace → 🌐 Traduire" },
   { "cat": "Agenda", "titre": "Rappels à la demande", "depuis": "1.51",
     "desc": "Demande un rappel en langage normal : à l'heure dite, une carte apparaît au-dessus du chat avec une notification Windows, même discussion fermée. « Encore dans 10 min » pour le repousser ; « Annuler ce rappel » dans la conversation.",
     "ex": "« Rappelle-moi dans 20 min de sortir le linge » · « demain à 8 h, appeler le secrétariat »" },

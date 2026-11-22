@@ -50,7 +50,7 @@ Si Windows affiche « Windows a protégé votre ordinateur » : *Informations co
 
 Un seul raccourci, **Alt + Espace** (modifiable), ou un clic sur le chat. Depuis Bébène, le même raccourci referme la discussion ; Échap aussi, comme un clic ailleurs.
 
-**Avec une sélection**, c'est encore plus pratique : sélectionne du texte, des fichiers ou des dossiers (dans l'Explorateur aussi), puis Alt + Espace. Bébène ouvre une nouvelle conversation avec ta sélection en petites étiquettes. Chaque raccourci suivant **ajoute** la nouvelle sélection, et rien n'est perdu si tu fermes la fenêtre avant d'envoyer. Pour un texte, des boutons proposent Expliquer, Traduire, Corriger ou Résumer.
+**Avec une sélection**, c'est encore plus pratique : sélectionne des fichiers ou des dossiers dans l'Explorateur ou sur le Bureau, puis Alt + Espace. Bébène ouvre une nouvelle conversation avec ta sélection en petites étiquettes. Chaque raccourci suivant **ajoute** la nouvelle sélection, et rien n'est perdu si tu fermes la fenêtre avant d'envoyer. Dans les autres applis, Alt + Espace ouvre simplement la discussion.
 
 <p align="center"><img src="docs/images/selection.png" width="460" alt="Sélections jointes à la prochaine conversation"></p>
 

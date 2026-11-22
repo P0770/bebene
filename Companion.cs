@@ -19,10 +19,10 @@ using Microsoft.Web.WebView2.WinForms;
 
 [assembly: System.Reflection.AssemblyTitle("Bébène")]
 [assembly: System.Reflection.AssemblyProduct("Bébène")]
-[assembly: System.Reflection.AssemblyVersion("1.56.0.0")]
+[assembly: System.Reflection.AssemblyVersion("1.57.0.0")]
 
 static class Program {
-    public const string Version = "1.56";
+    public const string Version = "1.57";
     public static bool OpenSetup;
     public static readonly uint Pid = (uint)Process.GetCurrentProcess().Id;   // identifiant de Bébène (lu une seule fois)   // --setup : ouvrir directement l'assistant d'installation
 
@@ -673,7 +673,8 @@ class Companion : Form {
         base.WndProc(ref m);
     }
 
-    // ---- « Demande sur la sélection » : copie le texte sélectionné dans l'appli active (Ctrl+C simulé), puis ouvre la discussion avec ----
+    // ---- « Demande sur la sélection » : fichiers / dossiers sélectionnés dans l'Explorateur ou sur le Bureau (Ctrl+C simulé), puis ouvre la discussion avec ----
+    // Le texte n'est plus capté (trop peu fiable selon les applis) : ailleurs, le raccourci ouvre simplement la discussion.
     // Le presse-papiers de l'utilisateur est remis comme avant (texte, image ou fichiers).
     [DllImport("user32.dll")] static extern short GetAsyncKeyState(int vk);
     [DllImport("user32.dll")] static extern uint GetClipboardSequenceNumber();
@@ -681,17 +682,20 @@ class Companion : Form {
     bool selBusy;
     [DllImport("user32.dll", CharSet = CharSet.Unicode)] static extern int GetClassName(IntPtr h, StringBuilder s, int n);
     [DllImport("user32.dll", CharSet = CharSet.Unicode)] internal static extern IntPtr FindWindow(string cls, string title);
-    // fenêtres où un Ctrl+C simulé serait dangereux (terminal : interrompt la commande en cours) → pas de capture
-    static bool IsTerminal(IntPtr h) {
+    // seules fenêtres où l'on copie : Explorateur (CabinetWClass) et Bureau (Progman / WorkerW)
+    static bool IsExplorer(IntPtr h) {
         var sb = new StringBuilder(256); GetClassName(h, sb, 256);
-        return Regex.IsMatch(sb.ToString(), "^(ConsoleWindowClass|CASCADIA_HOSTING_WINDOW_CLASS|PseudoConsoleWindow|VirtualConsoleClass|mintty)$");
+        return Regex.IsMatch(sb.ToString(), "^(CabinetWClass|ExploreWClass|Progman|WorkerW)$");
     }
     void AskSelection() {
         if (selBusy) return;
         var fg = GetForegroundWindow(); uint pid; GetWindowThreadProcessId(fg, out pid);
         if (pid == Program.Pid && Panel.Visible) { Panel.Hide(); return; }                 // depuis Bébène : le raccourci referme
-        if (fg == IntPtr.Zero || pid == Program.Pid || IsTerminal(fg)) { ShowPanel(); Panel.Post("selection\n"); return; }
+        if (fg == IntPtr.Zero || pid == Program.Pid || !IsExplorer(fg)) { ShowPanel(); Panel.Post("selection\n"); return; }
         selBusy = true;
+        // touche neutre (0xE8, non attribuée) pendant que Alt / Win sont encore enfoncés : sinon l'Explorateur voit « Alt relâché seul »
+        // (la touche du raccourci est mangée) et passe en navigation clavier dans son ruban
+        keybd_event(0xE8, 0, 0, UIntPtr.Zero); keybd_event(0xE8, 0, 2, UIntPtr.Zero);
         // on attend que l'utilisateur relâche Ctrl / Alt / Maj / Win du raccourci (sinon Ctrl+C devient Ctrl+Alt+C)
         int waited = 0; var t = new System.Windows.Forms.Timer { Interval = 30 };
         t.Tick += (s, e) => {
@@ -706,7 +710,7 @@ class Companion : Form {
         };
         t.Start();
     }
-    // copie ce qui est sélectionné (Ctrl+C simulé) : texte, ou fichiers / dossiers de l'Explorateur ; renvoie {text, files:[{p, d}]}
+    // copie les fichiers / dossiers sélectionnés (Ctrl+C simulé) ; renvoie {text:"", files:[{p, d}]}
     static string CopySelection() {
         // sauvegarde du presse-papiers (formats courants)
         string oldText = Clipboard.ContainsText() ? Clipboard.GetText() : null;
@@ -717,15 +721,14 @@ class Companion : Form {
         keybd_event(0x43, 0, 2, UIntPtr.Zero); keybd_event(0x11, 0, 2, UIntPtr.Zero);
         var sw = Stopwatch.StartNew();
         while (GetClipboardSequenceNumber() == seq && sw.ElapsedMilliseconds < 450) { Application.DoEvents(); Thread.Sleep(15); }   // rien de sélectionné : on n'attend pas longtemps
-        string text = ""; var files = new List<Dictionary<string, object>>();
+        var files = new List<Dictionary<string, object>>();
         if (GetClipboardSequenceNumber() != seq) {
             Thread.Sleep(30);
-            for (int i = 0; i < 5; i++) {                                                 // presse-papiers encore ouvert par l'appli : on réessaie
+            for (int i = 0; i < 5; i++) {                                                 // presse-papiers encore ouvert par l'Explorateur : on réessaie
                 try {
                     if (Clipboard.ContainsFileDropList())
                         foreach (string p in Clipboard.GetFileDropList())
                             if (files.Count < 50) files.Add(new Dictionary<string, object> { { "p", p }, { "d", Directory.Exists(p) } });
-                    if (files.Count == 0 && Clipboard.ContainsText()) text = Clipboard.GetText();
                     break;
                 } catch { Thread.Sleep(40); }
             }
@@ -737,9 +740,7 @@ class Companion : Form {
             } catch (Exception ex) { Program.Log("Sélection", "presse-papiers non restauré : " + ex.Message); }
         }
         if (oldImg != null) oldImg.Dispose();
-        text = (text ?? "").Trim();
-        if (text.Length > 20000) text = text.Substring(0, 20000);
-        return new JavaScriptSerializer().Serialize(new Dictionary<string, object> { { "text", text }, { "files", files } });
+        return new JavaScriptSerializer().Serialize(new Dictionary<string, object> { { "text", "" }, { "files", files } });
     }
 
     public string State { get { return state; } }

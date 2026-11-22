@@ -292,10 +292,12 @@ footer { padding: 10px 16px 14px; }
 .box { padding: 10px 10px 10px 18px; }
 textarea { min-height: 28px; }
 .opts { margin-top: 10px; gap: 16px; padding: 0 6px; }
-#quota { padding: 0; flex: 1; max-width: 250px; gap: 14px; }
+#quota { padding: 0; flex: 1; max-width: 290px; gap: 14px; }
 .q { gap: 6px; }
 .q i { min-width: 26px; }
 .q em { min-width: 0; }
+.q em, .q small, .q span { white-space: nowrap; flex-shrink: 0; }   /* « 88 % » / « ↻ 12 h » jamais coupés en colonne : c'est la barre qui rétrécit */
+.q i { min-width: 16px; }
 .q small { font-size: 10.5px; color: var(--muted); white-space: nowrap; font-variant-numeric: tabular-nums; }
 .mitem .cnt { font-size: 11px; color: var(--muted); background: rgba(var(--ov),.06); border-radius: 999px; padding: 0 7px; flex: none; }
 /* boutons Copier */
@@ -1573,8 +1575,11 @@ $('#mConvs').addEventListener('click', e => {
     const id = t.dataset.del;
     if (convArm !== id) { convArm = id; renderMenuNow(); setTimeout(() => { if (convArm === id) { convArm = ''; renderMenu(); } }, 4000); return; }
     const gone = convs.find(c => c.id === id), vw = gone && viewOf(gone);
-    if (vw) { post('stop\n' + vw.rkey); delete VIEWS[vw.rkey]; }      // une tâche en fond s'arrête avec sa conversation
-    if (conv && conv.id === id && busy) post('stop\n' + rkey);
+    // sa tâche (en cours ou finie sur une question) est arrêtée et oubliée : le chat ne reste pas en attente d'une conversation supprimée
+    const keys = new Set([id]);
+    if (vw) { keys.add(vw.rkey); delete VIEWS[vw.rkey]; }
+    if (conv && conv.id === id) keys.add(rkey);
+    keys.forEach(k => post('drop\n' + k));
     convArm = ''; convs = convs.filter(c => c.id !== id); if (conv && conv.id === id) conv = null; persist(); renderMenuNow(); return;
   }
   const c = convs.find(x => x.id === row.dataset.c); if (c) openConv(c);

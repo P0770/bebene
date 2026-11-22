@@ -582,6 +582,7 @@ class ChatPanel : Form {
             case "notehide": Notes.Hide(parts.Length > 1 ? parts[1] : ""); break;
             case "notedel": Notes.Delete(parts.Length > 1 ? parts[1] : ""); break;
             case "stop": StopRun(parts.Length > 1 ? parts[1] : ""); break;                       // stop\n<clé>
+            case "drop": DropRun(parts.Length > 1 ? parts[1] : ""); break;                   // drop\n<clé> : conversation supprimée
             case "calm": Calm(parts.Length > 1 && parts[1].Length > 0 ? parts[1] : null); break;   // question / demande abandonnée
             case "send": {                                 // send\n<clé>\n<auto>\n<sid>\n<autorisés>\n<flash>\n<projet>\n<texte>
                 var sp = m.Split(new[] { '\n' }, 8);
@@ -692,7 +693,7 @@ class ChatPanel : Form {
     // Une session reste ouverte entre deux messages (pas de redémarrage = réponse plus rapide), et se ferme après 10 min sans rien.
     // Si les réglages de lancement changent (autorisations, mode autonome, modèle…), la session est relancée avec --resume.
     class Runner {
-        public string Key, Sig = "", Model = "", HandKind = ""; public bool Busy, Asking, Hand, Stopping, Lite; public int Done, Total;
+        public string Key, Sig = "", Model = "", HandKind = ""; public bool Busy, Asking, Hand, Stopping, Lite, Forgotten; public int Done, Total;
         public Process P; public readonly StringBuilder Err = new StringBuilder(); public DateTime Used = DateTime.Now, FlagAt = DateTime.MinValue;
     }
     readonly Dictionary<string, Runner> runners = new Dictionary<string, Runner>();
@@ -716,6 +717,14 @@ class ChatPanel : Form {
     }
     void Retire(Runner r) { var p = r.P; r.P = null; r.Stopping = false; if (p == null) return; try { p.StandardInput.Close(); } catch { } KillAfter(p, 4000); }
     void StopRun(string key) { Runner r; if (runners.TryGetValue(key ?? "", out r) && r.P != null && r.Busy) { r.Stopping = true; KillProc(r.P); } }
+    // conversation supprimée : sa tâche est arrêtée et oubliée (sinon le chat reste en « question » / « besoin de toi » pour une conversation qui n'existe plus)
+    void DropRun(string key) {
+        Runner r; if (!runners.TryGetValue(key ?? "", out r)) return;
+        r.Asking = r.Hand = false;
+        if (r.Busy) { r.Forgotten = true; r.Stopping = true; if (r.P != null) KillProc(r.P); }    // retirée à la fin du processus
+        else { Retire(r); runners.Remove(r.Key); }
+        UpdateCat(false, 0);
+    }
     void KillTree() { foreach (var r in runners.Values) KillProc(r.P); }
     public void KillAll() { KillTree(); }
     public void TestSend(string key, string text) { var lw = Companion.LastWindow; Companion.LastWindow = ""; Send(key, text, false, "", "", true, ""); Companion.LastWindow = lw; }
@@ -842,7 +851,8 @@ class ChatPanel : Form {
                 if (r.Busy) {
                     string er; lock (r.Err) er = r.Err.ToString();
                     r.Busy = false; PostDone(key, r.Stopping ? "1" : (code == 0 ? "2" : code.ToString()), r.Stopping ? "" : er);
-                    r.Stopping = false; UpdateCat(true, code);
+                    r.Stopping = false;
+                    if (r.Forgotten) { runners.Remove(r.Key); UpdateCat(false, 0); } else UpdateCat(true, code);
                 }
                 try { p.Dispose(); } catch { }
             }); } catch { } // l'app se ferme pendant que Claude répond
