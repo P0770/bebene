@@ -860,29 +860,31 @@ static class Reminders {
 }
 
 class ReminderCard : Layered {
-    public CalEvent Ev; public string When = ""; public Action OnDone;
+    public CalEvent Ev; public string When = "", MyId; public Action OnDone;   // MyId : rappel demandé à Bébène (« rappelle-moi… »)
     const int W = 320, H = 116;
     protected override Size Measure() { return new Size(W, H); }
     protected override void Render(Graphics g) {
         var r = new RectangleF(4, 2, W - 8, H - 10);
         Card(g, r, 16);
-        bool exam = Ev.Kind == "exam";
-        using (var p = Round(new RectangleF(r.X + 1, r.Y + 1, 4, r.Height - 2), 2)) using (var b = new SolidBrush(exam ? ExamC : RdvC)) g.FillPath(b, p);
-        string tag = exam ? "EXAMEN" : "RENDEZ-VOUS";
+        bool exam = Ev.Kind == "exam", mine = MyId != null;
+        Color c = mine ? Accent : exam ? ExamC : RdvC;
+        using (var p = Round(new RectangleF(r.X + 1, r.Y + 1, 4, r.Height - 2), 2)) using (var b = new SolidBrush(c)) g.FillPath(b, p);
+        string tag = mine ? "RAPPEL" : exam ? "EXAMEN" : "RENDEZ-VOUS";
         var ts = g.MeasureString(tag, FTag); var tr = new RectangleF(r.X + 16, r.Y + 12, ts.Width + 8, 17);
-        using (var p = Round(tr, 5)) using (var b = new SolidBrush(Color.FromArgb(55, exam ? ExamC : RdvC))) g.FillPath(b, p);
-        DrawText(g, tag, FTag, exam ? Color.FromArgb(240, 140, 135) : Color.FromArgb(140, 196, 230), tr, StringAlignment.Center);
+        using (var p = Round(tr, 5)) using (var b = new SolidBrush(Color.FromArgb(55, c))) g.FillPath(b, p);
+        DrawText(g, tag, FTag, mine ? Accent2 : exam ? Color.FromArgb(240, 140, 135) : Color.FromArgb(140, 196, 230), tr, StringAlignment.Center);
         DrawText(g, Cap(When), FBold, Accent2, new RectangleF(tr.Right + 8, r.Y + 11, r.Right - tr.Right - 20, 19));
         DrawText(g, Ev.Title, FTitle, Txt, new RectangleF(r.X + 16, r.Y + 33, r.Width - 28, 22));
-        string t = (Ev.AllDay ? "Toute la journée" : Ev.Start.ToString("dddd d MMMM 'à' HH:mm", FR)) + (Ev.Loc.Length > 0 ? " · " + Ev.Loc.Replace("\n", " ") : "");
+        string t = mine ? "Prévu pour " + Ev.Start.ToString("HH:mm", FR)
+                        : (Ev.AllDay ? "Toute la journée" : Ev.Start.ToString("dddd d MMMM 'à' HH:mm", FR)) + (Ev.Loc.Length > 0 ? " · " + Ev.Loc.Replace("\n", " ") : "");
         DrawText(g, t, FSmall, Muted, new RectangleF(r.X + 16, r.Y + 55, r.Width - 28, 17));
         var ok = new RectangleF(r.Right - 66, r.Bottom - 34, 54, 24);
         var never = new RectangleF(r.X + 12, r.Bottom - 34, 140, 24);
         using (var p = Round(ok, 12)) using (var b = new SolidBrush(Accent)) g.FillPath(b, p);
         DrawText(g, "OK", FBold, Color.White, ok, StringAlignment.Center);
-        DrawText(g, "Ne plus me rappeler", FSmall, Muted, never);
+        DrawText(g, mine ? "Encore dans 10 min" : "Ne plus me rappeler", FSmall, Muted, never);
         Hit(Rectangle.Round(ok), () => { Hide(); if (OnDone != null) OnDone(); });
-        Hit(Rectangle.Round(never), () => { Reminders.Never(Ev); Hide(); if (OnDone != null) OnDone(); });
+        Hit(Rectangle.Round(never), () => { if (mine) MyReminders.Snooze(MyId, 10); else Reminders.Never(Ev); Hide(); if (OnDone != null) OnDone(); });
     }
 }
 

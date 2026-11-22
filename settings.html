@@ -201,6 +201,10 @@ html.light .hk:hover { border-color: #bdb5ae; }
 
 <details class="sec" id="alertes"><summary><span class="st"><b>Alertes et rappels</b><span>Rappels, demandes d'accord, correcteur</span></span><svg class="chev" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg></summary><div class="sb">
 <div class="card">
+  <div class="row">
+    <div class="lbl"><b>Point du jour</b><span style="white-space:normal">À la première ouverture de la journée : agenda du jour, examens et rendez-vous de la semaine, rappels, post-it épinglés et tâches en pause.</span></div>
+    <label class="switch"><input type="checkbox" id="dailyBrief"><span class="track"></span></label>
+  </div>
   <div class="row"><div class="lbl"><b style="font-weight:600">Ne plus demander mon accord pour…</b><span style="white-space:normal">Coche ce pour quoi tu ne veux plus la carte « 🔐 Claude a besoin de ton accord ». Les modifications de fichiers dans le dossier de travail ne demandent déjà jamais.</span></div></div>
   <div class="row">
     <div class="lbl"><b>Les commandes</b><span style="white-space:normal">PowerShell, Bash : agir dans Excel/Word, lancer un script, ranger des fichiers…</span></div>
@@ -380,6 +384,10 @@ html.light .hk:hover { border-color: #bdb5ae; }
     <div class="lbl"><b>Raccourci secondaire</b><span id="hk2msg">Même action, autre combinaison.</span></div>
     <span class="hkw"><button class="hk" id="hk2" title="Cliquer puis taper la nouvelle combinaison"></button><button class="hkx" data-hk="2" title="Désactiver ce raccourci">×</button></span>
   </div>
+  <div class="row">
+    <div class="lbl"><b>Demander sur la sélection</b><span id="hk3msg">Sélectionne du texte dans n'importe quelle appli, puis ce raccourci : Bébène s'ouvre avec ce texte.</span></div>
+    <span class="hkw"><button class="hk" id="hk3" title="Cliquer puis taper la nouvelle combinaison"></button><button class="hkx" data-hk="3" title="Désactiver ce raccourci">×</button></span>
+  </div>
   <div class="row"><div class="lbl"><span style="white-space:normal">Clique sur un raccourci puis tape la combinaison (ex. <kbd>Ctrl</kbd> + <kbd>Shift</kbd> + <kbd>B</kbd>). Échap annule. <a href="#" id="hkReset">Remettre les raccourcis d'origine</a></span></div></div>
   <div class="row">
     <div class="lbl"><b>Bébène</b><span id="version">Version</span></div>
@@ -502,7 +510,7 @@ function render(s) {
   $('#hname').textContent = s.name;
   if (document.activeElement !== $('#name')) $('#name').value = s.name;
   if (document.activeElement !== $('#prompt')) $('#prompt').value = s.prompt;
-  $('#showCat').checked = s.showCat; $('#topMost').checked = s.topMost; $('#autoStart').checked = s.autoStart; $('#caveman').checked = s.caveman; $('#chrome').checked = s.chrome; $('#postits').checked = s.postits; $('#prepare').checked = s.prepare; $('#spell').checked = s.spell; $('#stream').checked = s.stream; $('#autoModel').checked = s.autoModel; showHotkeys(s);
+  $('#showCat').checked = s.showCat; $('#topMost').checked = s.topMost; $('#autoStart').checked = s.autoStart; $('#caveman').checked = s.caveman; $('#chrome').checked = s.chrome; $('#postits').checked = s.postits; $('#prepare').checked = s.prepare; $('#dailyBrief').checked = s.dailyBrief !== false; $('#spell').checked = s.spell; $('#stream').checked = s.stream; $('#autoModel').checked = s.autoModel; showHotkeys(s);
   $('#model').value = s.model;
   $('#workDir').textContent = s.workDir; $('#workDir').title = s.workDir;
   $('#version').textContent = 'Version ' + s.version;
@@ -544,7 +552,7 @@ $('#mAdd').onclick = () => {
 
 document.querySelectorAll('[data-act]').forEach(b => b.onclick = () => post(b.dataset.act));
 $('#light').onchange = e => { document.documentElement.classList.toggle('light', e.target.checked); set({ light: e.target.checked }); };
-['showCat', 'topMost', 'autoStart', 'caveman', 'stream', 'autoModel', 'chrome', 'postits', 'prepare', 'spell'].forEach(id => $('#' + id).onchange = e => set({ [id]: e.target.checked }));
+['showCat', 'topMost', 'autoStart', 'caveman', 'stream', 'autoModel', 'chrome', 'postits', 'prepare', 'spell', 'dailyBrief'].forEach(id => $('#' + id).onchange = e => set({ [id]: e.target.checked }));
 $('#model').onchange = e => set({ model: e.target.value });
 $('#name').onchange = e => set({ name: e.target.value });
 $('#name').onkeydown = e => { if (e.key === 'Enter') e.target.blur(); };
@@ -671,17 +679,18 @@ post('tpl');
 })();
 
 // ---- raccourcis clavier configurables : clic sur le bouton, puis on tape la combinaison ----
-const HK_DEF = ['Alt+Space', 'Ctrl+Alt+C'];
-let hkWait = 0, hkVals = ['', ''];
+const HK_DEF = ['Alt+Space', 'Ctrl+Alt+C', 'Ctrl+Alt+Q'];
+let hkWait = 0, hkVals = ['', '', ''];
 function hkLabel(v) { return v ? v.replace('Space', 'Espace').replace(/\bD(\d)\b/, '$1').split('+').join(' + ') : 'Désactivé'; }
 function showHotkeys(s) {
-  hkVals = [s.hotkey1 || '', s.hotkey2 || ''];
-  [1, 2].forEach(i => {
+  hkVals = [s.hotkey1 || '', s.hotkey2 || '', s.hotkey3 || ''];
+  [1, 2, 3].forEach(i => {
     if (hkWait === i) return;
     const b = $('#hk' + i), v = hkVals[i - 1], ok = s.hotkeyOk ? s.hotkeyOk[i - 1] : true;
     b.textContent = hkLabel(v); b.className = 'hk' + (!v ? ' off' : !ok ? ' bad' : '');
     $('#hk' + i + 'msg').textContent = v && !ok ? 'Combinaison déjà prise par une autre application : choisis-en une autre.'
-      : i === 1 ? 'Ouvre ou ferme la discussion, de n\'importe où.' : 'Même action, autre combinaison.';
+      : i === 1 ? 'Ouvre ou ferme la discussion, de n\'importe où.' : i === 2 ? 'Même action, autre combinaison.'
+      : 'Sélectionne du texte dans n\'importe quelle appli, puis ce raccourci : Bébène s\'ouvre avec ce texte.';
   });
 }
 // nom de touche compris par Bébène (.NET Keys) à partir de l'événement clavier
@@ -704,11 +713,11 @@ function hkStop(val) {
   hkWait = 0;
   if (val !== undefined) { hkVals[i - 1] = val; set({ ['hotkey' + i]: val }); }     // enregistre et réactive les raccourcis
   else post('set\n' + JSON.stringify({ hotkeyResume: 1 }));
-  showHotkeys({ hotkey1: hkVals[0], hotkey2: hkVals[1] });
+  showHotkeys({ hotkey1: hkVals[0], hotkey2: hkVals[1], hotkey3: hkVals[2] });
 }
-[1, 2].forEach(i => $('#hk' + i).onclick = () => hkWait === i ? hkStop() : hkStart(i));
+[1, 2, 3].forEach(i => $('#hk' + i).onclick = () => hkWait === i ? hkStop() : hkStart(i));
 document.querySelectorAll('.hkx').forEach(b => b.onclick = () => { hkWait = +b.dataset.hk; hkStop(''); });
-$('#hkReset').onclick = e => { e.preventDefault(); hkStop(); set({ hotkey1: HK_DEF[0], hotkey2: HK_DEF[1] }); };
+$('#hkReset').onclick = e => { e.preventDefault(); hkStop(); set({ hotkey1: HK_DEF[0], hotkey2: HK_DEF[1], hotkey3: HK_DEF[2] }); };
 document.addEventListener('keydown', e => {
   if (!hkWait) return;
   e.preventDefault(); e.stopPropagation();

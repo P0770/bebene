@@ -66,6 +66,12 @@ Clic sur le chat, **Alt + Espace** ou **Ctrl + Alt + C** (raccourcis modifiables
   <img src="docs/images/discussion-conv.png" width="300" alt="Une conversation">
 </p>
 
+**Nouveautés 1.51**
+- **Coller une image** : Ctrl+V d'une capture d'écran (Win+Maj+S) ou d'une image copiée ; Claude la voit avec ton message.
+- **Demander sur la sélection** : sélectionne du texte dans n'importe quelle appli, puis **Ctrl + Alt + Q** : Bébène s'ouvre avec ce texte et propose Expliquer, Traduire, Corriger ou Résumer.
+- **Recherche** dans l'historique : titres et contenu de toutes les conversations, sans tenir compte des accents.
+- **Historique sans limite** : une conversation = un fichier (`%LOCALAPPDATA%ClaudeCompanionnversations`), plus de limite à 40.
+
 **L'en-tête**
 - l'avatar de Bébène (il pulse quand Claude réfléchit), son nom et en dessous le titre de la conversation ;
 - ☕ **offrir un café** (ouvre la page [Buy Me a Coffee](https://buymeacoffee.com/p0770)) · ✏️ **nouvelle conversation** · 📌 **épingler** (la fenêtre reste ouverte quand tu cliques ailleurs) · ⚙️ **réglages** · ✕ **fermer** (ou Échap) ;
@@ -130,6 +136,10 @@ Exemples :
 > « Rédige un mail pour décaler mon rendez-vous de jeudi »
 
 ### 3. Calendrier, examens et rendez-vous
+
+**Point du jour** (désactivable dans Réglages › Alertes) : à la première ouverture de la journée, une carte résume l'agenda du jour, les examens et rendez-vous de la semaine, les rappels, les post-it épinglés et les tâches en pause.
+
+**Rappels à la demande** : « rappelle-moi dans 20 min de… », « demain à 8 h… » : à l'heure dite, une carte apparaît au-dessus du chat avec une notification, même discussion fermée (« Encore dans 10 min » pour repousser).
 
 Deux **doubles flèches orange** encadrent la discussion :
 - **«** à gauche : le **calendrier du mois** (points de couleur = événements, point rouge = examen). Clic sur un jour pour voir le détail.
@@ -288,6 +298,7 @@ Tout est expliqué pas à pas dans **[docs/MISE-A-JOUR.md](docs/MISE-A-JOUR.md)*
 bebene/
 ├── Companion.cs                 démarrage, réglages, le chat animé (+ Version de l'app)
 ├── Discussion.cs                fenêtre de discussion, tâches Claude en parallèle
+├── Conversations.cs           historique en fichiers, rappels demandés, point du jour
 ├── PostIts.cs · Agenda.cs       post-it · calendriers, mails, rappels
 ├── Correcteur.cs · Modeles.cs   correcteur d'orthographe · modèles de référence
 ├── Installation.cs · Reglages.cs  assistant d'installation, mises à jour · fenêtre des réglages

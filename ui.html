@@ -486,6 +486,45 @@ html.light ::-webkit-scrollbar-thumb { background: rgba(40,30,35,.18); }
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 #toast.open { opacity: 1; transform: translate(-50%, 0); pointer-events: auto; }
 #toast.err { border-color: rgba(240,90,90,.5); }
+/* recherche dans l'historique */
+.msearch { padding: 2px 8px 6px; }
+.msearch input { width: 100%; font: inherit; font-size: 12.5px; padding: 6px 10px; border-radius: 9px; border: 1px solid var(--line); background: rgba(var(--sunk),.18); color: var(--text); outline: none; }
+.msearch input:focus { border-color: var(--accent); }
+.mitem small.snip { white-space: normal; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; margin-top: 2px; }
+.mitem small.snip mark { background: rgba(217,119,87,.3); color: var(--text); border-radius: 3px; padding: 0 1px; }
+/* rappel programmé dans la conversation */
+.rcard { border: 1px solid rgba(217,119,87,.4); background: rgba(217,119,87,.06); border-radius: 14px; padding: 9px 12px; font-size: 13px; animation: rise .25s ease; }
+.rcard .rh { font-weight: 600; display: flex; gap: 7px; }
+.rcard .rq { margin: 4px 0 7px 23px; }
+.rcard .rx { margin-left: 23px; font: inherit; font-size: 12px; border-radius: 9px; padding: 4px 10px; cursor: pointer; border: 1px solid var(--line); background: var(--raised); color: var(--muted); }
+.rcard .rx:hover { color: var(--text); border-color: var(--accent); }
+.rcard .rdone { margin-left: 23px; color: var(--muted); font-size: 12px; }
+/* texte sélectionné dans une autre appli */
+#selbar { display: none; margin: 0 2px 8px; border: 1px solid rgba(217,119,87,.35); background: rgba(217,119,87,.07); border-radius: 14px; padding: 8px 10px; font-size: 12.5px; animation: rise .2s ease; }
+#selbar.on { display: block; }
+#selbar .sh { display: flex; justify-content: space-between; align-items: center; font-weight: 600; }
+#selbar .sq { color: var(--muted); margin: 4px 0 7px; max-height: 3.9em; overflow: hidden; white-space: pre-wrap; }
+#selbar .sb { display: flex; flex-wrap: wrap; gap: 6px; }
+#selbar .sb button { font: inherit; font-size: 12px; border-radius: 9px; padding: 4px 9px; cursor: pointer; border: 1px solid var(--line); background: var(--raised); color: var(--text); }
+#selbar .sb button:hover { border-color: var(--accent); }
+#selbar .x, #brief .x { background: none; border: 0; color: var(--muted); font-size: 17px; cursor: pointer; line-height: 1; padding: 0 4px; }
+/* point du jour */
+#brief { display: none; position: absolute; left: 12px; right: 12px; top: 10px; z-index: 6; max-height: calc(100% - 20px); overflow-y: auto;
+  background: rgba(var(--pop),.97); border: 1px solid var(--line); border-radius: 16px; padding: 10px 14px 8px; font-size: 13px; box-shadow: 0 10px 30px rgba(0,0,0,.35); animation: rise .25s ease; }
+#brief.on { display: block; }
+#brief .bh { display: flex; justify-content: space-between; align-items: center; font-weight: 600; font-size: 14px; margin-bottom: 4px; }
+#brief .bs { color: var(--accent-2); font-size: 11.5px; font-weight: 600; text-transform: uppercase; letter-spacing: .04em; margin: 9px 0 3px; }
+#brief .bi { display: flex; gap: 9px; padding: 3px 0; width: 100%; text-align: left; font: inherit; color: var(--text); background: none; border: 0; }
+#brief .bi b { min-width: 52px; color: var(--muted); font-weight: 500; }
+#brief .bc { cursor: pointer; border-radius: 8px; }
+#brief .bc:hover { background: rgba(var(--ov),.06); }
+#brief .bn { color: var(--muted); }
+#brief .bt { font-style: normal; font-size: 10.5px; border-radius: 5px; padding: 0 5px; margin-left: 3px; }
+#brief .bt.ex { background: rgba(240,140,135,.18); color: #f08c87; }
+#brief .bt.rv { background: rgba(140,196,230,.18); color: #8cc4e6; }
+#brief .bt.ml { background: rgba(var(--ov),.08); color: var(--muted); }
+#brief .bf { margin-top: 8px; text-align: right; }
+#brief .bf a { color: var(--muted); font-size: 11.5px; }
 #toast u { color: var(--accent-2); }
 /* pause de quota */
 .pause { margin: 8px 0 4px; padding: 12px 14px; border-radius: 14px; background: rgba(224,184,79,.07); border: 1px solid rgba(224,184,79,.35); font-size: 13px; }
@@ -603,6 +642,7 @@ input.ren, input.gren { flex: 1; min-width: 0; font: inherit; font-size: 13px; f
       <svg class="chev" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg></button>
     <div class="ddmenu right">
       <div class="msec mhead"><span id="mConvTitle">Conversations récentes</span><button class="mgadd" id="mGroupAdd" title="Créer un sous-groupe pour ranger les conversations">＋ Groupe</button></div>
+      <div class="msearch"><input id="mSearch" type="search" placeholder="🔎 Rechercher dans les conversations…" autocomplete="off"></div>
       <div id="mConvs"></div>
       <button class="mlink" id="term">Continuer cette conversation dans le terminal ›</button>
     </div>
@@ -610,6 +650,7 @@ input.ren, input.gren { flex: 1; min-width: 0; font: inherit; font-size: 13px; f
 </div>
 
 <main>
+  <div id="brief"></div>
   <div id="log"></div>
   <div id="empty">
     <div class="orb"></div>
@@ -624,6 +665,7 @@ input.ren, input.gren { flex: 1; min-width: 0; font: inherit; font-size: 13px; f
 </main>
 
 <footer>
+  <div id="selbar"></div>
   <div id="lhint"></div>
   <div class="box">
     <textarea id="input" rows="1" placeholder="Écris à Claude…"></textarea>
@@ -675,7 +717,18 @@ const CAT = '<svg viewBox="0 0 40 40"><path d="M7 15 L9 3 L17 10 Q20 9 23 10 L31
 document.querySelectorAll('.orb').forEach(o => o.innerHTML = '<img src="avatar.png" alt="">');
 
 // ---- conversations enregistrées, projets, mode flash ----
-let convs = []; try { convs = JSON.parse(store.get('convs', '[]')) || []; } catch { convs = []; }
+// Historique : un fichier par conversation, géré par Bébène (window.__CONVS, injecté avant ce script).
+// Sans Bébène (tests) : stockage local de la page, comme avant.
+const FILES = Array.isArray(window.__CONVS);
+let convs = []; try { convs = FILES ? window.__CONVS : JSON.parse(store.get('convs', '[]')) || []; } catch { convs = []; }
+let migrate = false;
+if (FILES) {
+  if (!convs.length) { try { const old = JSON.parse(store.get('convs', '[]')) || []; if (old.length) { convs = old; migrate = true; } } catch { } }   // 1re fois : reprise de l'ancien stockage
+  else try { localStorage.removeItem('convs'); } catch { }                                                                                     // déjà dans les fichiers : place libérée
+}
+const sent = new Map();                    // dernier état enregistré de chaque conversation : on n'écrit que ce qui a changé
+if (FILES && !migrate) convs.forEach(c => sent.set(c.id, JSON.stringify(c)));
+let SEL = '';                              // texte sélectionné dans une autre appli (raccourci « Demander sur la sélection »)
 // ---- projet annoncé par Claude (« 📁 Projet : <nom> », celui qui déclenche l'archivage) ----
 function projName(s) {
   return String(s || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^a-z0-9._-]+/g, '-').replace(/^[-.]+|[-.]+$/g, '');
@@ -688,8 +741,10 @@ function projectIn(text) {
 // une seule fois : les anciennes conversations archivées dans un projet mais restées « sans projet » dans l'historique
 (function () {
   let fixed = 0;
+  if (store.get('projfix', '') === '1') { if (migrate) persist(); return; }     // déjà fait : on ne relit plus tout l'historique à chaque démarrage
+  store.set('projfix', '1');
   convs.forEach(c => { if (!c.project && c.hist) { const n = projectIn(c.hist.replace(/<[^>]+>/g, '')); if (n) { c.project = n; fixed++; } } });
-  if (fixed) try { localStorage.setItem('convs', JSON.stringify(convs)); } catch { }
+  if (fixed || migrate) persist();
 })();
 if (!convs.length && store.get('hist', '')) {                       // reprise de l'ancien historique unique
   convs.push({ id: 'c' + Date.now().toString(36), title: 'Conversation précédente', sid: store.get('sid', ''), hist: store.get('hist', ''), project: '', updated: Date.now() });
@@ -747,6 +802,13 @@ setTimeout(() => decorate(), 0);
 // et si c'est plein on retire les plus anciennes au lieu de perdre l'enregistrement sans rien dire.
 function persist() {
   convs.sort((a, b) => b.updated - a.updated);
+  if (FILES) {                                                       // fichiers : seulement les conversations modifiées, ajoutées ou supprimées
+    if (convs.length > 500) convs.length = 500;
+    const ids = new Set();
+    convs.forEach(c => { ids.add(c.id); const j = JSON.stringify(c); if (sent.get(c.id) !== j) { sent.set(c.id, j); post('convsave\n' + c.id + '\n' + j); } });
+    [...sent.keys()].forEach(id => { if (!ids.has(id)) { sent.delete(id); post('convdel\n' + id); } });
+    return;
+  }
   if (convs.length > 40) convs.length = 40;
   convs.forEach((c, i) => { if (i >= 10 && c.hist && c.hist.length > 120000) c.hist = c.hist.slice(-120000); });
   for (let tries = 0; tries < 40; tries++) {
@@ -819,8 +881,25 @@ function takeQuestion(t) {
     try { const o = JSON.parse(j.trim()); hand = { quoi: String((o && o.quoi) || ''), type: /cran/i.test(String(o && o.type)) ? 'ecran' : 'souris' }; } catch { hand = { quoi: '', type: 'souris' }; }
     return '';
   });
-  return { text: text3, ask, ready, hand };
+  const rappels = [];                                                   // rappels programmés (Bébène les montre à l'heure dite, côté C#)
+  const text4 = text3.replace(/```bebene-rappel\s*([\s\S]*?)```/g, (m, j) => {
+    try { const o = JSON.parse(j.trim()); if (o && o.quand && o.quoi) rappels.push({ quand: String(o.quand).trim(), quoi: String(o.quoi).trim().slice(0, 200) }); } catch { }
+    return '';
+  });
+  return { text: text4, ask, ready, hand, rappels };
 }
+// carte « ⏰ Rappel prévu » (même identifiant que côté C# : quand|quoi), avec Annuler
+function showRappel(r) {
+  const d = new Date(r.quand), ok = !isNaN(d);
+  const when = ok ? d.toLocaleString('fr-CH', { weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }) : r.quand;
+  el('rcard', '<div class="rh"><span>⏰</span><span>Rappel prévu · ' + esc(when) + '</span></div><div class="rq">' + esc(r.quoi) + '</div>'
+    + '<button class="rx" data-id="' + esc(r.quand + '|' + r.quoi) + '">Annuler ce rappel</button>');
+  scroll();
+}
+document.addEventListener('click', e => {
+  const b = e.target.closest('.rcard .rx'); if (!b) return;
+  post('remindcancel\n' + b.dataset.id); b.outerHTML = '<div class="rdone">Rappel annulé.</div>'; save();
+});
 // ---- étapes d'une tâche longue (outil TodoWrite de Claude) : une carte cochée qui se met à jour, et « 3/5 » sur le chat ----
 function showPlan(todos) {
   if (turn && todos.length) turn.todos = todos.map(t => ({ content: String(t.content || ''), status: String(t.status || '') }));
@@ -1009,6 +1088,7 @@ function compacted(ok, pre, post_) {
 function submit(text, allowed, silent) {
   text = (text || input.value).trim();
   if (busy || compacting || !text) return;
+  if (!silent && SEL) { text += '\n\nTexte sélectionné :\n"""\n' + SEL + '\n"""'; hideSel(); }   // question tapée sur un texte sélectionné ailleurs
   if (!silent) {
     const pc = openPause();                                            // tâche en pause : écrire = demander de continuer
     if (pc) { if (resumePause(pc, false, text)) { input.value = ''; autosize(); } return; }
@@ -1115,6 +1195,7 @@ function onLine(l) {
         if (q.ask) pendingAsk = q.ask;
         if (q.ready) pendingReady = q.ready;
         if (q.hand) pendingHand = q.hand;
+        q.rappels.forEach(showRappel);
       }
       if (c.type === 'tool_use' && c.name === 'TodoWrite' && !o.parent_tool_use_id) { showPlan((c.input || {}).todos || []); continue; }
       if (c.type === 'tool_use') {
@@ -1233,6 +1314,24 @@ function groupsOf(scope) {
 function menuScope() { return flash ? '' : project; }
 // Le menu n'est pas redessiné pendant un clic (bouton enfoncé) ni pendant une saisie dedans : un élément remplacé entre
 // l'appui et le relâchement perd son clic (ex. une tâche en fond qui avance pendant qu'on clique dans l'historique).
+// ---- recherche dans l'historique : sans accents ni majuscules ; texte de chaque conversation gardé en cache tant qu'elle ne change pas ----
+const fold = s => String(s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
+const plainCache = new Map();
+function plainOf(c) {
+  const k = c.updated + '|' + (c.hist || '').length, hit = plainCache.get(c.id);
+  if (hit && hit.k === k) return hit;
+  const doc = new DOMParser().parseFromString(c.hist || '', 'text/html');      // analysé hors de la page : aucune image chargée, aucun script lancé
+  doc.querySelectorAll('script, style').forEach(n => n.remove());
+  const raw = (doc.body.textContent || '').replace(/\s+/g, ' '), v = { k, raw, f: fold(raw) };
+  plainCache.set(c.id, v); return v;
+}
+// null = pas trouvé ; '' = trouvé dans le titre ; sinon extrait autour du mot, mot surligné
+function snippet(c, q) {
+  if (fold(c.title).includes(q)) return '';
+  const p = plainOf(c), i = p.f.indexOf(q); if (i < 0) return null;
+  const a = Math.max(0, i - 40), b = Math.min(p.raw.length, i + q.length + 60);
+  return (a ? '…' : '') + esc(p.raw.slice(a, i)) + '<mark>' + esc(p.raw.slice(i, i + q.length)) + '</mark>' + esc(p.raw.slice(i + q.length, b)) + (b < p.raw.length ? '…' : '');
+}
 function renderMenu() {
   if (ptrDown || editingIn('.dd')) { menuDirty = true; return; }
   renderMenuNow();
@@ -1251,15 +1350,24 @@ function renderMenuNow() {
   const scope = menuScope(), mine = convs.filter(c => (c.project || '') === scope || stOf(c));
   $('#ddHist').classList.toggle('attn', convs.some(c => c !== conv && stOf(c)));   // une tâche en fond travaille ou t'attend
   $('#mConvTitle').textContent = scope ? 'Conversations · ' + scope : 'Conversations sans projet';
-  const item = (c, ing) => '<div class="mitem conv' + (ing ? ' ing' : '') + (conv && c.id === conv.id ? ' on' : '') + '" data-c="' + c.id + '">'
+  const item = (c, ing, snip) => '<div class="mitem conv' + (ing ? ' ing' : '') + (conv && c.id === conv.id ? ' on' : '') + '" data-c="' + c.id + '">'
     + (cEdit === c.id
       ? '<input class="ren" data-ren="' + c.id + '" value="' + esc(c.title || '') + '" maxlength="60" placeholder="Titre de la conversation">'
       : '<span class="tx">' + (stOf(c) ? '<span class="cst">' + stOf(c) + '</span>' : '') + esc(c.title || 'Conversation')
-        + '<small>' + ago(c.updated) + (c.project !== undefined && (c.project || '') !== scope ? ' · # ' + esc(c.project || 'sans projet') : '') + '</small></span>'
+        + '<small>' + ago(c.updated) + (c.project !== undefined && (c.project || '') !== scope ? ' · # ' + esc(c.project || 'sans projet') : '') + '</small>'
+        + (snip ? '<small class="snip">' + snip + '</small>' : '') + '</span>'
         + '<button class="rn" data-rn="' + c.id + '" title="Renommer">✎</button>'
         + '<button class="mv" data-mv="' + c.id + '" title="Déplacer vers un sous-groupe ou un projet…">⇢</button>'
         + '<button class="del' + (convArm === c.id ? ' arm' : '') + '" data-del="' + c.id + '" title="Supprimer">' + (convArm === c.id ? 'Sûr ?' : '×') + '</button>')
     + '</div>';
+  const q = fold($('#mSearch').value.trim());
+  $('#mGroupAdd').hidden = flash || !!q;
+  if (q) {                                                             // recherche : titres et contenu de TOUTES les conversations (tous projets)
+    const hits = convs.map(c => ({ c, s: snippet(c, q) })).filter(x => x.s !== null);
+    $('#mConvTitle').textContent = hits.length ? hits.length + ' résultat' + (hits.length > 1 ? 's' : '') : 'Recherche';
+    setHTML($('#mConvs'), hits.length ? hits.slice(0, 60).map(x => item(x.c, false, x.s)).join('') : '<div class="mnone">Aucune conversation ne contient « ' + esc($('#mSearch').value.trim()) + ' ».</div>');
+    return;
+  }
   const gs = groupsOf(scope), inScope = c => (c.project || '') === scope;
   let h = gEdit && gEdit.name === null ? '<div class="mgrp new"><span class="gch"></span><input class="gren" placeholder="Nom du sous-groupe…" maxlength="40"></div>' : '';
   gs.forEach(g => {
@@ -1404,7 +1512,8 @@ $('#notes').onclick = e => { e.stopPropagation(); const p = $('#notepop'), was =
 document.addEventListener('click', e => { if (!inside(e, '#notepop, #notes')) $('#notepop').classList.remove('open'); });
 post('notes');
 function closeMenu() { document.querySelectorAll('.dd.open').forEach(d => d.classList.remove('open')); }
-function toggleDd(id) { const d = $(id), was = d.classList.contains('open'); closePops(); if (!was) { d.classList.add('open'); post('projects'); renderMenu(); } }
+function toggleDd(id) { const d = $(id), was = d.classList.contains('open'); closePops(); if (!was) { if (id === '#ddH') $('#mSearch').value = ''; d.classList.add('open'); post('projects'); renderMenu(); } }
+$('#mSearch').addEventListener('input', () => renderMenuNow());
 $('#ddProj').onclick = e => { e.stopPropagation(); toggleDd('#ddP'); };
 $('#ddHist').onclick = e => { e.stopPropagation(); toggleDd('#ddH'); };
 document.addEventListener('click', e => { if (!inside(e, '.dd')) closeMenu(); });
@@ -1614,6 +1723,76 @@ function toast(html, onclick, err) {
   clearTimeout(toastT); toastT = setTimeout(() => t.classList.remove('open'), 6000);
 }
 
+// ---- coller une image (Ctrl+V : capture d'écran, image copiée) : Bébène l'enregistre en PNG, son chemin est ajouté au message ----
+input.addEventListener('paste', e => {
+  const cd = e.clipboardData; if (!cd) return;
+  const img = [...cd.items].find(i => i.kind === 'file' && /^image\//.test(i.type));
+  if (img) {
+    e.preventDefault();
+    const f = img.getAsFile(); if (!f) return;
+    if (f.size > 20e6) { toast('Image trop grande (20 Mo au plus).', null, true); return; }
+    const r = new FileReader(); r.onload = () => post('pasteimg\n' + r.result); r.readAsDataURL(f);
+    return;
+  }
+  if (cd.files && cd.files.length) { e.preventDefault(); window.chrome.webview.postMessageWithAdditionalObjects('files', cd.files); }   // fichiers copiés dans l'Explorateur
+});
+function addPath(p) {
+  input.value = (input.value.trim() ? input.value.trimEnd() + ' ' : '') + '"' + p + '" ';
+  autosize(); input.focus();
+}
+
+// ---- « Demander sur la sélection » : le texte arrive du raccourci, une barre propose des actions (ou on tape sa question) ----
+const SEL_ACTS = {
+  expl: ['💡 Expliquer', 'Explique-moi simplement ce texte :'],
+  trad: ['🌐 Traduire', 'Traduis ce texte (en français s\'il est dans une autre langue, sinon en anglais) :'],
+  corr: ['✏️ Corriger', 'Corrige l\'orthographe et la grammaire de ce texte, et donne la version corrigée prête à copier :'],
+  resu: ['📝 Résumer', 'Résume ce texte en quelques points :']
+};
+function showSel(t) {
+  t = (t || '').trim();
+  if (!t) { hideSel(); toast('Aucun texte sélectionné : sélectionne du texte dans une appli, puis refais le raccourci.'); input.focus(); return; }
+  SEL = t;
+  const b = $('#selbar');
+  b.innerHTML = '<div class="sh"><span>📋 Texte sélectionné · ' + t.length + ' caractère' + (t.length > 1 ? 's' : '') + '</span><button class="x" title="Retirer">×</button></div>'
+    + '<div class="sq">' + esc(t.length > 220 ? t.slice(0, 220) + '…' : t) + '</div>'
+    + '<div class="sb">' + Object.keys(SEL_ACTS).map(k => '<button data-a="' + k + '">' + SEL_ACTS[k][0] + '</button>').join('') + '</div>';
+  b.classList.add('on');
+  input.placeholder = 'Ou pose ta question sur ce texte…'; input.focus();
+}
+function hideSel() {
+  const was = !!SEL; SEL = ''; $('#selbar').classList.remove('on');
+  if (was) input.placeholder = flash ? 'Question rapide… (non enregistrée)' : 'Écris à ' + ($('#name').textContent || 'Bébène') + '…';
+}
+$('#selbar').addEventListener('click', e => {
+  if (e.target.closest('.x')) { hideSel(); return; }
+  const a = e.target.closest('[data-a]'); if (!a || !SEL) return;
+  if (busy || compacting) newChat({ project: project });                 // la conversation affichée travaille : une nouvelle pour cette demande
+  const t = SEL_ACTS[a.dataset.a][1] + '\n\n"""\n' + SEL + '\n"""';
+  hideSel(); submit(t);
+});
+
+// ---- point du jour (une fois par jour, réglage « Point du jour ») ----
+function showBrief(v) {
+  let b; try { b = JSON.parse(v); } catch { return; }
+  const li = (h, t, extra) => '<div class="bi"><b>' + esc(h) + '</b><span>' + esc(t) + (extra || '') + '</span></div>';
+  const tag = e => (e.k === 'exam' ? ' <i class="bt ex">examen</i>' : e.k === 'rdv' ? ' <i class="bt rv">rdv</i>' : '') + (e.m ? ' <i class="bt ml" title="Trouvé dans un mail">✉</i>' : '');
+  const pins = (NOTES && NOTES.notes || []).filter(n => n.pinned && n.shown !== false);
+  const paused = convs.filter(c => c.attn === 'pause');
+  let h = '<div class="bh"><span>☀️ Point du jour · ' + esc(b.date || '') + '</span><button class="x" title="Fermer">×</button></div>';
+  h += '<div class="bs">Aujourd\'hui</div>' + (b.today.length ? b.today.map(e => li(e.h, e.t, (e.l ? ' · ' + esc(e.l) : '') + tag(e))).join('') : '<div class="bn">Rien dans ton agenda.</div>');
+  if (b.rappels.length) h += '<div class="bs">Rappels</div>' + b.rappels.map(r => li(r.h, '⏰ ' + r.t)).join('');
+  if (b.soon.length) h += '<div class="bs">Examens et rendez-vous de la semaine</div>' + b.soon.map(e => li(e.h, e.t, tag(e))).join('');
+  if (pins.length) h += '<div class="bs">Post-it épinglés</div>' + pins.map(n => '<div class="bi"><b>📌</b><span>' + esc(n.title || '') + '</span></div>').join('');
+  if (paused.length) h += '<div class="bs">Tâches en pause</div>' + paused.map(c => '<button class="bi bc" data-c="' + c.id + '"><b>⏸</b><span>' + esc(c.title || 'Conversation') + '</span></button>').join('');
+  h += '<div class="bf"><a href="#" class="boff">Ne plus afficher (réglages › Alertes)</a></div>';
+  const el2 = $('#brief'); el2.innerHTML = h; el2.classList.add('on');
+}
+$('#brief').addEventListener('click', e => {
+  if (e.target.closest('.x')) { $('#brief').classList.remove('on'); return; }
+  if (e.target.closest('.boff')) { e.preventDefault(); $('#brief').classList.remove('on'); post('settings'); return; }
+  const c = e.target.closest('[data-c]'); if (c) { const cv = convs.find(x => x.id === c.dataset.c); $('#brief').classList.remove('on'); if (cv) openConv(cv); }
+});
+
 window.chrome.webview.addEventListener('message', e => {
   const d = String(e.data), i = d.indexOf('\n');
   const k = i < 0 ? d : d.slice(0, i), v = i < 0 ? '' : d.slice(i + 1);
@@ -1646,11 +1825,10 @@ window.chrome.webview.addEventListener('message', e => {
     updErr = st === 'err'; updStatus = st === 'err' ? 'Échec : ' + msg : st === 'restart' ? 'Installation… Bébène redémarre dans un instant.' : msg;
     if (UPD) { $('#updpop').classList.add('open'); fillPop(); } }
   else if (k === 'title') { const j = v.indexOf('\n'), c = convs.find(x => x.id === v.slice(0, j)); if (c && !c.titleLock) { c.title = v.slice(j + 1).trim(); persist(); renderMenu(); setSub(); } }
-  else if (k === 'paths') {
-    const add = v.split('\n').filter(Boolean).map(p => '"' + p + '"').join(' ');
-    input.value = (input.value.trim() ? input.value.trimEnd() + ' ' : '') + add + ' ';
-    autosize(); input.focus();
-  }
+  else if (k === 'paths') v.split('\n').filter(Boolean).forEach(addPath);
+  else if (k === 'pasted') { addPath(v); toast('🖼 Image collée : Claude la verra avec ton message.'); }
+  else if (k === 'selection') showSel(v);
+  else if (k === 'brief') showBrief(v);
 });
 
 document.addEventListener('dragover', e => { e.preventDefault(); document.body.classList.add('drop'); });

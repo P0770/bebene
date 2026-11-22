@@ -45,20 +45,41 @@ Result 'gardien prêt' ($g -match 'PreToolUse' -and $g -match 'garde') "settings
 RunApp @('--screentest', "$out\screen.txt") | Out-Null
 $s = if (Test-Path "$out\screen.txt") { Get-Content "$out\screen.txt" -Raw } else { '' }
 Result 'commande de capture' ($s -match 'ecran\.ps1' -and $s -match 'BebeneEcran') "commande inattendue"
+# conversations en fichiers, rappels demandés à Bébène, point du jour (dossiers temporaires, rien de réel touché)
+Remove-Item "$out\store.txt" -ErrorAction SilentlyContinue
+RunApp @('--storetest', "$out\store.txt") | Out-Null
+$st = if (Test-Path "$out\store.txt") { Get-Content "$out\store.txt" -Encoding UTF8 } else { @() }
+Result 'historique en fichiers' (($st -join "`n") -match 'convs \[\{"id":"c1","title":"Un bis"\}\]') ($st -join ' / ')
+Result 'rappels demandés' (($st -join "`n") -match 'ajoutes 2 \| du Sortir le linge \| encore -') ($st -join ' / ')
+Result 'point du jour (données)' (($st -join "`n") -match 'brief \{"date":"[^"]+","today":\[.*"rappels":\[\]\}') ($st -join ' / ')
 
 # 3) pages HTML : chargement sans erreur JS, menus, scénario multitâche (réponses de Claude simulées)
 if (-not $edge) { Result 'pages HTML' $false 'Edge introuvable' }
 else {
     $stub = '<script>window.__err=[];window.onerror=(m,u,l)=>{__err.push(m+" @"+l)};window.__posts=[];window.__h=null;' +
             'window.chrome={webview:{postMessage(m){__posts.push(m)},addEventListener(t,f){if(t==="message")__h=f}}};</script>'
-    function PageTest($name, $page, $script, $expect) {
-        $ErrorActionPreference = 'Continue'                                   # Edge écrit des avertissements sur stderr : ce ne sont pas des échecs
-        $html = $stub + [IO.File]::ReadAllText((Join-Path $src $page), [Text.Encoding]::UTF8) + '<script>setTimeout(()=>{try{' + $script + '}catch(x){document.title="EX:"+x.message}},500)</script>'
-        $f = Join-Path $out (($page -replace '\.html$', '') + '-' + ($name -replace '[^a-z]', '') + '.html')
+    # Chaque page tourne dans son propre Edge (profil à part) : tous lancés en même temps, résultats lus à la fin (PageResults)
+    $script:pages = @()
+    function PageTest($name, $page, $script, $expect, $pre = '') {
+        $html = $stub + $pre + [IO.File]::ReadAllText((Join-Path $src $page), [Text.Encoding]::UTF8) + '<script>setTimeout(()=>{try{' + $script + '}catch(x){document.title="EX:"+x.message}},500)</script>'
+        $id = ($page -replace '\.html$', '') + '-' + ($name -replace '[^a-z]', '')
+        $f = Join-Path $out ($id + '.html'); $o = Join-Path $out ($id + '.dom')
         [IO.File]::WriteAllText($f, $html, (New-Object Text.UTF8Encoding $false))
-        $dom = & $edge --headless --disable-gpu --virtual-time-budget=3000 --dump-dom ("file:///" + ($f -replace '\\', '/')) 2>$null | Out-String
-        $title = if ($dom -match '<title>([^<]*)</title>') { [Net.WebUtility]::HtmlDecode($Matches[1]) } else { '(pas de titre)' }
-        Result ("page · " + $name) ($title -eq $expect) $title
+        $udd = Join-Path $env:TEMP ('BebeneEdge-' + $id); if (Test-Path $udd) { Remove-Item $udd -Recurse -Force -ErrorAction SilentlyContinue }
+        $p = Start-Process $edge -PassThru -WindowStyle Hidden -RedirectStandardOutput $o -RedirectStandardError ($o + '.err') -ArgumentList @(
+            '--headless', '--disable-gpu', '--no-first-run', '--virtual-time-budget=3000', ('"--user-data-dir=' + $udd + '"'), '--dump-dom', ('"file:///' + ($f -replace '\\', '/') + '"'))
+        $script:pages += [pscustomobject]@{ Name = $name; Expect = $expect; P = $p; Out = $o; Udd = $udd }
+    }
+    function PageResults {
+        foreach ($t in $script:pages) {
+            if (-not $t.P.WaitForExit(90000)) { try { $t.P.Kill() } catch { } }
+            $dom = ''                                                         # lu en partage : les processus enfants d'Edge peuvent encore tenir le fichier
+            if (Test-Path $t.Out) { $fs = [IO.File]::Open($t.Out, 'Open', 'Read', 'ReadWrite'); try { $dom = (New-Object IO.StreamReader $fs).ReadToEnd() } finally { $fs.Dispose() } }
+            $title = if ($dom -match '<title>([^<]*)</title>') { [Net.WebUtility]::HtmlDecode($Matches[1]) } else { '(pas de titre)' }
+            Result ("page · " + $t.Name) ($title -eq $t.Expect) $title
+            Remove-Item $t.Udd -Recurse -Force -ErrorAction SilentlyContinue
+        }
+        $script:pages = @()
     }
     PageTest 'discussion se charge' 'ui.html' 'document.title="R:"+JSON.stringify(__err)' 'R:[]'
     PageTest 'réglages se chargent' 'settings.html' 'document.title="R:"+JSON.stringify(__err)' 'R:[]'
@@ -116,6 +137,37 @@ else {
         '$("#updot").click();var b=$("#updpop").classList.contains("open");$("#ddHist").click();var c=!$("#updpop").classList.contains("open")&&$("#ddH").classList.contains("open");' +
         'document.dispatchEvent(new KeyboardEvent("keydown",{key:"Escape"}));var d=!$("#ddH").classList.contains("open")&&!__posts.includes("hide");' +
         'document.title="R:"+a+b+c+d+JSON.stringify(__err)') 'R:truetruetruetrue[]'
+    # v1.51 : historique en fichiers, recherche, rappels, sélection, point du jour, image collée
+    PageTest 'historique en fichiers' 'ui.html' (
+        'var a=convs.length===2&&!__posts.some(p=>p.startsWith("conv"))&&localStorage.getItem("convs")===null;' +
+        'convs.find(c=>c.id==="c1").title="Nouveau";persist();var s=__posts.filter(p=>p.startsWith("conv"));var b=s.length===1&&s[0].startsWith("convsave\nc1\n{");' +
+        'convs=convs.filter(c=>c.id!=="c2");persist();var c=__posts.includes("convdel\nc2");persist();var d=__posts.filter(p=>p.startsWith("conv")).length===2;' +
+        'document.title="R:"+a+b+c+d+JSON.stringify(__err)') 'R:truetruetruetrue[]' (
+        '<script>window.__CONVS=[{"id":"c1","title":"Un","updated":1,"project":"","hist":"<div class=\"msg user\">x</div>"},{"id":"c2","title":"Deux","updated":2,"project":""}]</script>')
+    PageTest 'recherche dans l historique' 'ui.html' (
+        'convs=[{id:"c1",title:"Maths",updated:Date.now(),project:"p1",hist:"<div class=\"md\">Le courant électrique</div>"},{id:"c2",title:"Autre",updated:Date.now(),project:"",hist:"rien"}];project="";' +
+        '$("#ddHist").click();var s=$("#mSearch");s.value="ELECTRIQUE";s.dispatchEvent(new Event("input"));var r=document.querySelectorAll("#mConvs .mitem");' +
+        'var a=r.length===1&&r[0].dataset.c==="c1"&&!!r[0].querySelector("mark");s.value="zzz";s.dispatchEvent(new Event("input"));var b=/Aucune/.test($("#mConvs").textContent);' +
+        'document.title="R:"+a+b+JSON.stringify(__err)') 'R:truetrue[]'
+    PageTest 'rappel dans la réponse' 'ui.html' ($sim +
+        'input.value="Rappelle-moi";submit();const k=rkey;send("rline\n"+k+"\n"+asst("C est noté.\n```bebene-rappel\n{\"quand\":\"2030-01-02T08:30\",\"quoi\":\"Sortir le linge\"}\n```"));send("rdone\n"+k+"\n0\n");' +
+        'var c=$("#log .rcard");var a=!!c&&/Sortir le linge/.test(c.textContent)&&!/bebene-rappel/.test($("#log").textContent);c.querySelector(".rx").click();' +
+        'var b=__posts.includes("remindcancel\n2030-01-02T08:30|Sortir le linge")&&!!$("#log .rcard .rdone");document.title="R:"+a+b+JSON.stringify(__err)') 'R:truetrue[]'
+    PageTest 'demander sur la sélection' 'ui.html' (
+        'const send=m=>__h({data:m});send("selection\nBonjour le monde");var a=$("#selbar").classList.contains("on")&&/Bonjour/.test($("#selbar").textContent);' +
+        '$("#selbar [data-a=trad]").click();const p=__posts.filter(x=>x.startsWith("send\n")).pop()||"";var b=/Traduis/.test(p)&&/Bonjour le monde/.test(p)&&!$("#selbar").classList.contains("on");' +
+        'send("selection\n");var c=!$("#selbar").classList.contains("on");document.title="R:"+a+b+c+JSON.stringify(__err)') 'R:truetruetrue[]'
+    PageTest 'point du jour' 'ui.html' (
+        'NOTES={enabled:true,notes:[{id:"a",title:"Acheter du pain",pinned:true,shown:true}]};convs=[{id:"c5",title:"Rapport",attn:"pause",updated:1,project:""}];' +
+        '__h({data:"brief\n"+JSON.stringify({date:"samedi 22 novembre",today:[{t:"Cours de maths",h:"08:15",l:"Salle 3",k:"",m:false}],soon:[{t:"Examen physique",h:"lun. 24 nov.",k:"exam",m:true}],rappels:[{t:"Appeler Paul",h:"14:00"}]})});' +
+        'var b=$("#brief");var a=b.classList.contains("on")&&["Cours de maths","Examen physique","Appeler Paul","Acheter du pain","Rapport"].every(x=>b.textContent.includes(x));' +
+        'b.querySelector(".x").click();document.title="R:"+a+!b.classList.contains("on")+JSON.stringify(__err)') 'R:truetrue[]'
+    PageTest 'coller une image' 'ui.html' (
+        'const dt=new DataTransfer();dt.items.add(new File([new Uint8Array([137,80,78,71])],"a.png",{type:"image/png"}));' +
+        'input.dispatchEvent(new ClipboardEvent("paste",{clipboardData:dt,bubbles:true,cancelable:true}));' +
+        'let n=0;const w=setInterval(()=>{var a=__posts.some(p=>p.startsWith("pasteimg\ndata:image/png;base64,"));if(!a&&++n<40)return;clearInterval(w);' +
+        '__h({data:"pasted\nC:\\t\\img.png"});var b=/img\.png/.test(input.value);document.title="R:"+a+b+JSON.stringify(__err)},50)') 'R:truetrue[]'
+    PageResults
 }
 
 # 4) (option) Claude réel : 2 conversations en parallèle, puis un 2e message qui réutilise la même session

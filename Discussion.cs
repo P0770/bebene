@@ -22,7 +22,7 @@ class ChatPanel : Form {
     public static bool NoActivate;   // tests : afficher sans prendre le clavier
     protected override bool ShowWithoutActivation { get { return NoActivate; } }
     readonly Companion owner;
-    readonly WebView2 web;
+    WebView2 web;                                                    // libérée après 10 min fermée (FreeWebIfIdle), recréée à l'ouverture
     public string WorkDir;
 
     public ChatPanel(Companion c) {
@@ -40,8 +40,9 @@ class ChatPanel : Form {
         firstUpd.Tick += (s, e) => { firstUpd.Stop(); firstUpd.Dispose(); CheckUpdate(); }; firstUpd.Start();
         VisibleChanged += (s, e) => { if (Visible && (DateTime.Now - lastUpd).TotalHours > 1) CheckUpdate(); };
         VisibleChanged += (s, e) => Util.WebMemory(web, Visible);
-        VisibleChanged += (s, e) => { if (Visible) { ProbeQuota(false); if (owner.State == "ready") owner.SetState("happy"); } };    // quota à jour à chaque ouverture
-        quotaTimer.Tick += (s, e) => { if (Visible) ProbeQuota(true); }; quotaTimer.Start();
+        VisibleChanged += (s, e) => { if (Visible) { ProbeQuota(false); if (owner.State == "ready") owner.SetState("happy"); } };    // quota (s'il date) à chaque ouverture
+        quotaTimer.Tick += (s, e) => { if (Visible) ProbeQuota(false); }; quotaTimer.Start();
+        VisibleChanged += (s, e) => { if (Visible) { if (web == null) MakeWeb(); DailyBrief(); } else hiddenAt = DateTime.Now; };
         Mailbox.LoadCache();                                         // derniers résultats tout de suite
         // analyse auto : 1 fois par jour au maximum (premier démarrage ou première ouverture du jour) ; sinon seulement via le bouton
         VisibleChanged += (s, e) => { if (Visible) DailyMailScan(); };
@@ -52,9 +53,29 @@ class ChatPanel : Form {
         BackColor = Color.Black;                                     // noir = zone où Windows dessine le verre dépoli
         WorkDir = Settings.Str("WorkDir", Environment.GetFolderPath(Environment.SpecialFolder.UserProfile));
         if (!Directory.Exists(WorkDir)) WorkDir = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
+        MakeWeb();
+    }
+    // la page reçoit l'historique avant ses propres scripts (window.__CONVS) : affichage immédiat, sans attendre un message
+    void MakeWeb() {
+        pageReady = false;
         web = new WebView2 { Dock = DockStyle.Fill, DefaultBackgroundColor = Color.Transparent };
         Controls.Add(web);
-        Util.InitWeb(web, "ui.html", OnMessage);
+        Util.InitWeb(web, "ui.html", OnMessage, "window.__CONVS=" + ConvStore.AllJson() + ";");
+    }
+    // discussion fermée depuis 10 min, rien en cours : on rend la mémoire de la page (~300 Mo). Tout est déjà enregistré (conversations en fichiers).
+    DateTime hiddenAt = DateTime.Now;
+    void FreeWebIfIdle() {
+        if (web == null || Visible || (DateTime.Now - hiddenAt).TotalMinutes < 10 || compactProc != null) return;
+        foreach (var r in runners.Values) if (r.Busy || r.Asking || r.Hand) return;
+        var w = web; web = null; pageReady = false; lock (pending) pending.Clear();
+        try { Controls.Remove(w); w.Dispose(); } catch (Exception ex) { Program.Log("WebView2", ex.Message); }
+    }
+    // point du jour : une fois par jour, à la première ouverture (réglage DailyBrief)
+    void DailyBrief() {
+        string day = DateTime.Today.ToString("yyyy-MM-dd");
+        if (!Settings.Bool("DailyBrief", true) || Settings.Str("BriefDay", "") == day) return;
+        Settings.Set("BriefDay", day);
+        Post("brief\n" + Brief.Json());
     }
 
     protected override void OnHandleCreated(EventArgs e) { base.OnHandleCreated(e); Util.DarkWindow(Handle, true); Util.Glass(Handle); }
@@ -90,16 +111,22 @@ class ChatPanel : Form {
         t.Start();
     }
 
-    public void FocusInput() { web.Focus(); Post("focus"); }
+    public void FocusInput() { if (web != null) web.Focus(); Post("focus"); }
 
     public static Action<string> PostHook;                                  // tests : messages interceptés au lieu d aller à la page
     public void Post(string s) {
         if (PostHook != null) { PostHook(s); return; }
         // la fenêtre peut ne jamais avoir été affichée : on passe par le contrôle WebView, qui a toujours son handle
         Control ui = IsHandleCreated ? (Control)this : (web != null && web.IsHandleCreated ? web : null);
-        if (ui == null) return;                                           // page pas prête : elle redemandera tout via "ready"
+        if (ui == null || !pageReady) { Queue(s); return; }                  // page pas prête (démarrage, page libérée) : envoyé à son « ready »
         if (ui.InvokeRequired) { try { ui.BeginInvoke((Action)(() => Post(s))); } catch { } return; }
-        if (web != null && web.CoreWebView2 != null) web.CoreWebView2.PostWebMessageAsString(s);  // la page n est pas encore prête : ignoré (elle redemande tout via "ready")
+        if (web != null && web.CoreWebView2 != null) web.CoreWebView2.PostWebMessageAsString(s); else Queue(s);
+    }
+    volatile bool pageReady; readonly List<string> pending = new List<string>();
+    void Queue(string s) { lock (pending) { if (pending.Count >= 200) pending.RemoveAt(0); pending.Add(s); } }
+    void Flush() {
+        List<string> l; lock (pending) { l = new List<string>(pending); pending.Clear(); }
+        foreach (var s in l) Post(s);
     }
 
     // ---- projets ClaudeHub et conversations flash ----
@@ -157,11 +184,14 @@ class ChatPanel : Form {
     }
 
     // ---- quota restant : mini-requête silencieuse (quelques tokens, ~1 s) qui renvoie les infos de limite officielles ----
-    DateTime lastProbe = DateTime.MinValue; volatile bool probing;
+    DateTime lastProbe = DateTime.MinValue, lastQuotaAt = DateTime.MinValue; volatile bool probing;
     readonly System.Windows.Forms.Timer quotaTimer = new System.Windows.Forms.Timer { Interval = 15 * 60 * 1000 };
     public void ProbeQuota(bool force) {
         if (probing || AnyBusy) return;                                   // une conversation en cours renvoie déjà ces infos
-        if (!force && (DateTime.Now - lastProbe).TotalMinutes < 5) return;
+        // chaque mesure lance un claude -p (processus Node + quelques tokens) : seulement si l'info date de plus de 30 min ;
+        // force = demandé par la page (fenêtre de quota écoulée) : au plus une fois toutes les 5 min
+        if (!force && (DateTime.Now - lastQuotaAt).TotalMinutes < 30) return;
+        if ((DateTime.Now - lastProbe).TotalMinutes < 5) return;
         probing = true; lastProbe = DateTime.Now;
         new Thread(() => {
             try {
@@ -177,7 +207,7 @@ class ChatPanel : Form {
                     string line;
                     while ((line = p.StandardOutput.ReadLine()) != null) {
                         var m = Regex.Match(line, "\"rate_limit_info\":(\\{.*\\}),\"uuid\"");
-                        if (line.Contains("\"rate_limit_event\"") && m.Success) Post("quota\n" + m.Groups[1].Value);
+                        if (line.Contains("\"rate_limit_event\"") && m.Success) { lastQuotaAt = DateTime.Now; Post("quota\n" + m.Groups[1].Value); }
                     }
                     p.WaitForExit(30000);
                 }
@@ -389,9 +419,25 @@ class ChatPanel : Form {
                 if (paths.Count > 0) Post("paths\n" + string.Join("\n", paths.ToArray()));
                 break;
             case "ready":
+                pageReady = true;
                 Post("pinned\n" + (Pinned ? 1 : 0)); PostTheme();
                 Post("dir\n" + WorkDir); Post("name\n" + Settings.Name);
-                PostCalendars(); ProbeQuota(true); Post("upd\n" + UpdJson()); break;               // la page est prête : on lit le quota tout de suite
+                PostCalendars(); ProbeQuota(false); Post("upd\n" + UpdJson());               // quota : mesuré seulement s'il date
+                Flush(); if (Visible) Post("focus"); break;
+            case "convsave": { var sp = m.Split(new[] { '\n' }, 3); if (sp.Length == 3) ConvStore.Save(sp[1], sp[2]); break; }   // convsave\n<id>\n<json>
+            case "convdel": ConvStore.Delete(parts.Length > 1 ? parts[1] : ""); break;
+            case "pasteimg": {                                                 // image collée (Ctrl+V) : PNG dans le dossier que Claude peut lire
+                string b64 = m.Length > 9 ? m.Substring(9) : "";
+                try {
+                    int c = b64.IndexOf(','); if (c >= 0 && c < 100) b64 = b64.Substring(c + 1);
+                    var bytes = Convert.FromBase64String(b64);
+                    string f = Path.Combine(ScreenDir(), "image-collee-" + DateTime.Now.ToString("yyyyMMdd-HHmmss-fff") + ".png");
+                    using (var ms = new MemoryStream(bytes)) using (var img = Image.FromStream(ms)) img.Save(f, ImageFormat.Png);
+                    Post("pasted\n" + f);
+                } catch (Exception ex) { Program.Log("Image collée", ex.Message); Post("saveerr\nimage illisible"); }
+                break;
+            }
+            case "remindcancel": MyReminders.Cancel(m.Length > 13 ? m.Substring(13) : ""); break;
             case "calrefresh": RefreshCalendars(); break;
             case "pin": Pinned = parts.Length > 1 && parts[1] == "1"; Settings.Set("Pinned", Pinned); break;
             case "sid": owner.SessionId = parts.Length > 1 ? parts[1] : ""; break;
@@ -577,6 +623,7 @@ class ChatPanel : Form {
     readonly System.Windows.Forms.Timer idleT = new System.Windows.Forms.Timer { Interval = 60000 };
     void InitRunners() {
         idleT.Tick += (s, e) => {
+            FreeWebIfIdle();
             foreach (var r in new List<Runner>(runners.Values)) {
                 if (!r.Busy && r.P != null && (DateTime.Now - r.Used).TotalMinutes > 10) Retire(r);           // session endormie : libère la mémoire
                 if ((r.Asking || r.Hand) && !r.Busy && (DateTime.Now - r.FlagAt).TotalMinutes > 30) { r.Asking = r.Hand = false; UpdateCat(false, 0); }
@@ -647,6 +694,7 @@ class ChatPanel : Form {
         // un prompt système stable garde l'historique en cache → beaucoup moins de tokens à chaque échange.
         if (Companion.LastWindow.Length > 0)
             text = "[Fenêtre active : " + Companion.LastWindow + " · pour la voir : " + ScreenCommand(Companion.LastHwnd) + "]\n" + text;
+        text = "[Maintenant : " + DateTime.Now.ToString("dddd d MMMM yyyy, HH:mm", new System.Globalization.CultureInfo("fr-CH")) + "]\n" + text;   // pour les rappels (« dans 20 min »)
         string args = BuildArgs(autonomous, allowed, flash, project, model);
         if (r == null) { r = new Runner { Key = key }; runners[key] = r; }
         if (r.P != null && (r.P.HasExited || r.Sig != args)) Retire(r);                   // réglages changés : on relance la session
@@ -665,6 +713,17 @@ class ChatPanel : Form {
         UpdateCat(false, 0);
     }
 
+    // texte d'un message « assistant » du flux stream-json
+    static string AssistantText(string json) {
+        var sb = new StringBuilder();
+        try {
+            var o = new JavaScriptSerializer { MaxJsonLength = int.MaxValue }.DeserializeObject(json) as Dictionary<string, object>;
+            var msg = o != null && o.ContainsKey("message") ? o["message"] as Dictionary<string, object> : null;
+            var content = msg != null && msg.ContainsKey("content") ? msg["content"] as object[] : null;
+            if (content != null) foreach (var c in content) { var cd = c as Dictionary<string, object>; if (cd != null && cd.ContainsKey("text")) sb.Append(Convert.ToString(cd["text"])).Append('\n'); }
+        } catch { }
+        return sb.ToString();
+    }
     static string TopType(string json) {
         try { var o = new JavaScriptSerializer { MaxJsonLength = int.MaxValue }.DeserializeObject(json) as Dictionary<string, object>; object t; return o != null && o.TryGetValue("type", out t) ? Convert.ToString(t) : ""; }
         catch { return ""; }
@@ -686,7 +745,9 @@ class ChatPanel : Form {
             if (type == "assistant") {
                 if (d.Contains("bebene-question")) { r.Asking = true; r.FlagAt = DateTime.Now; }
                 if (d.Contains("bebene-main")) { r.Hand = true; r.FlagAt = DateTime.Now; r.HandKind = Regex.IsMatch(d, "bebene-main[^`]*(ecran|écran)") ? "ecran" : "souris"; }
+                if (d.Contains("bebene-rappel")) MyReminders.AddFrom(AssistantText(d));
             }
+            if (d.Contains("\"rate_limit_event\"")) lastQuotaAt = DateTime.Now;              // quota connu : pas besoin de le mesurer
             Post("rline\n" + key + "\n" + d);
             if (type == "result") {                                                            // fin du tour : la session reste ouverte pour le message suivant
                 try { OnUi(() => {
@@ -753,7 +814,10 @@ class ChatPanel : Form {
             + "Si tu as VRAIMENT besoin de sa souris ou de son clavier, ou de voir une fenêtre que tu ne peux pas capturer (fenêtre réduite, cachée, autre bureau, écran verrouillé), n'insiste pas : "
             + "termine ta réponse par un bloc de code de langage bebene-main contenant du JSON {\"quoi\":\"ce dont tu as besoin et pourquoi, en une phrase\",\"type\":\"souris\"} "
             + "(\"type\":\"ecran\" quand il s'agit de voir une fenêtre ou un écran), puis arrête-toi : Bébène le prévient et tu reprends quand il te le donne. "
-            + "TÂCHES LONGUES : dès qu'une tâche a plus de 3 étapes, tiens ta liste d'étapes à jour avec l'outil TodoWrite (l'utilisateur voit la progression). "
+            + "RAPPELS : si l'utilisateur te demande de lui rappeler quelque chose à un moment donné (« rappelle-moi dans 20 min », « demain à 8 h »), calcule l'heure à partir de [Maintenant : …] "
+            + "et termine ta réponse par un bloc de code de langage bebene-rappel contenant du JSON {\"quand\":\"AAAA-MM-JJTHH:MM\",\"quoi\":\"le rappel, en quelques mots\"} (un bloc par rappel). "
+            + "Bébène l'affichera à l'heure dite, même discussion fermée : n'utilise pas d'autre moyen (tâche planifiée, script, alarme). "
+            + "TÂCHES LONGUES :dès qu'une tâche a plus de 3 étapes, tiens ta liste d'étapes à jour avec l'outil TodoWrite (l'utilisateur voit la progression). "
             + (Settings.Bool("Prepare", true)
                 ? "PRÉPARER AVANT DE PRODUIRE : quand l'utilisateur commence un projet ou parle de vouloir faire un fichier (rapport, présentation, document, classeur, code…), "
                   + "NE CRÉE AUCUN FICHIER de résultat tout de suite. D'abord : écoute, rassemble ce qu'il fournit (textes, fichiers, consignes), lis les modèles de référence utiles, "

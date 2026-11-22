@@ -19,10 +19,10 @@ using Microsoft.Web.WebView2.WinForms;
 
 [assembly: System.Reflection.AssemblyTitle("Bébène")]
 [assembly: System.Reflection.AssemblyProduct("Bébène")]
-[assembly: System.Reflection.AssemblyVersion("1.50.0.0")]
+[assembly: System.Reflection.AssemblyVersion("1.51.0.0")]
 
 static class Program {
-    public const string Version = "1.50";
+    public const string Version = "1.51";
     public static bool OpenSetup;
     public static readonly uint Pid = (uint)Process.GetCurrentProcess().Id;   // identifiant de Bébène (lu une seule fois)   // --setup : ouvrir directement l'assistant d'installation
 
@@ -116,6 +116,26 @@ static class Program {
                 using (var b = new UpWidget().Snapshot()) b.Save(args[2] + ".png", ImageFormat.Png);
                 File.WriteAllText(args[2], sb.ToString(), Encoding.UTF8);
             } finally { Settings.Set("ManualEvents", bm); Settings.Set("HiddenEvents", bh); }
+            return;
+        }
+        if (args.Length == 2 && args[0] == "--storetest") {   // test : conversations en fichiers + rappels demandés + point du jour (dossiers temporaires)
+            string tmp = Path.Combine(Path.GetTempPath(), "BebeneStoreTest-" + Guid.NewGuid().ToString("N").Substring(0, 6));
+            Directory.CreateDirectory(tmp);
+            Environment.SetEnvironmentVariable("BEBENE_CONVS", Path.Combine(tmp, "conv"));
+            Environment.SetEnvironmentVariable("BEBENE_RAPPELS", Path.Combine(tmp, "rappels.json"));
+            var sb = new StringBuilder();
+            ConvStore.Save("c1", "{\"id\":\"c1\",\"title\":\"Un\"}"); ConvStore.Save("c2", "{\"id\":\"c2\",\"title\":\"Deux\"}");
+            ConvStore.Save("c1", "{\"id\":\"c1\",\"title\":\"Un bis\"}"); ConvStore.Save("../x", "{}"); ConvStore.Delete("c2");
+            sb.AppendLine("convs " + ConvStore.AllJson());
+            string soon = DateTime.Now.AddMinutes(-1).ToString("yyyy-MM-ddTHH:mm"), later = DateTime.Now.AddHours(1).ToString("yyyy-MM-ddTHH:mm");
+            int n = MyReminders.AddFrom("Ok !\n```bebene-rappel\n{\"quand\":\"" + soon + "\",\"quoi\":\"Sortir le linge\"}\n```\n```bebene-rappel\n{\"quand\":\"" + later + "\",\"quoi\":\"Appeler Paul\"}\n```");
+            n += MyReminders.AddFrom("```bebene-rappel\n{\"quand\":\"" + soon + "\",\"quoi\":\"Sortir le linge\"}\n```");   // doublon ignoré
+            var due = MyReminders.Due(); var again = MyReminders.Due();
+            sb.AppendLine("ajoutes " + n + " | du " + (due != null ? due.Quoi : "-") + " | encore " + (again != null ? again.Quoi : "-"));
+            MyReminders.Cancel(later + "|Appeler Paul");
+            sb.AppendLine("brief " + Brief.Json());
+            File.WriteAllText(args[1], sb.ToString(), Encoding.UTF8);
+            try { Directory.Delete(tmp, true); } catch { }
             return;
         }
         if (args.Length == 2 && args[0] == "--bench") { new Companion(false).Bench(args[1]); return; }   // test : temps de rendu d une image du chat
@@ -314,11 +334,13 @@ static class Util {
         catch { }
     }
 
-    public static async void InitWeb(WebView2 web, string page, EventHandler<CoreWebView2WebMessageReceivedEventArgs> onMsg) {
+    // initScript : exécuté dans la page avant ses propres scripts (ex. historique des conversations)
+    public static async void InitWeb(WebView2 web, string page, EventHandler<CoreWebView2WebMessageReceivedEventArgs> onMsg, string initScript = null) {
         try {
             var env = await WebEnv();
             await web.EnsureCoreWebView2Async(env);
             var cw = web.CoreWebView2;
+            if (initScript != null) await cw.AddScriptToExecuteOnDocumentCreatedAsync(initScript);
             cw.Settings.IsStatusBarEnabled = false;
             cw.Settings.IsZoomControlEnabled = false;
             cw.WebMessageReceived += onMsg;
@@ -490,7 +512,8 @@ class Companion : Form {
             if (files != null && files.Length > 0) { ShowPanel(); Panel.Post("paths\n" + string.Join("\n", files)); }
         };
 
-        timer.Tick += (s, e) => { Tick(); if (Visible) Draw(); };
+        // endormi et immobile : 1 image sur 3 suffit (~10 par seconde), la respiration et les « z » restent fluides
+        timer.Tick += (s, e) => { Tick(); if (Visible && (!Asleep || ++slowTick % 3 == 0)) Draw(); };
         VisibleChanged += (s, e) => ForceRedraw();                         // réaffiché : on renvoie l image même si elle n a pas changé
         timer.Start();
 
@@ -521,8 +544,9 @@ class Companion : Form {
         RegisterHotkeys();
     }
     // Raccourcis configurables (réglages > Système) : texte « Ctrl+Alt+Shift+Win+Touche » (nom de touche .NET : A, D1, F5, Space…), vide = aucun
-    public static readonly string[] HotkeyDefaults = { "Alt+Space", "Ctrl+Alt+C" };
-    public bool[] HotkeyOk = new bool[2];
+    // 1 et 2 : ouvrir / fermer la discussion ; 3 : demander à Bébène à propos du texte sélectionné dans n'importe quelle appli
+    public static readonly string[] HotkeyDefaults = { "Alt+Space", "Ctrl+Alt+C", "Ctrl+Alt+Q" };
+    public bool[] HotkeyOk = new bool[3];
     ToolStripMenuItem openItem;
     public static bool ParseHotkey(string s, out uint mod, out uint vk) {
         mod = 0; vk = 0;
@@ -550,18 +574,72 @@ class Companion : Form {
     public void RegisterHotkeys() {
         if (!IsHandleCreated) return;
         var labels = new List<string>();
-        for (int i = 0; i < 2; i++) {
+        for (int i = 0; i < 3; i++) {
             UnregisterHotKey(Handle, i + 1);
             uint mod, vk;
             string s = Settings.Str("Hotkey" + (i + 1), HotkeyDefaults[i]);
             HotkeyOk[i] = ParseHotkey(s, out mod, out vk) && RegisterHotKey(Handle, i + 1, mod | 0x4000, vk);
-            if (HotkeyOk[i]) labels.Add(HotkeyLabel(s));
+            if (HotkeyOk[i] && i < 2) labels.Add(HotkeyLabel(s));
         }
         if (openItem != null) openItem.ShortcutKeyDisplayString = labels.Count > 0 ? labels[0] : "";
     }
     // pendant qu on tape une nouvelle combinaison dans les réglages, les raccourcis actuels ne doivent pas l intercepter
-    public void PauseHotkeys() { if (IsHandleCreated) { UnregisterHotKey(Handle, 1); UnregisterHotKey(Handle, 2); } }
-    protected override void WndProc(ref Message m) { if (m.Msg == 0x0312) TogglePanel(); base.WndProc(ref m); }
+    public void PauseHotkeys() { if (IsHandleCreated) { UnregisterHotKey(Handle, 1); UnregisterHotKey(Handle, 2); UnregisterHotKey(Handle, 3); } }
+    protected override void WndProc(ref Message m) {
+        if (m.Msg == 0x0312) { if (m.WParam.ToInt32() == 3) AskSelection(); else TogglePanel(); }
+        base.WndProc(ref m);
+    }
+
+    // ---- « Demande sur la sélection » : copie le texte sélectionné dans l'appli active (Ctrl+C simulé), puis ouvre la discussion avec ----
+    // Le presse-papiers de l'utilisateur est remis comme avant (texte, image ou fichiers).
+    [DllImport("user32.dll")] static extern short GetAsyncKeyState(int vk);
+    [DllImport("user32.dll")] static extern uint GetClipboardSequenceNumber();
+    [DllImport("user32.dll")] static extern void keybd_event(byte vk, byte scan, uint flags, UIntPtr extra);
+    bool selBusy;
+    void AskSelection() {
+        if (selBusy) return;
+        var fg = GetForegroundWindow(); uint pid; GetWindowThreadProcessId(fg, out pid);
+        if (fg == IntPtr.Zero || pid == Program.Pid) { ShowPanel(); Panel.Post("selection\n"); return; }
+        selBusy = true;
+        // on attend que l'utilisateur relâche Ctrl / Alt / Maj / Win du raccourci (sinon Ctrl+C devient Ctrl+Alt+C)
+        int waited = 0; var t = new System.Windows.Forms.Timer { Interval = 30 };
+        t.Tick += (s, e) => {
+            waited += 30;
+            bool held = false; foreach (int vk in new[] { 0x10, 0x11, 0x12, 0x5B, 0x5C }) if ((GetAsyncKeyState(vk) & 0x8000) != 0) held = true;
+            if (held && waited < 1500) return;
+            t.Stop(); t.Dispose();
+            string text = "";
+            try { text = CopySelection(); } catch (Exception ex) { Program.Log("Sélection", ex.Message); }
+            selBusy = false;
+            ShowPanel(); Panel.Post("selection\n" + text);
+        };
+        t.Start();
+    }
+    static string CopySelection() {
+        // sauvegarde du presse-papiers (formats courants)
+        string oldText = Clipboard.ContainsText() ? Clipboard.GetText() : null;
+        Image oldImg = Clipboard.ContainsImage() ? Clipboard.GetImage() : null;
+        System.Collections.Specialized.StringCollection oldFiles = Clipboard.ContainsFileDropList() ? Clipboard.GetFileDropList() : null;
+        uint seq = GetClipboardSequenceNumber();
+        keybd_event(0x11, 0, 0, UIntPtr.Zero); keybd_event(0x43, 0, 0, UIntPtr.Zero);          // Ctrl+C
+        keybd_event(0x43, 0, 2, UIntPtr.Zero); keybd_event(0x11, 0, 2, UIntPtr.Zero);
+        var sw = Stopwatch.StartNew();
+        while (GetClipboardSequenceNumber() == seq && sw.ElapsedMilliseconds < 800) { Application.DoEvents(); Thread.Sleep(20); }
+        string text = "";
+        if (GetClipboardSequenceNumber() != seq) {
+            Thread.Sleep(30);
+            for (int i = 0; i < 5; i++) { try { text = Clipboard.ContainsText() ? Clipboard.GetText() : ""; break; } catch { Thread.Sleep(40); } }   // presse-papiers encore ouvert par l'appli
+            try {
+                if (oldFiles != null) Clipboard.SetFileDropList(oldFiles);
+                else if (oldImg != null) Clipboard.SetImage(oldImg);
+                else if (oldText != null) Clipboard.SetText(oldText);
+                else Clipboard.Clear();
+            } catch (Exception ex) { Program.Log("Sélection", "presse-papiers non restauré : " + ex.Message); }
+        }
+        if (oldImg != null) oldImg.Dispose();
+        text = (text ?? "").Trim();
+        return text.Length > 20000 ? text.Substring(0, 20000) : text;
+    }
 
     public string State { get { return state; } }
     float readyT, askT;
@@ -573,7 +651,7 @@ class Companion : Form {
     // notification Windows (tâche finie, question, accord, besoin de toi) ; un clic ouvre la conversation concernée
     string toastKey;
     public void Notify(string kind, string title, string key) {
-        string head = kind == "ask" ? "❓ Une question pour toi" : kind == "perm" ? "🔐 Accord demandé" : kind == "hand" ? "🐾 " + Settings.Name + " a besoin de toi" : kind == "pause" ? "⏸ Tâche en pause : quota presque épuisé" : "✅ Tâche terminée";
+        string head = kind == "ask" ? "❓ Une question pour toi" : kind == "perm" ? "🔐 Accord demandé" : kind == "hand" ? "🐾 " + Settings.Name + " a besoin de toi" : kind == "pause" ? "⏸ Tâche en pause : quota presque épuisé" : kind == "rappel" ? "⏰ Rappel" : "✅ Tâche terminée";
         toastKey = key;
         try { tray.ShowBalloonTip(6000, head, string.IsNullOrEmpty(title) ? "Conversation" : (title.Length > 120 ? title.Substring(0, 120) + "…" : title), ToolTipIcon.None); } catch { }
     }
@@ -789,6 +867,8 @@ class Companion : Form {
     // le chat est souvent immobile (assis, endormi) : une image identique a la precedente n est pas renvoyee a l ecran
     byte[] lastFrame, curFrame;
     public void ForceRedraw() { lastFrame = null; }
+    int slowTick;
+    bool Asleep { get { return act == "lie" && !held && !falling && peekT <= 0 && petT <= 0 && heartT <= 0 && jumpT < 0 && landT <= 0 && state == "idle"; } }
     void Draw() {
         using (var img = BuildImage()) {
             var bd = img.LockBits(new Rectangle(0, 0, img.Width, img.Height), ImageLockMode.ReadOnly, PixelFormat.Format32bppPArgb);   // prémultiplié = format de UpdateLayeredWindow
@@ -1228,9 +1308,14 @@ class Companion : Form {
     ReminderCard remindCard; readonly System.Windows.Forms.Timer remindTimer = new System.Windows.Forms.Timer { Interval = 60000 };
     void CheckReminders() {
         if (remindCard != null && remindCard.Visible) return;                    // une carte à la fois
-        string when; var e = Reminders.Due(out when); if (e == null) return;
+        string when; CalEvent e; string myId = null;
+        var mine = MyReminders.Due();                                            // rappel demandé à Bébène (« rappelle-moi… ») : d'abord
+        if (mine != null) {
+            e = new CalEvent { Title = mine.Quoi, Start = MyReminders.When(mine), Kind = "rappel" }; when = "Maintenant"; myId = mine.Id;
+            Notify("rappel", mine.Quoi, null);
+        } else { e = Reminders.Due(out when); if (e == null) return; }
         if (remindCard == null) { remindCard = new ReminderCard(); remindCard.OnDone = () => CheckReminders(); }
-        remindCard.Ev = e; remindCard.When = when;
+        remindCard.Ev = e; remindCard.When = when; remindCard.MyId = myId;
         var wa = Screen.FromControl(this).WorkingArea;
         int x = Visible ? Left + W / 2 - 160 : wa.Right - 340, y = Visible ? Top - 116 : wa.Bottom - 130;
         remindCard.ShowAt(new Point(Math.Max(wa.Left + 4, Math.Min(x, wa.Right - 324)), Math.Max(wa.Top + 4, y)));
@@ -1278,7 +1363,7 @@ class Companion : Form {
         var d = new Dictionary<string, object> {
             { "name", Settings.Name }, { "model", Settings.Str("Model", "") }, { "scale", scalePct }, { "activity", Settings.Int("Activity", 50) },
             { "showCat", Settings.Bool("ShowCat", true) }, { "topMost", TopMost }, { "autoStart", Settings.AutoStart },
-            { "prompt", Settings.Str("Prompt", "") }, { "hotkey1", Settings.Str("Hotkey1", HotkeyDefaults[0]) }, { "hotkey2", Settings.Str("Hotkey2", HotkeyDefaults[1]) }, { "hotkeyOk", HotkeyOk }, { "stream", Settings.Bool("Stream", true) }, { "light", Settings.Bool("Light", false) }, { "autoModel", Settings.Bool("AutoModel", true) },{ "caveman", Settings.Bool("Caveman", true) }, { "chrome", Settings.Bool("Chrome", true) }, { "postits", Settings.Bool("PostIts", true) }, { "prepare", Settings.Bool("Prepare", true) }, { "spell", Settings.Bool("SpellCheck", false) }, { "autoAllow", Settings.Str("AutoAllow", "") }, { "remindExam", Settings.Bool("RemindExam", true) }, { "remindRdv", Settings.Bool("RemindRdv", true) }, { "remindWhen", Settings.Str("RemindWhen", "both") }, { "features", Features() }, { "manual", Manual.Raw() }, { "hidden", new List<string>(Manual.Hidden()) }, { "calendars", Calendars.Config() }, { "locFilter", Settings.Str("LocFilter", "") }, { "gmailUser", Mailbox.GmailUser }, { "gmailSet", Mailbox.GmailReady }, { "outlookOn", Mailbox.OutlookOn }, { "mailStatus", Mailbox.Status }, { "mailRunning", Mailbox.Running },{ "workDir", Panel.WorkDir }, { "hasSession", SessionId.Length > 0 },
+            { "prompt", Settings.Str("Prompt", "") }, { "hotkey1", Settings.Str("Hotkey1", HotkeyDefaults[0]) }, { "hotkey2", Settings.Str("Hotkey2", HotkeyDefaults[1]) }, { "hotkey3", Settings.Str("Hotkey3", HotkeyDefaults[2]) }, { "dailyBrief", Settings.Bool("DailyBrief", true) }, { "hotkeyOk", HotkeyOk }, { "stream", Settings.Bool("Stream", true) }, { "light", Settings.Bool("Light", false) }, { "autoModel", Settings.Bool("AutoModel", true) },{ "caveman", Settings.Bool("Caveman", true) }, { "chrome", Settings.Bool("Chrome", true) }, { "postits", Settings.Bool("PostIts", true) }, { "prepare", Settings.Bool("Prepare", true) }, { "spell", Settings.Bool("SpellCheck", false) }, { "autoAllow", Settings.Str("AutoAllow", "") }, { "remindExam", Settings.Bool("RemindExam", true) }, { "remindRdv", Settings.Bool("RemindRdv", true) }, { "remindWhen", Settings.Str("RemindWhen", "both") }, { "features", Features() }, { "manual", Manual.Raw() }, { "hidden", new List<string>(Manual.Hidden()) }, { "calendars", Calendars.Config() }, { "locFilter", Settings.Str("LocFilter", "") }, { "gmailUser", Mailbox.GmailUser }, { "gmailSet", Mailbox.GmailReady }, { "outlookOn", Mailbox.OutlookOn }, { "mailStatus", Mailbox.Status }, { "mailRunning", Mailbox.Running },{ "workDir", Panel.WorkDir }, { "hasSession", SessionId.Length > 0 },
             { "version", Program.Version }
         };
         return new JavaScriptSerializer().Serialize(d);
@@ -1309,9 +1394,10 @@ class Companion : Form {
                 case "stream": Settings.Set("Stream", Convert.ToBoolean(kv.Value)); break;
                 case "autoModel": Settings.Set("AutoModel", Convert.ToBoolean(kv.Value)); break;
                 case "light": Settings.Set("Light", Convert.ToBoolean(kv.Value)); Panel.PostTheme(); break;
-                case "hotkey1": case "hotkey2": {
+                case "dailyBrief": Settings.Set("DailyBrief", Convert.ToBoolean(kv.Value)); break;
+                case "hotkey1": case "hotkey2": case "hotkey3": {
                     string hk = Convert.ToString(kv.Value).Trim(); uint hm, hv;
-                    if (hk == "" || ParseHotkey(hk, out hm, out hv)) Settings.Set(kv.Key == "hotkey1" ? "Hotkey1" : "Hotkey2", hk);
+                    if (hk == "" || ParseHotkey(hk, out hm, out hv)) Settings.Set("Hotkey" + kv.Key.Substring(6), hk);
                     RegisterHotkeys(); break;
                 }
                 case "hotkeyPause": PauseHotkeys(); break;
