@@ -131,7 +131,11 @@ Le texte est envoyé sur l'entrée standard, précédé de `[Fenêtre active : �
 **Clic droit sur une réponse** : menu `#ctxm` (copier la sélection, copier la réponse, télécharger en `.txt`).
 
 ### Raccourcis clavier
-`RegisterHotKey` (ids 1 et 2) depuis les réglages `Hotkey1` / `Hotkey2` (texte `Ctrl+Alt+Shift+Win+Touche`, nom de touche .NET ; vide = désactivé). Pendant la saisie d'une combinaison dans les réglages, les raccourcis sont libérés (`hotkeyPause`) puis réenregistrés ; `HotkeyOk` signale une combinaison déjà prise.
+Un seul raccourci : `RegisterHotKey` id 1 depuis le réglage `Hotkey1` (défaut `Alt+Space` ; texte `Ctrl+Alt+Shift+Win+Touche`, nom de touche .NET ; vide = désactivé). `AskSelection` : depuis Bébène, il referme la discussion ; dans un terminal (`ConsoleWindowClass`, `CASCADIA_HOSTING_WINDOW_CLASS`…), il ouvre seulement ; ailleurs, il attend le relâchement des modificateurs, simule Ctrl+C, lit le texte ou la liste de fichiers (`FileDropList`, avec `d` = dossier), restaure le presse-papiers et envoie `selection\n{text, files:[{p, d}]}`. Pendant la saisie d'une combinaison dans les réglages, le raccourci est libéré (`hotkeyPause`) puis réenregistré ; `HotkeyOk` signale une combinaison déjà prise.
+
+**Brouillon** (page) : `DRAFT = {items:[{t:'text', v} | {t:'path', p, d}], group}` dans `localStorage.draft`, texte tapé dans `draftText`. Chaque sélection s'ajoute (sans doublon) ; si la conversation affichée a déjà des messages, une nouvelle est ouverte. `submit` ajoute `draftContext()` au message ; `save()` crée la conversation dans `DRAFT.group`.
+
+**Notifications Windows** : `Companion.Notify(type, …)` avec `type` ∈ `NotifKinds` (`done`, `ask`, `perm`, `hand`, `pause`, `rappel`) ; chaque type se coupe dans les réglages (`Notif_<type>`).
 
 ### Conversations
 Stockées dans le `localStorage` de la WebView (au plus 40, les anciennes raccourcies). Un **projet** fait travailler Claude dans `ClaudeHub/projets/<nom>/`, ce qui déclenche l'archivage automatique de ClaudeHub. **Sous-groupes** : `conv.group` + liste `localStorage.groups` par projet (`""` = sans projet), repliés dans `gfold`. Créer (＋ Groupe), renommer (✎), supprimer (× en 2 clics : les conversations restent, sans groupe), déplacer (⇢ ou clic droit → liste Sous-groupe / Projet). Le mode **Flash** n'enregistre rien et supprime la transcription `~/.claude/projects/**/<session>.jsonl`.
@@ -145,7 +149,7 @@ Stockées dans le `localStorage` de la WebView (au plus 40, les anciennes raccou
 
 ### Fenêtre
 - Verre acrylique Windows 11 + fond HTML à 90 % d'opacité, coins arrondis natifs (8 px), contour DWM orange discret.
-- Clic ailleurs = fermeture (sauf épinglée, si la fenêtre active appartient à Bébène ou à la discussion elle-même : liste déroulante, dialogue — `OwnedByMe` remonte propriétaires et parents). Les réglages comptent comme « ailleurs », sauf ouverts depuis le ⚙ de la discussion.
+- Clic ailleurs = fermeture (sauf épinglée). Deux détections : un sondage des boutons de la souris (`GetAsyncKeyState`, toutes les 25 ms tant que la fenêtre est visible) qui ferme sur un clic hors de la partie visible (`DWMWA_EXTENDED_FRAME_BOUNDS`) d'une fenêtre « ailleurs » (`IsElsewhere` : autre processus, ou les réglages sauf ⚙ cliqué il y a moins de 3 s ; le chat, les post-it, les volets et les fenêtres propres à la discussion via `OwnedByMe` ne comptent pas) ; et la perte d'activation (Alt+Tab), avec nouvel essai si le premier plan est encore vide.
 - **Menus de la page** : une seule fenêtre flottante ouverte à la fois (`closePops`) ; clic dehors ou Échap la ferme (Échap ne cache la discussion que si rien n'est ouvert). Un menu n'est jamais redessiné pendant un clic (`ptrDown`) ni pendant une saisie dedans (`editingIn`), et seulement si son contenu change (`setHTML`) : sinon l'élément cliqué est remplacé et le clic est perdu.
 - **Rond en haut à gauche** : avatar ; au survol, ⚙ (clic = réglages). La pastille de mise à jour est un bouton séparé sur son bord.
 - **Déplacement** : `mousedown` sur l'en-tête → message `drag` → `ReleaseCapture` + `WM_NCLBUTTONDOWN(HTCAPTION)`. Un drapeau `Moved` empêche le recalage sur le chat ; il est remis à zéro à la fermeture sauf si la fenêtre est épinglée. Même principe pour les volets (`Layered.Moved`).

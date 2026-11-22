@@ -19,10 +19,10 @@ using Microsoft.Web.WebView2.WinForms;
 
 [assembly: System.Reflection.AssemblyTitle("Bébène")]
 [assembly: System.Reflection.AssemblyProduct("Bébène")]
-[assembly: System.Reflection.AssemblyVersion("1.55.0.0")]
+[assembly: System.Reflection.AssemblyVersion("1.56.0.0")]
 
 static class Program {
-    public const string Version = "1.55";
+    public const string Version = "1.56";
     public static bool OpenSetup;
     public static readonly uint Pid = (uint)Process.GetCurrentProcess().Id;   // identifiant de Bébène (lu une seule fois)   // --setup : ouvrir directement l'assistant d'installation
 
@@ -70,6 +70,29 @@ static class Program {
             var sb = new StringBuilder();
             foreach (var x in Speller.Check(args[1])) sb.AppendLine(x.Word + " -> " + x.Repl);
             File.WriteAllText(args[2], "langue=" + Speller.Lang + "\r\n" + sb, Encoding.UTF8); return;
+        }
+        if (args.Length == 2 && args[0] == "--clicktest") {   // test : décision « clic ailleurs » (sans toucher à la souris)
+            Application.EnableVisualStyles();
+            ChatPanel.NoActivate = true;
+            var d = new Companion(false);
+            d.Shown += (s, e) => {
+                d.Panel.Location = new Point(30, 30); d.Panel.Fit(Screen.FromPoint(new Point(30, 30)).WorkingArea); d.Panel.Show();
+                var t = new System.Windows.Forms.Timer { Interval = 2500 };
+                t.Tick += (s2, e2) => {
+                    t.Stop();
+                    var vb = d.Panel.VisibleBounds(); var b = d.Panel.Bounds;
+                    var sb = new StringBuilder();
+                    sb.AppendLine("bureau=" + d.Panel.IsElsewhere(Companion.FindWindow("Progman", null)));
+                    sb.AppendLine("barre=" + d.Panel.IsElsewhere(Companion.FindWindow("Shell_TrayWnd", null)));
+                    sb.AppendLine("discussion=" + d.Panel.IsElsewhere(d.Panel.Handle));
+                    sb.AppendLine("chat=" + d.Panel.IsElsewhere(d.Handle));
+                    sb.AppendLine("visible-dans-fenetre=" + (b.Contains(vb) && vb.Width > 100));
+                    File.WriteAllText(args[1], sb.ToString(), Encoding.UTF8);
+                    Application.Exit();
+                };
+                t.Start();
+            };
+            Application.Run(d); return;
         }
         if (args.Length == 2 && args[0] == "--paneltest") {   // test : affiche la discussion 5 s sans prendre le clavier et la capture
             Application.EnableVisualStyles();
@@ -571,9 +594,9 @@ class Companion : Form {
         };
 
         // résolution / zoom / écran changé (portable branché sur un écran puis débranché) : la discussion se recale
-        Microsoft.Win32.SystemEvents.DisplaySettingsChanged += (s, e) => { try { BeginInvoke((Action)(() => { if (Panel != null && Panel.Visible) PlacePanel(); })); } catch { } };
+        Microsoft.Win32.SystemEvents.DisplaySettingsChanged += (s, e) => { try { BeginInvoke((Action)(() => { waDirty = true; if (Panel != null && Panel.Visible) PlacePanel(); })); } catch { } };
         // endormi et immobile : 1 image sur 3 suffit (~10 par seconde), la respiration et les « z » restent fluides
-        timer.Tick += (s, e) => { Tick(); if (Visible && (!Asleep || ++slowTick % 3 == 0)) Draw(); };
+        timer.Tick += (s, e) => { Tick(); if (Visible && (Asleep ? ++slowTick % 3 == 0 : !Calm || ++slowTick % 2 == 0)) Draw(); };   // endormi 10 images/s, assis immobile 15, sinon 30
         VisibleChanged += (s, e) => ForceRedraw();                         // réaffiché : on renvoie l image même si elle n a pas changé
         timer.Start();
 
@@ -605,8 +628,9 @@ class Companion : Form {
         RegisterHotkeys();
     }
     // Raccourcis configurables (réglages > Système) : texte « Ctrl+Alt+Shift+Win+Touche » (nom de touche .NET : A, D1, F5, Space…), vide = aucun
-    // 1 et 2 : ouvrir / fermer la discussion ; 3 : demander à Bébène à propos du texte sélectionné dans n'importe quelle appli
-    public static readonly string[] HotkeyDefaults = { "Alt+Space", "Ctrl+Alt+C", "Ctrl+Alt+Q" };
+    // UN seul raccourci (Hotkey1) : ouvre la discussion en emportant ce qui est sélectionné dans l'appli active (texte, fichiers, dossiers) ;
+    // depuis Bébène lui-même, il ferme la discussion. Hotkey2 / Hotkey3 (anciennes versions) ne sont plus enregistrés.
+    public static readonly string[] HotkeyDefaults = { "Alt+Space", "", "" };
     public bool[] HotkeyOk = new bool[3];
     ToolStripMenuItem openItem;
     public static bool ParseHotkey(string s, out uint mod, out uint vk) {
@@ -635,19 +659,17 @@ class Companion : Form {
     public void RegisterHotkeys() {
         if (!IsHandleCreated) return;
         var labels = new List<string>();
-        for (int i = 0; i < 3; i++) {
-            UnregisterHotKey(Handle, i + 1);
-            uint mod, vk;
-            string s = Settings.Str("Hotkey" + (i + 1), HotkeyDefaults[i]);
-            HotkeyOk[i] = ParseHotkey(s, out mod, out vk) && RegisterHotKey(Handle, i + 1, mod | 0x4000, vk);
-            if (HotkeyOk[i] && i < 2) labels.Add(HotkeyLabel(s));
-        }
+        for (int i = 0; i < 3; i++) UnregisterHotKey(Handle, i + 1);
+        uint mod, vk;
+        string s = Settings.Str("Hotkey1", HotkeyDefaults[0]);
+        HotkeyOk[0] = ParseHotkey(s, out mod, out vk) && RegisterHotKey(Handle, 1, mod | 0x4000, vk);
+        if (HotkeyOk[0]) labels.Add(HotkeyLabel(s));
         if (openItem != null) openItem.ShortcutKeyDisplayString = labels.Count > 0 ? labels[0] : "";
     }
     // pendant qu on tape une nouvelle combinaison dans les réglages, les raccourcis actuels ne doivent pas l intercepter
     public void PauseHotkeys() { if (IsHandleCreated) { UnregisterHotKey(Handle, 1); UnregisterHotKey(Handle, 2); UnregisterHotKey(Handle, 3); } }
     protected override void WndProc(ref Message m) {
-        if (m.Msg == 0x0312) { if (m.WParam.ToInt32() == 3) AskSelection(); else TogglePanel(); }
+        if (m.Msg == 0x0312 && m.WParam.ToInt32() == 1) AskSelection();
         base.WndProc(ref m);
     }
 
@@ -657,10 +679,18 @@ class Companion : Form {
     [DllImport("user32.dll")] static extern uint GetClipboardSequenceNumber();
     [DllImport("user32.dll")] static extern void keybd_event(byte vk, byte scan, uint flags, UIntPtr extra);
     bool selBusy;
+    [DllImport("user32.dll", CharSet = CharSet.Unicode)] static extern int GetClassName(IntPtr h, StringBuilder s, int n);
+    [DllImport("user32.dll", CharSet = CharSet.Unicode)] internal static extern IntPtr FindWindow(string cls, string title);
+    // fenêtres où un Ctrl+C simulé serait dangereux (terminal : interrompt la commande en cours) → pas de capture
+    static bool IsTerminal(IntPtr h) {
+        var sb = new StringBuilder(256); GetClassName(h, sb, 256);
+        return Regex.IsMatch(sb.ToString(), "^(ConsoleWindowClass|CASCADIA_HOSTING_WINDOW_CLASS|PseudoConsoleWindow|VirtualConsoleClass|mintty)$");
+    }
     void AskSelection() {
         if (selBusy) return;
         var fg = GetForegroundWindow(); uint pid; GetWindowThreadProcessId(fg, out pid);
-        if (fg == IntPtr.Zero || pid == Program.Pid) { ShowPanel(); Panel.Post("selection\n"); return; }
+        if (pid == Program.Pid && Panel.Visible) { Panel.Hide(); return; }                 // depuis Bébène : le raccourci referme
+        if (fg == IntPtr.Zero || pid == Program.Pid || IsTerminal(fg)) { ShowPanel(); Panel.Post("selection\n"); return; }
         selBusy = true;
         // on attend que l'utilisateur relâche Ctrl / Alt / Maj / Win du raccourci (sinon Ctrl+C devient Ctrl+Alt+C)
         int waited = 0; var t = new System.Windows.Forms.Timer { Interval = 30 };
@@ -669,13 +699,14 @@ class Companion : Form {
             bool held = false; foreach (int vk in new[] { 0x10, 0x11, 0x12, 0x5B, 0x5C }) if ((GetAsyncKeyState(vk) & 0x8000) != 0) held = true;
             if (held && waited < 1500) return;
             t.Stop(); t.Dispose();
-            string text = "";
-            try { text = CopySelection(); } catch (Exception ex) { Program.Log("Sélection", ex.Message); }
+            string json = "";
+            try { json = CopySelection(); } catch (Exception ex) { Program.Log("Sélection", ex.Message); }
             selBusy = false;
-            ShowPanel(); Panel.Post("selection\n" + text);
+            ShowPanel(); Panel.Post("selection\n" + json);
         };
         t.Start();
     }
+    // copie ce qui est sélectionné (Ctrl+C simulé) : texte, ou fichiers / dossiers de l'Explorateur ; renvoie {text, files:[{p, d}]}
     static string CopySelection() {
         // sauvegarde du presse-papiers (formats courants)
         string oldText = Clipboard.ContainsText() ? Clipboard.GetText() : null;
@@ -685,11 +716,19 @@ class Companion : Form {
         keybd_event(0x11, 0, 0, UIntPtr.Zero); keybd_event(0x43, 0, 0, UIntPtr.Zero);          // Ctrl+C
         keybd_event(0x43, 0, 2, UIntPtr.Zero); keybd_event(0x11, 0, 2, UIntPtr.Zero);
         var sw = Stopwatch.StartNew();
-        while (GetClipboardSequenceNumber() == seq && sw.ElapsedMilliseconds < 800) { Application.DoEvents(); Thread.Sleep(20); }
-        string text = "";
+        while (GetClipboardSequenceNumber() == seq && sw.ElapsedMilliseconds < 450) { Application.DoEvents(); Thread.Sleep(15); }   // rien de sélectionné : on n'attend pas longtemps
+        string text = ""; var files = new List<Dictionary<string, object>>();
         if (GetClipboardSequenceNumber() != seq) {
             Thread.Sleep(30);
-            for (int i = 0; i < 5; i++) { try { text = Clipboard.ContainsText() ? Clipboard.GetText() : ""; break; } catch { Thread.Sleep(40); } }   // presse-papiers encore ouvert par l'appli
+            for (int i = 0; i < 5; i++) {                                                 // presse-papiers encore ouvert par l'appli : on réessaie
+                try {
+                    if (Clipboard.ContainsFileDropList())
+                        foreach (string p in Clipboard.GetFileDropList())
+                            if (files.Count < 50) files.Add(new Dictionary<string, object> { { "p", p }, { "d", Directory.Exists(p) } });
+                    if (files.Count == 0 && Clipboard.ContainsText()) text = Clipboard.GetText();
+                    break;
+                } catch { Thread.Sleep(40); }
+            }
             try {
                 if (oldFiles != null) Clipboard.SetFileDropList(oldFiles);
                 else if (oldImg != null) Clipboard.SetImage(oldImg);
@@ -699,7 +738,8 @@ class Companion : Form {
         }
         if (oldImg != null) oldImg.Dispose();
         text = (text ?? "").Trim();
-        return text.Length > 20000 ? text.Substring(0, 20000) : text;
+        if (text.Length > 20000) text = text.Substring(0, 20000);
+        return new JavaScriptSerializer().Serialize(new Dictionary<string, object> { { "text", text }, { "files", files } });
     }
 
     public string State { get { return state; } }
@@ -711,7 +751,10 @@ class Companion : Form {
     public void Progress(int done, int total) { progDone = done; progTotal = total; }
     // notification Windows (tâche finie, question, accord, besoin de toi) ; un clic ouvre la conversation concernée
     string toastKey;
+    public static readonly string[] NotifKinds = { "done", "ask", "perm", "hand", "pause", "rappel" };   // types choisis un par un dans Réglages › Alertes
+    static Dictionary<string, object> NotifPrefs() { var d = new Dictionary<string, object>(); foreach (var k in NotifKinds) d[k] = Settings.Bool("Notif_" + k, true); return d; }
     public void Notify(string kind, string title, string key) {
+        if (!Settings.Bool("Notif_" + (Array.IndexOf(NotifKinds, kind) >= 0 ? kind : "done"), true)) return;
         string head = kind == "ask" ? "❓ Une question pour toi" : kind == "perm" ? "🔐 Accord demandé" : kind == "hand" ? "🐾 " + Settings.Name + " a besoin de toi" : kind == "pause" ? "⏸ Tâche en pause : quota presque épuisé" : kind == "rappel" ? "⏰ Rappel" : "✅ Tâche terminée";
         toastKey = key;
         try { tray.ShowBalloonTip(6000, head, string.IsNullOrEmpty(title) ? "Conversation" : (title.Length > 120 ? title.Substring(0, 120) + "…" : title), ToolTipIcon.None); } catch { }
@@ -821,6 +864,16 @@ class Companion : Form {
     }
 
     float dpiS = 1f; int dpiTick;
+    // zone utile de l'écran du chat : Screen.FromPoint crée un contexte graphique Windows à chaque appel (coûteux 30 fois par seconde)
+    // → gardée en mémoire, recalculée 1 fois par seconde, quand le chat change d'écran ou quand l'affichage change
+    Rectangle waCache; int waTick; bool waDirty = true;
+    Rectangle WorkArea() {
+        var c = new Point(Left + W / 2, Top + H / 2);
+        if (waDirty || ++waTick % 30 == 0 || (held && !waCache.Contains(c))) {
+            waCache = Screen.FromPoint(c).WorkingArea; waDirty = false;
+        }
+        return waCache;
+    }
     void Tick() {
         if (++dpiTick % 30 == 0 && !held) {               // passÃ© sur un Ã©cran avec un autre zoom : on garde le bas-centre
             var sc = Util.ScaleOf(Bounds);
@@ -840,7 +893,7 @@ class Companion : Form {
         // "question" : Claude attend une info capitale → Bébène se gratte la tête, regarde à gauche puis à droite, oreilles qui bougent
         if (state == "question") { askT += dt; if (askT > 4.5f) { askT = 0; if (!held && !falling) SetAct("scratch", 1.1f); earTw = 5; } }
 
-        var wa = Screen.FromPoint(new Point(Left + W / 2, Top + H / 2)).WorkingArea;
+        var wa = WorkArea();
         int groundTop = wa.Bottom - 51 * Px;
         bool busy = state == "thinking" || state == "ready" || state == "question" || state == "hand" || Panel.Visible;
         if (state == "hand") { askT += dt; if (askT > 5f) { askT = 0; if (!held && !falling) jumpT = 0; earTw = 5; } }   // besoin de toi : petit saut toutes les 5 s
@@ -936,6 +989,9 @@ class Companion : Form {
     int slowTick;
     // images réduites (1 sur 3) seulement quand il dort vraiment immobile : pose atteinte, ni oreille, ni queue qui balance, ni geste en cours
     bool Asleep { get { return act == "lie" && actT > 2 && !held && !falling && peekT <= 0 && petT <= 0 && heartT <= 0 && jumpT < 0 && landT <= 0 && earTw == 0 && state == "idle"
+        && walkAmp < 0.01f && Math.Abs(swing) < 0.5f && Math.Abs(stretch) < 0.2f && cur.Dist(goal) < 0.15f; } }
+    // assis ou couché sans bouger (ni porté, ni saut, ni marche) : 15 images/s suffisent
+    bool Calm { get { return (act == "sit" || act == "lie") && !held && !falling && jumpT < 0 && landT <= 0 && petT <= 0 && heartT <= 0
         && walkAmp < 0.01f && Math.Abs(swing) < 0.5f && Math.Abs(stretch) < 0.2f && cur.Dist(goal) < 0.15f; } }
     void Draw() {
         using (var img = BuildImage()) {
@@ -1431,7 +1487,7 @@ class Companion : Form {
         var d = new Dictionary<string, object> {
             { "name", Settings.Name }, { "model", Settings.Str("Model", "") }, { "scale", scalePct }, { "activity", Settings.Int("Activity", 50) },
             { "showCat", Settings.Bool("ShowCat", true) }, { "topMost", TopMost }, { "autoStart", Settings.AutoStart },
-            { "prompt", Settings.Str("Prompt", "") }, { "hotkey1", Settings.Str("Hotkey1", HotkeyDefaults[0]) }, { "hotkey2", Settings.Str("Hotkey2", HotkeyDefaults[1]) }, { "hotkey3", Settings.Str("Hotkey3", HotkeyDefaults[2]) }, { "dailyBrief", Settings.Bool("DailyBrief", true) }, { "hotkeyOk", HotkeyOk }, { "stream", Settings.Bool("Stream", true) }, { "light", Settings.Bool("Light", false) }, { "autoModel", Settings.Bool("AutoModel", true) },{ "caveman", Settings.Bool("Caveman", true) }, { "chrome", Settings.Bool("Chrome", true) }, { "postits", Settings.Bool("PostIts", true) }, { "prepare", Settings.Bool("Prepare", true) }, { "spell", Settings.Bool("SpellCheck", false) }, { "autoAllow", Settings.Str("AutoAllow", "") }, { "remindExam", Settings.Bool("RemindExam", true) }, { "remindRdv", Settings.Bool("RemindRdv", true) }, { "remindWhen", Settings.Str("RemindWhen", "both") }, { "features", Features() }, { "manual", Manual.Raw() }, { "hidden", new List<string>(Manual.Hidden()) }, { "calendars", Calendars.Config() }, { "locFilter", Settings.Str("LocFilter", "") }, { "gmailUser", Mailbox.GmailUser }, { "gmailSet", Mailbox.GmailReady }, { "outlookOn", Mailbox.OutlookOn }, { "mailStatus", Mailbox.Status }, { "mailRunning", Mailbox.Running },{ "workDir", Panel.WorkDir }, { "hasSession", SessionId.Length > 0 },
+            { "prompt", Settings.Str("Prompt", "") }, { "hotkey1", Settings.Str("Hotkey1", HotkeyDefaults[0]) }, { "dailyBrief", Settings.Bool("DailyBrief", true) }, { "notifs", NotifPrefs() }, { "hotkeyOk", HotkeyOk }, { "stream", Settings.Bool("Stream", true) }, { "light", Settings.Bool("Light", false) }, { "autoModel", Settings.Bool("AutoModel", true) },{ "caveman", Settings.Bool("Caveman", true) }, { "chrome", Settings.Bool("Chrome", true) }, { "postits", Settings.Bool("PostIts", true) }, { "prepare", Settings.Bool("Prepare", true) }, { "spell", Settings.Bool("SpellCheck", false) }, { "autoAllow", Settings.Str("AutoAllow", "") }, { "remindExam", Settings.Bool("RemindExam", true) }, { "remindRdv", Settings.Bool("RemindRdv", true) }, { "remindWhen", Settings.Str("RemindWhen", "both") }, { "features", Features() }, { "manual", Manual.Raw() }, { "hidden", new List<string>(Manual.Hidden()) }, { "calendars", Calendars.Config() }, { "locFilter", Settings.Str("LocFilter", "") }, { "gmailUser", Mailbox.GmailUser }, { "gmailSet", Mailbox.GmailReady }, { "outlookOn", Mailbox.OutlookOn }, { "mailStatus", Mailbox.Status }, { "mailRunning", Mailbox.Running },{ "workDir", Panel.WorkDir }, { "hasSession", SessionId.Length > 0 },
             { "version", Program.Version }
         };
         return new JavaScriptSerializer().Serialize(d);
@@ -1463,7 +1519,12 @@ class Companion : Form {
                 case "autoModel": Settings.Set("AutoModel", Convert.ToBoolean(kv.Value)); break;
                 case "light": Settings.Set("Light", Convert.ToBoolean(kv.Value)); Panel.PostTheme(); break;
                 case "dailyBrief": Settings.Set("DailyBrief", Convert.ToBoolean(kv.Value)); break;
-                case "hotkey1": case "hotkey2": case "hotkey3": {
+                case "notif": {                                          // notif = {type: oui/non} : notifications Windows choisies dans les réglages
+                    var nd = kv.Value as Dictionary<string, object>;
+                    if (nd != null) foreach (var nk in nd) if (Array.IndexOf(NotifKinds, nk.Key) >= 0) Settings.Set("Notif_" + nk.Key, Convert.ToBoolean(nk.Value));
+                    break;
+                }
+                case "hotkey1": {
                     string hk = Convert.ToString(kv.Value).Trim(); uint hm, hv;
                     if (hk == "" || ParseHotkey(hk, out hm, out hv)) Settings.Set("Hotkey" + kv.Key.Substring(6), hk);
                     RegisterHotkeys(); break;

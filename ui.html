@@ -607,6 +607,21 @@ details.acts[open] > summary { margin-bottom: 8px; }
 details.acts .plan { margin: 0 0 8px; }
 /* ---- zone de saisie : grandit avec le texte, sans barre tant que tout tient ---- */
 textarea#input { overflow-y: hidden; line-height: 1.5; min-height: 0; height: 31px; max-height: none; scrollbar-width: thin; }
+/* ---- brouillon : sélections capturées par le raccourci (puces) + destination de la nouvelle conversation ---- */
+#selbar { border-color: rgba(var(--ov),.08); background: rgba(var(--ov),.035); padding: 8px 10px; }
+.ddest { display: flex; align-items: center; flex-wrap: wrap; gap: 6px; font-size: 12px; color: var(--muted); margin-bottom: 6px; }
+.ddest:last-child { margin-bottom: 0; }
+.ddest b { color: var(--accent-2); font-weight: 600; }
+.ddest select { font: inherit; font-size: 12px; color: var(--text); background: var(--raised); border: 1px solid var(--line); border-radius: 8px; padding: 2px 6px; }
+.dchips { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.dchip { display: inline-flex; align-items: center; gap: 5px; max-width: 100%; min-width: 0; font-size: 12px; padding: 3px 4px 3px 9px; border-radius: 999px;
+  background: rgba(217,119,87,.12); border: 1px solid rgba(217,119,87,.28); white-space: nowrap; }
+.dchip .dl { min-width: 0; overflow: hidden; text-overflow: ellipsis; }   /* nom long : coupé avec « … », la croix reste toujours visible */
+.dchip button { flex: none; width: 18px; height: 18px; border-radius: 50%; border: 0; background: none; color: var(--muted); cursor: pointer; font-size: 13px; line-height: 1; }
+.dchip button:hover { background: rgba(240,100,100,.15); color: #f08a85; }
+.dclr { font: inherit; font-size: 11.5px; color: var(--muted); background: none; border: 0; cursor: pointer; padding: 2px 6px; border-radius: 6px; }
+.dclr:hover { color: var(--text); background: rgba(var(--ov),.06); }
+#selbar .sb { margin-top: 8px; }
 </style>
 </head>
 <body>
@@ -763,7 +778,6 @@ function convChanged(c) {                  // comparaison champ par champ : pas 
   return ks.some(k => { const a = c[k], b = s[k]; return Array.isArray(a) ? !Array.isArray(b) || a.length !== b.length || a.some((x, i) => x !== b[i]) : a !== b; });
 }
 if (FILES && !migrate) convs.forEach(c => sent.set(c.id, snapOf(c)));
-let SEL = '';                              // texte sélectionné dans une autre appli (raccourci « Demander sur la sélection »)
 // ---- projet annoncé par Claude (« 📁 Projet : <nom> », celui qui déclenche l'archivage) ----
 function projName(s) {
   return String(s || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^a-z0-9._-]+/g, '-').replace(/^[-.]+|[-.]+$/g, '');
@@ -793,6 +807,7 @@ let ptrDown = false, menuDirty = false;   // bouton de souris enfoncé ; menu à
 
 let conv = convs.find(c => c.id === store.get('cur', '')) || null;
 let flash = false, project = conv ? conv.project || '' : store.get('project', ''), projects = [];
+let DRAFT = (() => { try { const d = JSON.parse(store.get('draft', '') || '{}'); return { items: d.items || [], group: d.group || '' }; } catch { return { items: [], group: '' }; } })();
 let ARCH = new Set();                                                 // projets archivés (cachés de la palette, gérés dans les réglages)
 const hueOf = s => { let h = 0; for (const c of String(s)) h = (h * 31 + c.charCodeAt(0)) % 360; return h; };   // couleur stable par projet
 let granted = new Set(conv && conv.granted ? conv.granted : []);   // actions autorisées pour la conversation en cours
@@ -856,7 +871,11 @@ function persist() {
 }
 function save() {
   if (flash || !log.children.length) return;                       // flash : rien n'est enregistré
-  if (!conv) { conv = { id: 'c' + Date.now().toString(36), title: '', sid: sid, project: project, updated: Date.now(), hist: '' }; convs.unshift(conv); }
+  if (!conv) {                                                       // 1er message : la conversation naît dans le projet et le sous-groupe choisis
+    conv = { id: 'c' + Date.now().toString(36), title: '', sid: sid, project: project, updated: Date.now(), hist: '' };
+    if (DRAFT.group && groupsOf(project).includes(DRAFT.group)) conv.group = DRAFT.group;
+    DRAFT.group = ''; saveDraft(); convs.unshift(conv); renderDraft();
+  }
   conv.sid = sid; conv.hist = log.innerHTML; conv.updated = Date.now(); conv.project = project; conv.granted = [...granted]; conv.autoAll = autoAll;
   if (!conv.title) { const u = log.querySelector('.msg.user'); conv.title = u ? shortTitle(u.textContent) : 'Conversation'; }
   persist();
@@ -1123,16 +1142,16 @@ function compacted(ok, pre, post_) {
   }
   compactNote = null; lastCtx = 0; refresh(); save();
 }
-function submit(text, allowed, silent) {
+function submit(text, allowed, silent, noDraft) {
   text = (text || input.value).trim();
   if (busy || compacting || !text) return;
-  if (!silent && SEL) { text += '\n\nTexte sélectionné :\n"""\n' + SEL + '\n"""'; hideSel(); }   // question tapée sur un texte sélectionné ailleurs
+  if (!silent && !noDraft && DRAFT.items.length) text += draftContext(takeDraft());   // question tapée sur ce que le raccourci a capturé (texte, dossiers…)
   if (!silent) {
     const pc = openPause();                                            // tâche en pause : écrire = demander de continuer
     if (pc) { if (resumePause(pc, false, text)) { input.value = ''; autosize(); } return; }
     turn = { req: text, files: [], todos: null, acts: 0 };
   } else if (!turn) turn = { req: text, files: [], todos: null, acts: 0 };
-  if (!silent) { input.value = ''; autosize(); el('msg user', esc(text)); decorate(); }
+  if (!silent) { input.value = ''; store.set('draftText', ''); autosize(); el('msg user', esc(text)); decorate(); }
   cur = el('msg bot', '<div class="typing"><span></span><span></span><span></span></div>');
   busy = true; gotResult = false; denials = []; pendingAsk = null; pendingReady = null; pendingHand = null; refresh(); scroll();
   if (conv) conv.attn = '';
@@ -1339,7 +1358,7 @@ function applyMode() {
   $('#projLabel').textContent = flash ? 'Projets et historique' : project || 'Sans projet'; $('#ddProj').classList.toggle('has', !!project && !flash);
   $('#projDot').classList.toggle('none', !project || flash); $('#projDot').style.setProperty('--h', hueOf(project));
   setSub();
-  input.placeholder = flash ? 'Question rapide… (non enregistrée)' : 'Écris à ' + ($('#name').textContent || 'Bébène') + '…';
+  renderDraft();                                                     // texte d'aide, sous-groupe du projet choisi
   renderMenu();
 }
 function setSub() {
@@ -1941,35 +1960,72 @@ function addPath(p) {
   autosize(); input.focus();
 }
 
-// ---- « Demander sur la sélection » : le texte arrive du raccourci, une barre propose des actions (ou on tape sa question) ----
+// ---- Brouillon de la prochaine conversation : ce que le raccourci a capturé (texte, fichiers, dossiers) + le texte tapé.
+// Gardé (localStorage) tant que le 1er message n'est pas envoyé : fermer la discussion ou relancer Bébène ne perd rien.
+// Chaque nouveau raccourci AJOUTE sa sélection. Avant d'envoyer, on choisit le projet (palette) et le sous-groupe (liste ici).
 const SEL_ACTS = {
   expl: ['💡 Expliquer', 'Explique-moi simplement ce texte :'],
   trad: ['🌐 Traduire', 'Traduis ce texte (en français s\'il est dans une autre langue, sinon en anglais) :'],
   corr: ['✏️ Corriger', 'Corrige l\'orthographe et la grammaire de ce texte, et donne la version corrigée prête à copier :'],
   resu: ['📝 Résumer', 'Résume ce texte en quelques points :']
 };
-function showSel(t) {
-  t = (t || '').trim();
-  if (!t) { hideSel(); toast('Aucun texte sélectionné : sélectionne du texte dans une appli, puis refais le raccourci.'); input.focus(); return; }
-  SEL = t;
-  const b = $('#selbar');
-  b.innerHTML = '<div class="sh"><span>📋 Texte sélectionné · ' + t.length + ' caractère' + (t.length > 1 ? 's' : '') + '</span><button class="x" title="Retirer">×</button></div>'
-    + '<div class="sq">' + esc(t.length > 220 ? t.slice(0, 220) + '…' : t) + '</div>'
-    + '<div class="sb">' + Object.keys(SEL_ACTS).map(k => '<button data-a="' + k + '">' + SEL_ACTS[k][0] + '</button>').join('') + '</div>';
-  b.classList.add('on');
-  input.placeholder = 'Ou pose ta question sur ce texte…'; input.focus();
+function saveDraft() { store.set('draft', JSON.stringify(DRAFT)); }
+const baseName = p => String(p).replace(/[\/]+$/, '').split(/[\/]/).pop() || p;
+function draftContext(items) {
+  const ps = items.filter(x => x.t === 'path'), ts = items.filter(x => x.t === 'text');
+  let s = '';
+  if (ps.length) s += '\n\nDossiers et fichiers sélectionnés :\n' + ps.map(x => '- ' + x.p + (x.d ? ' (dossier)' : '')).join('\n');
+  ts.forEach(x => { s += '\n\nTexte sélectionné :\n"""\n' + x.v + '\n"""'; });
+  return s;
 }
-function hideSel() {
-  const was = !!SEL; SEL = ''; $('#selbar').classList.remove('on');
-  if (was) input.placeholder = flash ? 'Question rapide… (non enregistrée)' : 'Écris à ' + ($('#name').textContent || 'Bébène') + '…';
+function isNewChat() { return !flash && !conv && !log.querySelector('.msg'); }
+function renderDraft() {
+  const b = $('#selbar'), it = DRAFT.items, gs = isNewChat() ? groupsOf(project) : [];
+  if (DRAFT.group && !gs.includes(DRAFT.group)) DRAFT.group = '';
+  if (!it.length && !gs.length) { b.classList.remove('on'); setHTML(b, ''); placeholder(); return; }
+  const chip = (x, i) => x.t === 'path'
+    ? '<span class="dchip" title="' + esc(x.p) + '"><span class="dl">' + (x.d ? '📁' : '📄') + ' ' + esc(baseName(x.p)) + '</span><button data-rm="' + i + '" title="Retirer">×</button></span>'
+    : '<span class="dchip" title="' + esc(x.v.slice(0, 600)) + '"><span class="dl">📋 « ' + esc(x.v.replace(/\s+/g, ' ').slice(0, 38)) + (x.v.length > 38 ? '…' : '') + ' » · ' + x.v.length + ' car.</span><button data-rm="' + i + '" title="Retirer">×</button></span>';
+  let h = '';
+  if (gs.length) h += '<div class="ddest">Nouvelle conversation dans <b># ' + esc(project) + '</b> › <select id="dGroup" title="Sous-groupe de la nouvelle conversation"><option value="">Sans groupe</option>'
+    + gs.map(g => '<option' + (g === DRAFT.group ? ' selected' : '') + ' value="' + esc(g) + '">📂 ' + esc(g) + '</option>').join('') + '</select></div>';
+  if (it.length) {
+    h += '<div class="dchips">' + it.map(chip).join('') + (it.length > 1 ? '<button class="dclr" title="Tout retirer">Tout retirer</button>' : '') + '</div>';
+    if (it.some(x => x.t === 'text')) h += '<div class="sb">' + Object.keys(SEL_ACTS).map(k => '<button data-a="' + k + '">' + SEL_ACTS[k][0] + '</button>').join('') + '</div>';
+  }
+  setHTML(b, h); b.classList.add('on'); placeholder();
 }
+function placeholder() {
+  const it = DRAFT.items;
+  input.placeholder = flash ? 'Question rapide… (non enregistrée)'
+    : it.some(x => x.t === 'path') ? 'Que veux-tu faire avec ' + (it.filter(x => x.t === 'path').length > 1 ? 'ces éléments' : 'cet élément') + ' ?'
+    : it.length ? 'Ou pose ta question sur ce texte…' : 'Écris à ' + ($('#name').textContent || 'Bébène') + '…';
+}
+// message « selection » du raccourci : {text, files:[{p, d}]} (ancien format : texte brut)
+function showSel(v) {
+  let s; try { s = JSON.parse(v); } catch { s = { text: v || '' }; }
+  if (typeof s !== 'object' || !s) s = { text: String(v || '') };
+  const text = String(s.text || '').trim(), files = Array.isArray(s.files) ? s.files : [];
+  if ((text || files.length) && !isNewChat() && !flash) newChat({ project: project });   // une conversation déjà commencée : la sélection part dans une nouvelle
+  if (text && !DRAFT.items.some(x => x.t === 'text' && x.v === text)) DRAFT.items.push({ t: 'text', v: text.slice(0, 20000) });
+  files.forEach(f => { if (f && f.p && !DRAFT.items.some(x => x.t === 'path' && x.p === f.p)) DRAFT.items.push({ t: 'path', p: f.p, d: !!f.d }); });
+  saveDraft(); renderDraft(); input.focus();
+}
+function takeDraft() { const it = DRAFT.items; DRAFT.items = []; saveDraft(); renderDraft(); return it; }
 $('#selbar').addEventListener('click', e => {
-  if (e.target.closest('.x')) { hideSel(); return; }
-  const a = e.target.closest('[data-a]'); if (!a || !SEL) return;
+  const rm = e.target.closest('[data-rm]');
+  if (rm) { DRAFT.items.splice(+rm.dataset.rm, 1); saveDraft(); renderDraft(); input.focus(); return; }
+  if (e.target.closest('.dclr')) { takeDraft(); input.focus(); return; }
+  const a = e.target.closest('[data-a]'); if (!a || !DRAFT.items.length) return;
   if (busy || compacting) newChat({ project: project });                 // la conversation affichée travaille : une nouvelle pour cette demande
-  const t = SEL_ACTS[a.dataset.a][1] + '\n\n"""\n' + SEL + '\n"""';
-  hideSel(); submit(t);
+  const t = SEL_ACTS[a.dataset.a][1] + draftContext(takeDraft());
+  submit(t, undefined, false, true);
 });
+$('#selbar').addEventListener('change', e => { if (e.target.id === 'dGroup') { DRAFT.group = e.target.value; saveDraft(); } });
+// texte tapé : gardé lui aussi (fermeture de la discussion, page libérée, redémarrage)
+{ let t = 0; input.addEventListener('input', () => { clearTimeout(t); t = setTimeout(() => store.set('draftText', input.value), 250); }); }
+if (!input.value && store.get('draftText', '')) { input.value = store.get('draftText', ''); setTimeout(autosize, 0); }
+renderDraft();
 
 // ---- point du jour (une fois par jour, réglage « Point du jour ») ----
 function showBrief(v) {

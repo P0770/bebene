@@ -50,6 +50,11 @@ Remove-Item "$out\fit.txt" -ErrorAction SilentlyContinue
 RunApp @('--fittest', "$out\fit.txt") | Out-Null
 $ft = if (Test-Path "$out\fit.txt") { Get-Content "$out\fit.txt" -Encoding UTF8 } else { @() }
 Result 'discussion tient sur petit écran' ($ft.Count -eq 4 -and -not (($ft -join "`n") -match 'DEBORDE')) ($ft -join ' / ')
+# clic ailleurs : bureau et barre des tâches = ailleurs ; la discussion et le chat = non
+Remove-Item "$out\click.txt" -ErrorAction SilentlyContinue
+RunApp @('--clicktest', "$out\click.txt") | Out-Null
+$ck = if (Test-Path "$out\click.txt") { (Get-Content "$out\click.txt" -Encoding UTF8) -join ' ' } else { '' }
+Result 'clic ailleurs ferme la discussion' ($ck -match 'bureau=True' -and $ck -match 'barre=True' -and $ck -match 'discussion=False' -and $ck -match 'chat=False' -and $ck -match 'visible-dans-fenetre=True') $ck
 # conversations en fichiers, rappels demandés à Bébène, point du jour (dossiers temporaires, rien de réel touché)
 Remove-Item "$out\store.txt" -ErrorAction SilentlyContinue
 RunApp @('--storetest', "$out\store.txt") | Out-Null
@@ -71,6 +76,8 @@ else {
         $f = Join-Path $out ($id + '.html'); $o = Join-Path $out ($id + '.dom')
         [IO.File]::WriteAllText($f, $html, (New-Object Text.UTF8Encoding $false))
         $udd = Join-Path $env:TEMP ('BebeneEdge-' + $id); if (Test-Path $udd) { Remove-Item $udd -Recurse -Force -ErrorAction SilentlyContinue }
+        # au plus 6 pages à la fois : lancer les ~45 Edge d un coup faisait ramer tout le PC pendant les tests
+        while (@($script:pages | Where-Object { -not $_.P.HasExited }).Count -ge 6) { Start-Sleep -Milliseconds 100 }
         $p = Start-Process $edge -PassThru -WindowStyle Hidden -RedirectStandardOutput $o -RedirectStandardError ($o + '.err') -ArgumentList @(
             '--headless', '--disable-gpu', '--no-first-run', '--virtual-time-budget=3000', ('"--user-data-dir=' + $udd + '"'), '--dump-dom', ('"file:///' + ($f -replace '\\', '/') + '"'))
         $script:pages += [pscustomobject]@{ Name = $name; Expect = $expect; P = $p; Out = $o; Udd = $udd }
@@ -193,6 +200,19 @@ else {
         'const send=m=>__h({data:m});send("selection\nBonjour le monde");var a=$("#selbar").classList.contains("on")&&/Bonjour/.test($("#selbar").textContent);' +
         '$("#selbar [data-a=trad]").click();const p=__posts.filter(x=>x.startsWith("send\n")).pop()||"";var b=/Traduis/.test(p)&&/Bonjour le monde/.test(p)&&!$("#selbar").classList.contains("on");' +
         'send("selection\n");var c=!$("#selbar").classList.contains("on");document.title="R:"+a+b+c+JSON.stringify(__err)') 'R:truetruetrue[]'
+    PageTest 'brouillon : sélections gardées et ajoutées' 'ui.html' (
+        'const send=m=>__h({data:m});projects=["p1"];GROUPS={p1:["G1"]};project="p1";applyMode();' +
+        'send("selection\n"+JSON.stringify({text:"",files:[{p:"C:/A/Docs",d:true}]}));var a=document.querySelectorAll("#selbar .dchip").length===1&&!!$("#dGroup")&&/ces|cet/.test(input.placeholder);' +
+        'send("selection\n"+JSON.stringify({text:"Bonjour",files:[{p:"C:/A/Docs",d:true},{p:"C:/A/x.pdf",d:false}]}));var b=document.querySelectorAll("#selbar .dchip").length===3&&JSON.parse(localStorage.getItem("draft")).items.length===3;' +
+        '$("#dGroup").value="G1";$("#dGroup").dispatchEvent(new Event("change",{bubbles:true}));$("#selbar [data-rm=\"2\"]").click();var c=DRAFT.group==="G1"&&DRAFT.items.length===2;' +
+        'input.value="Analyse ça";submit();save();const p=__posts.filter(x=>x.startsWith("send\n")).pop()||"";var d=/C:\/A\/Docs \(dossier\)/.test(p)&&/Bonjour/.test(p)&&!/x\.pdf/.test(p)&&!DRAFT.items.length&&convs[0].group==="G1"&&convs[0].project==="p1";' +
+        'busy=false;send("selection\n"+JSON.stringify({text:"Autre",files:[]}));var e=!$("#log .msg")&&DRAFT.items.length===1&&project==="p1";' +
+        'document.title="R:"+a+b+c+d+e+JSON.stringify(__err)') 'R:truetruetruetruetrue[]'
+    PageTest 'étiquette longue : croix visible' 'ui.html' (
+        'const send=m=>__h({data:m});send("selection\n"+JSON.stringify({text:"",files:[{p:"C:/Users/x/OneDrive - HESSO/3Annee/imagerie medicale/test 1/un dossier au nom vraiment tres tres long pour voir si la croix reste visible",d:true}]}));' +
+        'const c=$("#selbar .dchip"),x=c.querySelector("button"),r=x.getBoundingClientRect(),rc=c.getBoundingClientRect(),rb=$("#selbar").getBoundingClientRect();' +
+        'var a=r.width>0&&r.right<=rc.right+1&&r.right<=rb.right+1&&document.elementFromPoint(r.left+r.width/2,r.top+r.height/2)===x;x.click();var b=!DRAFT.items.length;' +
+        'document.title="R:"+a+b+JSON.stringify(__err)') 'R:truetrue[]'
     PageTest 'point du jour' 'ui.html' (
         'NOTES={enabled:true,notes:[{id:"a",title:"Acheter du pain",pinned:true,shown:true}]};convs=[{id:"c5",title:"Rapport",attn:"pause",updated:1,project:""}];' +
         '__h({data:"brief\n"+JSON.stringify({date:"samedi 22 novembre",today:[{t:"Cours de maths",h:"08:15",l:"Salle 3",k:"",m:false}],soon:[{t:"Examen physique",h:"lun. 24 nov.",k:"exam",m:true}],rappels:[{t:"Appeler Paul",h:"14:00"}]})});' +

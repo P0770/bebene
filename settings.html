@@ -93,6 +93,10 @@ details.sec[open] > summary { border-bottom: 1px solid var(--line); }
 details.sec .sb { padding: 10px; }
 details.sec .sb > .card { background: var(--bg); }
 details.sec .sb > .card + .card { margin-top: 10px; }
+/* ---- notifications Windows ---- */
+.nrow { display: grid; grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); gap: 6px 14px; padding-top: 4px; }
+.nchk { display: flex; align-items: center; gap: 8px; font-size: 13px; cursor: pointer; }
+.nchk input { accent-color: var(--accent); width: 15px; height: 15px; }
 /* ---- mes projets ---- */
 .pcap { font-size: 11px; font-weight: 600; letter-spacing: .6px; text-transform: uppercase; color: var(--muted); margin: 14px 4px 6px; }
 .pcap span { text-transform: none; letter-spacing: 0; font-weight: 400; }
@@ -221,6 +225,8 @@ html.light .hk:hover { border-color: #bdb5ae; }
     <div class="lbl"><b>Point du jour</b><span style="white-space:normal">À la première ouverture de la journée : agenda du jour, examens et rendez-vous de la semaine, rappels, post-it épinglés et tâches en pause.</span></div>
     <label class="switch"><input type="checkbox" id="dailyBrief"><span class="track"></span></label>
   </div>
+  <div class="row"><div class="lbl"><b style="font-weight:600">Notifications Windows</b><span style="white-space:normal">Quand la discussion est fermée ou que la tâche tourne en fond. Décoche ce dont tu ne veux pas être prévenu.</span></div></div>
+  <div class="row nrow" id="notifs"></div>
   <div class="row"><div class="lbl"><b style="font-weight:600">Ne plus demander mon accord pour…</b><span style="white-space:normal">Coche ce pour quoi tu ne veux plus la carte « 🔐 Claude a besoin de ton accord ». Les modifications de fichiers dans le dossier de travail ne demandent déjà jamais.</span></div></div>
   <div class="row">
     <div class="lbl"><b>Les commandes</b><span style="white-space:normal">PowerShell, Bash : agir dans Excel/Word, lancer un script, ranger des fichiers…</span></div>
@@ -393,16 +399,8 @@ html.light .hk:hover { border-color: #bdb5ae; }
     <label class="switch"><input type="checkbox" id="autoStart"><span class="track"></span></label>
   </div>
   <div class="row">
-    <div class="lbl"><b>Raccourci principal</b><span id="hk1msg">Ouvre ou ferme la discussion, de n'importe où.</span></div>
-    <span class="hkw"><button class="hk" id="hk1" title="Cliquer puis taper la nouvelle combinaison"></button><button class="hkx" data-hk="1" title="Désactiver ce raccourci">×</button></span>
-  </div>
-  <div class="row">
-    <div class="lbl"><b>Raccourci secondaire</b><span id="hk2msg">Même action, autre combinaison.</span></div>
-    <span class="hkw"><button class="hk" id="hk2" title="Cliquer puis taper la nouvelle combinaison"></button><button class="hkx" data-hk="2" title="Désactiver ce raccourci">×</button></span>
-  </div>
-  <div class="row">
-    <div class="lbl"><b>Demander sur la sélection</b><span id="hk3msg">Sélectionne du texte dans n'importe quelle appli, puis ce raccourci : Bébène s'ouvre avec ce texte.</span></div>
-    <span class="hkw"><button class="hk" id="hk3" title="Cliquer puis taper la nouvelle combinaison"></button><button class="hkx" data-hk="3" title="Désactiver ce raccourci">×</button></span>
+    <div class="lbl"><b>Raccourci</b><span id="hk1msg" style="white-space:normal"></span></div>
+    <span class="hkw"><button class="hk" id="hk1" title="Cliquer puis taper la nouvelle combinaison"></button><button class="hkx" data-hk="1" title="Désactiver le raccourci">×</button></span>
   </div>
   <div class="row"><div class="lbl"><span style="white-space:normal">Clique sur un raccourci puis tape la combinaison (ex. <kbd>Ctrl</kbd> + <kbd>Shift</kbd> + <kbd>B</kbd>). Échap annule. <a href="#" id="hkReset">Remettre les raccourcis d'origine</a></span></div></div>
   <div class="row">
@@ -526,6 +524,7 @@ function render(s) {
   $('#hname').textContent = s.name;
   if (document.activeElement !== $('#name')) $('#name').value = s.name;
   if (document.activeElement !== $('#prompt')) $('#prompt').value = s.prompt;
+  if (s.notifs) document.querySelectorAll('#notifs [data-n]').forEach(c => c.checked = s.notifs[c.dataset.n] !== false);
   $('#showCat').checked = s.showCat; $('#topMost').checked = s.topMost; $('#autoStart').checked = s.autoStart; $('#caveman').checked = s.caveman; $('#chrome').checked = s.chrome; $('#postits').checked = s.postits; $('#prepare').checked = s.prepare; $('#dailyBrief').checked = s.dailyBrief !== false; $('#spell').checked = s.spell; $('#stream').checked = s.stream; $('#autoModel').checked = s.autoModel; showHotkeys(s);
   $('#model').value = s.model;
   $('#workDir').textContent = s.workDir; $('#workDir').title = s.workDir;
@@ -589,6 +588,9 @@ $('#mAdd').onclick = () => {
 
 document.querySelectorAll('[data-act]').forEach(b => b.onclick = () => post(b.dataset.act));
 $('#light').onchange = e => { document.documentElement.classList.toggle('light', e.target.checked); set({ light: e.target.checked }); };
+const NOTIFS = [['done', '✅ Tâche terminée'], ['ask', '❓ Une question pour toi'], ['perm', '🔐 Accord demandé'], ['hand', '🐾 Besoin de ta souris ou de ton écran'], ['pause', '⏸ Pause : quota presque épuisé'], ['rappel', '⏰ Rappels']];
+$('#notifs').innerHTML = NOTIFS.map(([k, l]) => '<label class="nchk"><input type="checkbox" data-n="' + k + '"><span>' + l + '</span></label>').join('');
+$('#notifs').addEventListener('change', e => { const k = e.target.dataset.n; if (k) set({ notif: { [k]: e.target.checked } }); });
 ['showCat', 'topMost', 'autoStart', 'caveman', 'stream', 'autoModel', 'chrome', 'postits', 'prepare', 'spell', 'dailyBrief'].forEach(id => $('#' + id).onchange = e => set({ [id]: e.target.checked }));
 $('#model').onchange = e => set({ model: e.target.value });
 $('#name').onchange = e => set({ name: e.target.value });
@@ -716,18 +718,18 @@ post('tpl');
 })();
 
 // ---- raccourcis clavier configurables : clic sur le bouton, puis on tape la combinaison ----
-const HK_DEF = ['Alt+Space', 'Ctrl+Alt+C', 'Ctrl+Alt+Q'];
+const HK_DEF = ['Alt+Space'];
+const HK_MSG = 'Ouvre la discussion de n\'importe où. Si du texte, des fichiers ou des dossiers sont sélectionnés, ils sont ajoutés à la prochaine conversation. Depuis Bébène, il la referme.';
 let hkWait = 0, hkVals = ['', '', ''];
 function hkLabel(v) { return v ? v.replace('Space', 'Espace').replace(/\bD(\d)\b/, '$1').split('+').join(' + ') : 'Désactivé'; }
 function showHotkeys(s) {
-  hkVals = [s.hotkey1 || '', s.hotkey2 || '', s.hotkey3 || ''];
-  [1, 2, 3].forEach(i => {
+  hkVals = [s.hotkey1 || ''];
+  [1].forEach(i => {
     if (hkWait === i) return;
     const b = $('#hk' + i), v = hkVals[i - 1], ok = s.hotkeyOk ? s.hotkeyOk[i - 1] : true;
     b.textContent = hkLabel(v); b.className = 'hk' + (!v ? ' off' : !ok ? ' bad' : '');
     $('#hk' + i + 'msg').textContent = v && !ok ? 'Combinaison déjà prise par une autre application : choisis-en une autre.'
-      : i === 1 ? 'Ouvre ou ferme la discussion, de n\'importe où.' : i === 2 ? 'Même action, autre combinaison.'
-      : 'Sélectionne du texte dans n\'importe quelle appli, puis ce raccourci : Bébène s\'ouvre avec ce texte.';
+      : HK_MSG;
   });
 }
 // nom de touche compris par Bébène (.NET Keys) à partir de l'événement clavier
@@ -750,11 +752,11 @@ function hkStop(val) {
   hkWait = 0;
   if (val !== undefined) { hkVals[i - 1] = val; set({ ['hotkey' + i]: val }); }     // enregistre et réactive les raccourcis
   else post('set\n' + JSON.stringify({ hotkeyResume: 1 }));
-  showHotkeys({ hotkey1: hkVals[0], hotkey2: hkVals[1], hotkey3: hkVals[2] });
+  showHotkeys({ hotkey1: hkVals[0] });
 }
-[1, 2, 3].forEach(i => $('#hk' + i).onclick = () => hkWait === i ? hkStop() : hkStart(i));
+[1].forEach(i => $('#hk' + i).onclick = () => hkWait === i ? hkStop() : hkStart(i));
 document.querySelectorAll('.hkx').forEach(b => b.onclick = () => { hkWait = +b.dataset.hk; hkStop(''); });
-$('#hkReset').onclick = e => { e.preventDefault(); hkStop(); set({ hotkey1: HK_DEF[0], hotkey2: HK_DEF[1], hotkey3: HK_DEF[2] }); };
+$('#hkReset').onclick = e => { e.preventDefault(); hkStop(); set({ hotkey1: HK_DEF[0] }); };
 document.addEventListener('keydown', e => {
   if (!hkWait) return;
   e.preventDefault(); e.stopPropagation();

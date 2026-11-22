@@ -5,12 +5,12 @@
 <h1 align="center">Bébène</h1>
 
 <p align="center">
-  <b>Un chat noir en pixel art qui vit sur ton bureau Windows et qui te répond grâce à Claude Code.</b><br>
-  Il marche, dort, fait sa toilette, chasse ta souris… et quand tu cliques dessus, il ouvre une discussion
-  capable de répondre à tes questions <i>et</i> d'agir sur ton PC : fichiers, Excel, Word, dossiers, programmes.
+  <b>Un chat noir en pixel art qui vit sur ton bureau Windows et te répond grâce à Claude Code.</b><br>
+  Clique dessus : il ouvre une discussion qui répond à tes questions <i>et</i> agit sur ton PC (fichiers, Excel, Word, programmes).
 </p>
 
 <p align="center">
+  <a href="https://github.com/P0770/bebene/releases/latest"><img src="https://img.shields.io/github/v/release/P0770/bebene?label=version&style=flat-square&labelColor=1d1d22&color=d97757" alt="Dernière version"></a>
   <a href="https://github.com/P0770/bebene/actions/workflows/bebene.yml"><img src="https://github.com/P0770/bebene/actions/workflows/bebene.yml/badge.svg" alt="Tests"></a>
   <a href="https://buymeacoffee.com/p0770"><img src="https://img.shields.io/badge/Buy%20me%20a%20coffee-%E2%98%95-f2c66d?style=flat-square&labelColor=1d1d22" alt="Buy me a coffee"></a>
 </p>
@@ -21,88 +21,60 @@
 
 ---
 
-## Sommaire
-
-1. [En bref](#en-bref)
-2. [Ce que Bébène sait faire](#ce-que-bébène-sait-faire)
-   - [La discussion](#1-la-discussion)
-   - [Agir sur ton PC](#2-agir-sur-ton-pc)
-   - [Calendrier, examens et rendez-vous](#3-calendrier-examens-et-rendez-vous)
-   - [Correcteur d'orthographe](#4-correcteur-dorthographe)
-   - [Le chat de bureau](#5-le-chat-de-bureau)
-   - [Réglages et assistant d'installation](#6-réglages-et-assistant-dinstallation)
-3. [Installation](#installation)
-4. [Utilisation au quotidien](#utilisation-au-quotidien)
-5. [Sécurité et vie privée](#sécurité-et-vie-privée)
-6. [Faire évoluer Bébène et publier une nouvelle version](#faire-évoluer-bébène-et-publier-une-nouvelle-version)
-7. [Structure du dépôt](#structure-du-dépôt)
-8. [Questions fréquentes](#questions-fréquentes)
-
-Documentation détaillée : [Architecture technique](docs/ARCHITECTURE.md) · [Publier une mise à jour](docs/MISE-A-JOUR.md) · [Modifier ou contribuer](CONTRIBUTING.md)
-
----
-
 ## En bref
 
-| | |
-|---|---|
-| **Plateforme** | Windows 10 / 11 |
-| **Cerveau** | [Claude Code](https://claude.com/claude-code) (`claude -p`), avec ton compte Claude Pro ou Max : aucune clé d'API |
-| **Technologie** | C# (WinForms, .NET Framework 4, aucun SDK à installer) + WebView2 pour l'interface de discussion |
-| **Mémoire** | partagée avec Claude Code via le dossier **ClaudeHub** sur OneDrive (préférences, journal, projets) |
-| **Coût en tokens** | seulement quand tu discutes : calendrier, mails, correcteur et animations sont 100 % locaux |
+- **Un assistant toujours à portée de main** : un raccourci (Alt + Espace) ou un clic sur le chat, et tu poses ta question.
+- **Il agit vraiment** : c'est Claude Code, avec accès à tes fichiers et à tes programmes, et il te demande ton accord avant chaque commande.
+- **Il t'organise** : projets, calendrier, examens et rendez-vous, rappels, post-it.
+- **Il reste léger** : environ 0,1 % du processeur au repos ; calendrier, mails et correcteur fonctionnent en local, sans consommer de tokens.
+
+Il faut Windows 10 ou 11 et un abonnement Claude **Pro ou Max** (aucune clé d'API).
+
+**Sommaire** : [Installer](#installer) · [Au quotidien](#au-quotidien) · [Ce qu'il sait faire](#ce-quil-sait-faire) · [Réglages](#réglages) · [Vie privée et sécurité](#vie-privée-et-sécurité) · [Mises à jour](#mises-à-jour) · [Questions fréquentes](#questions-fréquentes) · [Pour les développeurs](#pour-les-développeurs)
 
 ---
 
-## Ce que Bébène sait faire
+## Installer
 
-### 1. La discussion
+1. Télécharge le dernier `Bebene-<version>.zip` dans les **[Releases](../../releases/latest)**.
+2. Dézippe-le, puis double-clique sur **`ClaudeCompanion.exe`**.
+3. L'**assistant d'installation** s'ouvre : suis les étapes, chaque bouton fait le travail pour toi (Claude Code, connexion au compte, mémoire, démarrage avec Windows…).
 
-Clic sur le chat, **Alt + Espace** ou **Ctrl + Alt + C** (raccourcis modifiables dans Réglages > Système) : la discussion s'ouvre juste au-dessus de Bébène. La réponse s'écrit **en direct**, mot par mot, pendant que Claude la rédige.
+Si Windows affiche « Windows a protégé votre ordinateur » : *Informations complémentaires* → *Exécuter quand même*.
+
+---
+
+## Au quotidien
+
+### Ouvrir Bébène
+
+Un seul raccourci, **Alt + Espace** (modifiable), ou un clic sur le chat. Depuis Bébène, le même raccourci referme la discussion ; Échap aussi, comme un clic ailleurs.
+
+**Avec une sélection**, c'est encore plus pratique : sélectionne du texte, des fichiers ou des dossiers (dans l'Explorateur aussi), puis Alt + Espace. Bébène ouvre une nouvelle conversation avec ta sélection en petites étiquettes. Chaque raccourci suivant **ajoute** la nouvelle sélection, et rien n'est perdu si tu fermes la fenêtre avant d'envoyer. Pour un texte, des boutons proposent Expliquer, Traduire, Corriger ou Résumer.
+
+<p align="center"><img src="docs/images/selection.png" width="460" alt="Sélections jointes à la prochaine conversation"></p>
+
+### Écrire et recevoir la réponse
+
+- La zone de saisie grandit avec ton texte. **Entrée** envoie, **Maj + Entrée** va à la ligne, et les listes (`1.`, `-`) se continuent toutes seules.
+- Tu peux **coller une capture d'écran** (Ctrl + V) ou **déposer des fichiers** sur la discussion ou sur le chat.
+- La réponse s'écrit **en direct**. Pendant le travail, tu vois ce que Claude fait (recherches, commandes, étapes) ; une fois la réponse arrivée, il ne reste qu'elle, avec au besoin une ligne repliée « ✏️ 2 fichiers modifiés · voir ».
+- Tu as fermé la fenêtre entre-temps ? Le chat saute de joie avec un « ! » jusqu'à ce que tu lises sa réponse, et une notification Windows te prévient (au choix dans les réglages).
 
 <p align="center">
-  <img src="docs/images/discussion-vide.png" width="300" alt="Discussion vide">
-  &nbsp;
   <img src="docs/images/discussion-conv.png" width="300" alt="Une conversation">
+  &nbsp;
+  <img src="docs/images/reponse-prete.png" width="380" alt="Bébène attend qu'on lise sa réponse">
 </p>
 
-**Nouveautés 1.55**
-- **La réponse, sans le reste** : pendant le travail, on voit les recherches, commandes et étapes ; dès que la réponse arrive, il ne reste qu'elle, avec au besoin une ligne repliée « ✏️ 2 fichiers modifiés · étapes · voir ».
-- **Zone de saisie à la taille du texte** : une ligne au départ, elle grandit avec le texte (jusqu'à 40 % de la fenêtre) ; la barre de défilement n'apparaît qu'au-delà.
-- **Aucun fichier non demandé** : Bébène ne produit ni résumé, ni copie, ni extraction de tes documents sans ton accord ; il le propose en une phrase. Seule la mémoire du projet (`NOTES.md`, quelques lignes) est tenue à jour d'office.
-- **Plus léger** : sauvegarde de l'historique bien plus rapide (seules les conversations modifiées sont comparées), ancien tableau de bord caché retiré de la page, plus de fausses alertes de blocage après une mise en veille.
+### Projets et conversations
 
-**Nouveautés 1.52 → 1.54**
-- **Palette projets et conversations** (**Ctrl + K**) : un seul panneau remplace les menus # et Historique : recherche, projets en tuiles colorées, conversations du projet choisi, tout au clavier.
-- **Ranger en glissant** : attrape une conversation et dépose-la sur un sous-groupe, « Sans groupe », un autre projet, ou sur « ＋ Dépose ici » pour créer un sous-groupe.
-- **Archiver un projet** (Réglages › Mes projets) : un projet terminé disparaît du menu, sans rien effacer ; « Remettre dans le menu » le fait revenir.
-- **Net sur tous les écrans** : Bébène suit le zoom Windows (125 %, 150 %…) de chaque écran ; la discussion s'adapte aux petits écrans.
+Tout est dans **la palette** (bouton du projet ou **Ctrl + K**) :
 
-**Nouveautés 1.51**
-- **Coller une image** : Ctrl+V d'une capture d'écran (Win+Maj+S) ou d'une image copiée ; Claude la voit avec ton message.
-- **Demander sur la sélection** : sélectionne du texte dans n'importe quelle appli, puis **Ctrl + Alt + Q** : Bébène s'ouvre avec ce texte et propose Expliquer, Traduire, Corriger ou Résumer.
-- **Recherche** dans l'historique : titres et contenu de toutes les conversations, sans tenir compte des accents.
-- **Historique sans limite** : une conversation = un fichier (`%LOCALAPPDATA%\ClaudeCompanion\conversations`), plus de limite à 40.
-
-**L'en-tête**
-- l'avatar de Bébène (il pulse quand Claude réfléchit), son nom et en dessous le titre de la conversation ;
-- ☕ **offrir un café** (ouvre la page [Buy Me a Coffee](https://buymeacoffee.com/p0770)) · ✏️ **nouvelle conversation** · 📌 **épingler** (la fenêtre reste ouverte quand tu cliques ailleurs) · ⚙️ **réglages** · ✕ **fermer** (ou Échap) ;
-- **glisse l'en-tête** pour déplacer la fenêtre : elle revient à sa place à la fermeture, sauf si elle est épinglée.
-
-**La barre de choix**, juste en dessous :
-
-| Élément | Rôle |
-|---|---|
-| **Conversation \| ⚡ Flash** | interrupteur. *Conversation* = enregistrée dans l'historique. *Flash* = question rapide qui n'est enregistrée **nulle part** (ni historique, ni archive, et la transcription de Claude Code est effacée). |
-| **● projet · Ctrl K ▾** | ouvre la **palette** (voir ci-dessous). La pastille a la couleur du projet en cours. |
-
-**La palette** (clic sur le bouton du projet ou **Ctrl + K**)
-- **Recherche** en haut : filtre les projets par leur nom et cherche dans le titre et le contenu de toutes les conversations.
-- **Projets en tuiles** : chaque projet a sa couleur, son nombre de conversations, et ⏳ si une tâche y travaille. Un clic fait passer dans le projet : Claude travaille dans `ClaudeHub/projets/<nom>/` et la conversation y est **archivée automatiquement**. « ＋ Nouveau » crée un projet.
-- **Conversations du projet** : rangées en sous-groupes (＋ Groupe, ✎ renommer, × supprimer), avec « ＋ Nouvelle conversation » en tête.
-- **Glisser pour ranger** : dépose une conversation sur un sous-groupe, sur « Sans groupe », sur la zone « ＋ Dépose ici » (nouveau sous-groupe) ou sur la tuile d'un autre projet. Reste 0,6 s sur une tuile pour ouvrir ce projet et viser un de ses sous-groupes. « Annuler » dans la notification remet tout comme avant.
-- **Au clavier** : ↑ ↓ (← → dans les tuiles), Entrée pour ouvrir, Échap pour fermer.
-- **En bas** : 📂 autre dossier, 🗄 projets archivés, « Terminal › » pour reprendre la conversation dans Claude Code.
+- **une recherche** dans les projets et dans le contenu de toutes les conversations ;
+- **les projets** en tuiles de couleur ; un projet rassemble les conversations d'un même sujet, et Claude travaille dans son dossier ;
+- **les conversations** du projet, rangées en sous-groupes : **glisse** une conversation sur un sous-groupe, un autre projet, ou sur « ＋ Dépose ici » pour créer un sous-groupe ;
+- un projet terminé s'**archive** (Réglages › Mes projets) : il quitte la palette sans rien perdre.
 
 <p align="center">
   <img src="docs/images/palette.png" width="320" alt="La palette : projets en tuiles et conversations">
@@ -110,271 +82,132 @@ Clic sur le chat, **Alt + Espace** ou **Ctrl + Alt + C** (raccourcis modifiables
   <img src="docs/images/palette-glisser.png" width="320" alt="Glisser une conversation dans un sous-groupe">
 </p>
 
-> Un **projet** rassemble toutes les conversations d'un même sujet. Un projet terminé s'**archive** dans Réglages › Mes projets : il quitte la palette mais garde son dossier, ses notes et ses conversations, et reste trouvable par la recherche.
+Pour une question rapide sans aucune trace, passe en **⚡ Flash** : rien n'est enregistré, même pas la transcription de Claude Code.
 
-**Le mode Flash** change la couleur de la zone de saisie (pointillés dorés) pour qu'on ne l'oublie pas :
+### En bas de la fenêtre
 
-<p align="center"><img src="docs/images/discussion-flash.png" width="300" alt="Mode flash"></p>
+- **Mode autonome** : désactivé, Claude te demande avant chaque commande ; activé, il agit seul.
+- **Quota restant** sur la limite de 5 heures et sur la semaine, avec le compte à rebours. Si le quota passe sous 3 %, la tâche se met en pause proprement et reprend d'un clic plus tard.
 
-**Le pied de la fenêtre**
-- **Mode autonome** : désactivé, Claude modifie les fichiers mais **te demande avant chaque commande** ; activé, il agit sans demander.
-- **Quota restant** : ce qu'il te reste sur ta limite de **5 heures** et sur la **semaine**, avec le compte à rebours jusqu'à la recharge (`↻ 2h44`, `↻ 4 j`). La barre passe du vert au jaune puis au rouge. Les chiffres viennent directement de Claude Code (événement `rate_limit_event`), mesurés à l'ouverture, toutes les 15 minutes et à chaque réponse.
+---
 
-**Écrire des listes** : commence une ligne par `1.` ou `*` (ou `-`) suivi d'un espace : **Entrée** passe à l'élément suivant (`2.`, `3.`… ou `•`), Entrée sur un élément vide termine la liste. **Ctrl + Entrée** envoie à tout moment, **Maj + Entrée** fait un simple retour à la ligne.
+## Ce qu'il sait faire
 
-<p align="center"><img src="docs/images/discussion-liste.png" width="300" alt="Écrire une liste"></p>
+### Agir sur ton PC
 
-**Titres résumés** : le titre de chaque conversation dans l'historique est rédigé par Claude (modèle Haiku, quelques tokens) pour résumer ce qui s'y est dit ; il est revu au fil de la conversation.
-
-**Compactage automatique** : quand une conversation devient longue (environ 40 000 tokens de plus qu'au début), Bébène en résume le début avec le modèle Haiku. Chaque message suivant renvoie alors beaucoup moins de tokens à Claude ; une petite note « ♻ Conversation compactée : 68k → 12k tokens » l'indique dans la conversation.
-
-**Copier** : chaque bloc de code a une barre avec son langage et un bouton **Copier** ; survole n'importe quel message (le tien ou celui de Bébène) pour faire apparaître un petit bouton qui le copie en entier, au format d'origine (Markdown).
-
-<p align="center"><img src="docs/images/discussion-copier.png" width="300" alt="Copier du code ou un message"></p>
-
-**Glisser-déposer** : dépose un ou plusieurs fichiers sur la discussion *ou directement sur le chat* : leurs chemins sont ajoutés à ton message.
-
-**Quand tu fermes la discussion pendant que Claude réfléchit**, Bébène garde son animation de réflexion (petites bulles, queue qui s'agite). Quand la réponse est prête, il devient **content** : yeux plissés, bulle « ! », petits sauts avec un cœur, et il attend comme ça jusqu'à ce que tu rouvres la discussion, même si tu le prends par la peau du cou entre-temps.
-
-<p align="center"><img src="docs/images/reponse-prete.png" width="480" alt="Bébène attend qu'on lise sa réponse"></p>
-
-### 2. Agir sur ton PC
-
-Bébène n'est pas qu'un chat qui parle : c'est **Claude Code**, avec accès à tes fichiers et à tes programmes.
-
-- **Fichiers et dossiers** : ranger, renommer, chercher, résumer, comparer, convertir.
-- **Office et autres programmes** : Excel, Word, PowerPoint, Outlook, Inventor… Bébène agit **dans le fichier ouvert devant toi** (pilotage COM, ligne de commande ou UI Automation, via la skill `piloter-applis`).
-- **Fenêtre active** : Bébène sait quelle fenêtre tu utilisais juste avant de lui écrire. « Corrige le document ouvert » suffit.
-- **Autorisations** : avant une commande, une carte te demande ton accord. « Autoriser » vaut pour toute la conversation. Dans les réglages, tu peux autoriser certains outils une fois pour toutes.
+- **Fichiers et dossiers** : ranger, renommer, chercher, comparer, convertir.
+- **Programmes** : Excel, Word, PowerPoint, Outlook, Inventor… directement **dans le fichier ouvert devant toi**. Bébène sait quelle fenêtre tu utilisais : « corrige le document ouvert » suffit.
+- **Plusieurs tâches à la fois** : lance une tâche longue, passe à une autre conversation ; jusqu'à trois en parallèle.
+- **Il prépare avant de produire** : pour un rapport ou une présentation, il propose d'abord un plan et signale ce qui manque. Il ne crée **aucun fichier sans ton accord** (seule la mémoire du projet, `NOTES.md`, est tenue à jour).
 
 <p align="center"><img src="docs/images/discussion-accord.png" width="300" alt="Demande d'autorisation"></p>
 
-Exemples :
 > « Mets les graphiques du fichier ouvert en échelle logarithmique »
 > « Trouve ce qui prend de la place dans mon dossier Documents »
-> « Rédige un mail pour décaler mon rendez-vous de jeudi »
 
-### 3. Calendrier, examens et rendez-vous
+### T'organiser
 
-**Point du jour** (désactivable dans Réglages › Alertes) : à la première ouverture de la journée, une carte résume l'agenda du jour, les examens et rendez-vous de la semaine, les rappels, les post-it épinglés et les tâches en pause.
-
-**Rappels à la demande** : « rappelle-moi dans 20 min de… », « demain à 8 h… » : à l'heure dite, une carte apparaît au-dessus du chat avec une notification, même discussion fermée (« Encore dans 10 min » pour repousser).
-
-Deux **doubles flèches orange** encadrent la discussion :
-- **«** à gauche : le **calendrier du mois** (points de couleur = événements, point rouge = examen). Clic sur un jour pour voir le détail.
-- **»** à droite : deux listes séparées, **Examens** et **Rendez-vous**, avec le compte à rebours (« aujourd'hui », « dans 4 j »).
+- **Calendrier, examens et rendez-vous** : les doubles flèches de chaque côté de la discussion ouvrent le calendrier du mois et la liste des examens et rendez-vous. Ils viennent de tes agendas (`webcal`, `.ics`), de tes mails des 6 derniers mois (Gmail, Outlook classique, analysés **sur ton PC**) ou d'un ajout à la main.
+- **Rappels** : « rappelle-moi dans 20 min de… » ; et pour les examens et rendez-vous, la veille à 18 h et 1 h avant.
+- **Point du jour** : à la première ouverture de la journée, l'agenda, les examens de la semaine, les rappels et les tâches en pause.
+- **Post-it** sur le bureau, avec cases à cocher ; Bébène peut en créer quand tu le lui demandes.
 
 <p align="center"><img src="docs/images/volets.png" width="640" alt="Calendrier et liste des examens et rendez-vous"></p>
 
-D'où viennent les événements :
-- **tes calendriers** : liens `webcal://`, `https://…ics` ou fichiers `.ics` (Google Agenda, Outlook, horaire de l'école…), répétitions (`RRULE`) comprises ;
-- **tes mails des 6 derniers mois** : Gmail (mot de passe d'application, chiffré sur ton PC) et Outlook classique. Bébène y repère les convocations d'examen et les rendez-vous (date, heure, lieu), **sur ton PC, sans token** ;
-- **à la main** : bouton « ＋ Ajouter un examen ou un RDV », et × sur une carte pour la retirer.
+### Corriger ton orthographe
 
-Les volets sont **transparents** (seules les cartes sont dessinées) et **déplaçables** : glisse-les où tu veux, ils reviennent à leur place à la fermeture.
+Partout où tu écris, une petite croix rouge apparaît sur chaque faute quand tu fais une pause ; un clic affiche les suggestions et Bébène tape la correction. Correcteur de Windows, **100 % local**, jamais dans les champs de mot de passe ni les terminaux.
 
-**Rappels** : une carte apparaît au-dessus du chat la veille à 18 h et 1 h avant (réglable séparément pour examens et rendez-vous). Boutons *OK* et *Ne plus me rappeler*.
+### Le chat
 
-<p align="center"><img src="docs/images/rappel.png" width="360" alt="Carte de rappel"></p>
+Bébène est entièrement dessiné par le programme, en pixel art. Il marche, fait sa toilette, s'étire, dort dans quatre positions, chasse ta souris et ronronne quand tu le caresses. Attrapé par la peau du cou, il se balance comme un pendule. Un réglage le rend plus calme ou plus joueur.
 
-### 4. Correcteur d'orthographe
+<p align="center"><img src="docs/images/attrape.png" width="640" alt="Bébène attrapé par la peau du cou"></p>
 
-Partout où tu écris (navigateur, Word, Bloc-notes, Teams…), quand tu fais une pause, **une petite croix rouge** apparaît sur chaque faute. Clic dessus : les suggestions s'affichent, et Bébène tape la correction à ta place.
-- correcteur intégré de Windows (français de Suisse), **100 % local, 0 token** ;
-- seulement les fautes d'orthographe, seulement le texte que tu es en train d'écrire ;
-- jamais dans les champs de mot de passe, les terminaux ou les gestionnaires de mots de passe.
+---
 
-### 5. Le chat de bureau
+## Réglages
 
-Bébène est dessiné **procéduralement** (aucune image : chaque pose est calculée), en pixel art 8 bits.
+Clic droit sur l'icône de Bébène (zone de notification) → **Réglages…**, ou ⚙ dans la discussion. Les sections, de la plus utile à la moins utile :
 
-- il **marche, court, s'assoit, fait sa toilette** (visage et corps), **s'étire en bâillant**, **se gratte** derrière l'oreille, **se frotte en ronronnant** ;
-- il **dort** dans 4 positions (allongé, enroulé, étalé, en pain) quand tu laisses le PC tranquille ;
-- il **chasse ta souris** de temps en temps ;
-- **caresse-le** (survole-le) : il ferme les yeux, ronronne (petites ondes) et envoie un cœur ;
-- **attrape-le par la peau du cou** : il se balance comme un pendule, à l'opposé de ton geste, puis retombe quand tu le lâches.
-
-<p align="center"><img src="docs/images/attrape.png" width="720" alt="Bébène attrapé et secoué"></p>
-
-Détails : yeux verts, oreilles légèrement asymétriques, collier orange avec un petit poisson, queue physique avec inertie.
-
-### 6. Réglages et assistant d'installation
-
-Clic droit sur l'icône de Bébène (zone de notification) → **Réglages…**, ou ⚙️ dans la discussion.
-
-<p align="center"><img src="docs/images/reglages.png" width="380" alt="Réglages"></p>
-
-Les sections, de la plus utilisée à la moins utilisée :
-
-| Section | Contenu |
+| Section | Pour |
 |---|---|
-| **Lancer** | ouvrir Claude Code, reprendre la conversation dans le terminal, dossier de travail |
-| **Mes examens et rendez-vous** | ajouter à la main, retrouver ceux qu'on a retirés |
-| **Alertes et rappels** | rappels examens / RDV, outils autorisés sans demande, correcteur |
-| **Claude** | modèle (Opus, Sonnet, Haiku), mode économe *Caveman*, écriture en direct, instructions personnalisées |
-| **Ce que Bébène sait faire** | le catalogue de toutes les fonctions avec un exemple, et un badge « Nouveau » |
-| **Compagnon** | nom, taille, afficher le chat, toujours au premier plan |
-| **Calendriers** | liens webcal / .ics, filtre de lieu |
-| **Boîtes mail** | Gmail et Outlook classique |
-| **Assistant d'installation** | checklist interactive (voir ci-dessous) |
-| **Système** | correcteur, démarrage avec Windows, raccourcis clavier, version |
+| **Lancer** | ouvrir Claude Code, reprendre la conversation dans le terminal, dossier de travail, modèles de référence |
+| **Mes projets** | archiver ou remettre un projet dans la palette |
+| **Mes examens et rendez-vous** | en ajouter ou en retirer à la main |
+| **Alertes et rappels** | point du jour, notifications Windows au choix, outils autorisés sans demande |
+| **Claude** | modèle, mode économe, écriture en direct, instructions personnelles |
+| **Compagnon** | nom, taille, activité du chat, mode clair |
+| **Calendriers · Boîtes mail** | liens d'agenda, Gmail, Outlook classique |
+| **Système** | raccourci, démarrage avec Windows, correcteur, version |
 
-**L'assistant d'installation** vérifie et fait chaque étape à ta place : Claude Code installé, compte connecté, mémoire ClaudeHub, outils (RTK, Caveman), raccourci du menu Démarrer, démarrage avec Windows… Il s'ouvre tout seul quand Bébène est lancé sur un PC pas encore prêt.
+La section **Ce que Bébène sait faire** liste toutes les fonctions avec un exemple, et marque les nouveautés.
+
+---
+
+## Vie privée et sécurité
+
+- **Rien sans ton accord** : une carte te demande avant chaque commande (sauf en mode autonome), et aucun document n'est créé sans que tu le demandes.
+- **Il ne peut pas se modifier lui-même** : un verrou bloque toute écriture ou commande visant son propre programme, même en mode autonome.
+- **Local** : mails, calendriers et correcteur restent sur ton PC. Le mot de passe Gmail est chiffré (DPAPI, lisible seulement par ton compte Windows).
+- **Mode Flash** : aucune trace.
+- **Versions officielles protégées** : seul le propriétaire publie ; les autres proposent leurs changements par *pull request*.
 
 ---
 
 ## Mises à jour
 
-Une **pastille sur l'avatar** de Bébène, en haut à gauche de la discussion, indique l'état :
+Une pastille sur l'avatar de Bébène signale une nouvelle version (orange) ou une mise à jour réussie (verte). Un clic montre les nouveautés et **Mettre à jour** : Bébène télécharge la version, remplace uniquement son programme et redémarre. Réglages, conversations, calendriers et mails sont conservés.
 
-| Pastille | Signification |
-|---|---|
-| 🟠 orange, qui pulse | une version plus récente est publiée dans les [Releases](../../releases) |
-| 🟢 verte | la dernière mise à jour s'est bien installée |
-
-<p align="center">
-  <img src="docs/images/maj-disponible.png" width="300" alt="Nouvelle version disponible">
-  &nbsp;
-  <img src="docs/images/maj-reussie.png" width="300" alt="Mise à jour réussie">
-</p>
-
-Survole-la pour le détail, clique pour voir les nouveautés et **Mettre à jour**. Bébène télécharge le zip de la Release, se ferme, remplace **uniquement son programme** (exe, DLL, pages) et redémarre. Les réglages (registre), les conversations, les calendriers, les mails et le journal sont ailleurs et ne sont pas touchés.
-
-La vérification se fait 15 secondes après le démarrage, puis toutes les 6 heures et à l'ouverture de la discussion. Elle compare le numéro de version installé avec celui de la dernière Release GitHub. Tant que le dépôt est privé, elle passe par GitHub CLI (`gh`) connecté sur le PC.
-
----
-
-## Installation
-
-### Depuis une version publiée (recommandé)
-
-1. Va dans **[Releases](../../releases)** et télécharge le dernier `Bebene-<version>-<date>.zip`.
-2. Dézippe-le où tu veux (Bureau, Téléchargements…).
-3. Double-clique sur **`ClaudeCompanion.exe`**.
-4. L'**assistant d'installation** s'ouvre : suis les étapes dans l'ordre. Chaque bouton fait le travail pour toi.
-
-Il faut : Windows 10 ou 11, une connexion internet et un compte Claude **Pro ou Max**.
-Si Windows affiche « Windows a protégé votre ordinateur » : *Informations complémentaires* → *Exécuter quand même*.
-
-### Depuis le code source
-
-```powershell
-git clone https://github.com/P0770/bebene.git
-cd bebene
-.\build.ps1 -Install
-```
-
-`build.ps1` compile avec le `csc.exe` déjà présent dans Windows (.NET Framework 4), ne télécharge rien d’autre que les DLL WebView2 (NuGet, une seule fois), installe l'app dans `%USERPROFILE%\ClaudeCompanion` et la relance. `-Install` ajoute aussi le raccourci du menu Démarrer et le démarrage avec Windows.
-
----
-
-## Utilisation au quotidien
-
-| Action | Comment |
-|---|---|
-| Ouvrir / fermer la discussion | clic sur le chat, **Alt + Espace**, **Ctrl + Alt + C** (modifiables), Échap pour fermer |
-| Nouvelle conversation | ✏️ dans l'en-tête, ou clic droit sur l'icône → *Nouvelle conversation* |
-| Question rapide sans trace | interrupteur **⚡ Flash** |
-| Travailler sur un projet | **Ctrl + K** → tuile du projet, ou « ＋ Nouveau » |
-| Reprendre une ancienne conversation | **🕘 ▾** |
-| Gros travail | *Continuer dans le terminal* (même conversation dans Claude Code) |
-| Joindre un fichier | glisser-déposer sur la discussion ou sur le chat |
-| Garder la fenêtre ouverte | 📌 |
-| Déplacer une fenêtre | glisser son en-tête (discussion) ou la carte (calendrier, examens) |
-| Calendrier / examens | doubles flèches **«** et **»** de chaque côté de la discussion |
-| Quitter | clic droit sur l'icône → *Quitter* |
-
-Menu de l'icône (zone de notification) : *Ouvrir la discussion*, *Nouvelle conversation*, *Ouvrir Claude Code ici*, *Correcteur d'orthographe*, *Afficher le chat sur le bureau*, *Réglages…*, *Quitter*.
-
----
-
-## Sécurité et vie privée
-
-- **Verrou anti auto-modification** : depuis ses conversations, Bébène **ne peut pas modifier son propre programme**, ses réglages ou ses données, même en mode autonome. Un *hook* Claude Code (`garde.ps1`) bloque toute écriture ou commande qui vise son dossier. Son évolution se fait uniquement avec Claude Code dans le terminal.
-- **Mails** : lus et analysés **localement**. Le mot de passe d'application Gmail est chiffré avec DPAPI (lisible seulement par ton compte Windows). Rien n'est envoyé à Claude.
-- **Calendriers et correcteur** : entièrement locaux.
-- **Mode Flash** : aucune trace, même la transcription locale de Claude Code est supprimée.
-- **Réglages** : dans le registre (`HKCU\Software\ClaudeCompanion`). **Journal** : `%LOCALAPPDATA%\ClaudeCompanion\bebene.log`.
-
----
-
-## Faire évoluer Bébène et publier une nouvelle version
-
-En résumé : **modifier → tester → double-clic sur `Publier sur GitHub.cmd`**.
-
-1. Fais tes modifications avec Claude Code dans ce dossier (Bébène ne peut pas se modifier lui-même).
-2. Teste : `.\build.ps1` compile et relance l'app.
-3. Pour une **nouvelle version téléchargeable**, augmente le numéro dans `Companion.cs` (`Version` **et** `AssemblyVersion`) et ajoute les nouveautés dans `fonctions.json` avec `"depuis": "<nouvelle version>"`.
-4. Double-clic sur **`Publier sur GitHub.cmd`** : il te demande une phrase de description et envoie le code. GitHub compile et lance les tests ; si le numéro de version est nouveau et que tout passe, il publie lui-même la *Release* (zip + notes tirées de `fonctions.json`).
-
-Tout est expliqué pas à pas dans **[docs/MISE-A-JOUR.md](docs/MISE-A-JOUR.md)**.
-
----
-
-## Structure du dépôt
-
-```
-bebene/
-├── Companion.cs                 démarrage, réglages, le chat animé (+ Version de l'app)
-├── Discussion.cs                fenêtre de discussion, tâches Claude en parallèle
-├── Conversations.cs           historique en fichiers, rappels demandés, point du jour
-├── PostIts.cs · Agenda.cs       post-it · calendriers, mails, rappels
-├── Correcteur.cs · Modeles.cs   correcteur d'orthographe · modèles de référence
-├── Installation.cs · Reglages.cs  assistant d'installation, mises à jour · fenêtre des réglages
-├── tests/tests.ps1              tous les tests (images, gardien, pages ; -Claude : tâches réelles)
-├── ui.html                      page de la discussion (WebView2)
-├── settings.html                page des réglages et assistant d'installation
-├── fonctions.json               catalogue des fonctions (affiché dans les réglages + notes de version)
-├── build.ps1                    compilation, icône, installation
-├── creer-paquet.ps1             crée le zip à partager           ← « Créer le paquet Bébène.cmd »
-├── publier-version.ps1          envoie le code sur GitHub          ← « Publier sur GitHub.cmd » (propriétaire uniquement)
-├── .github/workflows/bebene.yml GitHub : compile + teste à chaque envoi, publie la Release si version nouvelle
-├── ci/publier-release.ps1       (utilisé par GitHub) zip + Release
-├── hub-modele/                  modèle de mémoire livré dans le zip (copie de ClaudeHub/outils et skills)
-├── CONTRIBUTING.md              utiliser, modifier, proposer des changements
-├── assets/
-│   ├── icone-bebene.png         icône source (pixel art 32×32)
-│   └── make-icon.ps1            générateur de l'icône
-├── docs/
-│   ├── ARCHITECTURE.md          fonctionnement interne
-│   ├── MISE-A-JOUR.md           publier une nouvelle version
-│   └── images/                  captures du README (générées par les modes de test)
-└── NOTES.md                     journal de développement, version par version
-```
-
----
-
-## Modifier Bébène ou proposer des changements
-
-Tout le monde peut télécharger Bébène, copier le code (fork) et le modifier chez soi. **Seul le propriétaire publie les versions officielles** : GitHub refuse toute écriture d'une autre personne, et le script de publication le vérifie aussi. Les propositions passent par une *pull request*. Détails : [CONTRIBUTING.md](CONTRIBUTING.md).
+<p align="center"><img src="docs/images/maj-disponible.png" width="300" alt="Nouvelle version disponible"></p>
 
 ---
 
 ## Questions fréquentes
 
-**Bébène consomme-t-il mes tokens en permanence ?**
-Non. Seule la discussion utilise Claude. La mesure du quota fait une mini-requête (modèle Haiku, quelques tokens) à l'ouverture et toutes les 15 minutes quand la fenêtre est visible.
+**Consomme-t-il mes tokens en permanence ?**
+Non, seulement quand tu discutes. La mesure du quota fait une mini-requête très légère (modèle Haiku) de temps en temps.
 
-**Le quota affiché est-il fiable ?**
-Oui, ce sont les chiffres officiels renvoyés par Claude Code. Le compte à rebours avance en continu, et quand la fenêtre de 5 h est écoulée, Bébène refait une mesure.
+**Et mon processeur ?**
+Environ 0,1 % au repos et une centaine de Mo de mémoire. La page de discussion est libérée après 10 minutes fermée.
 
 **Outlook ne fonctionne pas ?**
-Le *nouvel* Outlook ne permet pas aux autres programmes de lire les mails. Ouvre une fois **Outlook (classic)** et ajoutes-y ton compte.
+Le *nouvel* Outlook ne laisse pas les autres programmes lire les mails : ouvre une fois **Outlook (classic)** et ajoutes-y ton compte.
 
 **Le chat a disparu ?**
 Clic droit sur l'icône → *Afficher le chat sur le bureau*.
 
-**Une mise à jour efface-t-elle mes réglages ou mes conversations ?**
-Non. Elle ne remplace que le programme (exe, DLL, pages). Réglages, conversations, calendriers, mails et mémoire sont rangés ailleurs.
-
-**La pastille de mise à jour n'apparaît jamais ?**
-Il faut une connexion internet et une Release plus récente que ta version. Si le dépôt est privé, il faut aussi GitHub CLI (`gh`) connecté à un compte qui y a accès.
-
-**Le PC n'a pas WebView2 ?**
-Bébène le détecte au démarrage et propose de l'installer (gratuit, Microsoft). Il est déjà présent sur Windows 11 et la plupart des Windows 10.
+**Le raccourci ne copie rien dans mon terminal ?**
+C'est voulu : dans un terminal, Ctrl + C interromprait la commande en cours. Bébène s'y ouvre simplement.
 
 **Où regarder si quelque chose plante ?**
-`%LOCALAPPDATA%\ClaudeCompanion\bebene.log`. Un chien de garde y écrit aussi la pile d'appels si l'interface se fige plus de 3 secondes.
+`%LOCALAPPDATA%\ClaudeCompanion\bebene.log`.
+
+---
+
+## Pour les développeurs
+
+Bébène est un programme C# (WinForms, .NET Framework 4) compilé avec le `csc.exe` déjà présent dans Windows, sans SDK. La discussion et les réglages sont des pages HTML affichées dans WebView2 ; le cerveau est `claude -p` (flux `stream-json`), une session par conversation.
+
+```powershell
+git clone https://github.com/P0770/bebene.git
+cd bebene
+.\build.ps1 -Install      # compile, installe dans %USERPROFILE%\ClaudeCompanion et relance
+.\tests\tests.ps1         # une quarantaine de tests (images, pages, fenêtres)
+```
+
+À chaque envoi sur `main`, GitHub Actions compile, lance les tests et publie la Release si le numéro de version (`Version` et `AssemblyVersion` dans `Companion.cs`) est nouveau. Les nouveautés viennent de `fonctions.json`.
+
+| Fichier | Rôle |
+|---|---|
+| `Companion.cs` | démarrage, le chat animé, raccourci, notifications |
+| `Discussion.cs` · `Conversations.cs` | fenêtre de discussion, tâches Claude, historique, rappels |
+| `Agenda.cs` · `PostIts.cs` · `Correcteur.cs` | calendriers et mails · post-it · correcteur |
+| `Installation.cs` · `Reglages.cs` · `Modeles.cs` | assistant et mises à jour · réglages · modèles de référence |
+| `ui.html` · `settings.html` | pages de la discussion et des réglages |
+| `tests/tests.ps1` · `.github/workflows/bebene.yml` | tests · intégration continue et publication |
+
+Pour aller plus loin : [Architecture](docs/ARCHITECTURE.md) · [Publier une version](docs/MISE-A-JOUR.md) · [Contribuer](CONTRIBUTING.md).
 
 ---
 

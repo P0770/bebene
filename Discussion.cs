@@ -106,18 +106,53 @@ class ChatPanel : Form {
     }
     DateTime settingsAsked = DateTime.MinValue;
     public bool Pinned = Settings.Bool("Pinned", false);
+    // Fermeture quand on clique ailleurs (sauf épinglée). Deux détections :
+    // 1. un CLIC (gauche ou droit) hors de la partie visible de la fenêtre, vu par sondage des boutons toutes les 25 ms tant qu'elle est
+    //    affichée : marche aussi sur les fenêtres qui ne prennent pas le focus (bureau, barre des tâches, widgets) ;
+    // 2. la perte d'activation (Alt+Tab, autre fenêtre ouverte au clavier), avec nouvel essai si Windows est encore en transition.
+    [DllImport("user32.dll")] static extern short GetAsyncKeyState(int vk);
+    [DllImport("user32.dll")] static extern IntPtr WindowFromPoint(Point p);
+    [DllImport("dwmapi.dll")] static extern int DwmGetWindowAttribute(IntPtr h, int attr, out RECT r, int size);
+    System.Windows.Forms.Timer clickWatch; bool btnWasDown;
+    internal Rectangle VisibleBounds() {                                             // sans les bordures invisibles de redimensionnement ni l'ombre
+        RECT r; if (IsHandleCreated && DwmGetWindowAttribute(Handle, 9, out r, Marshal.SizeOf(typeof(RECT))) == 0 && r.R > r.L) return Rectangle.FromLTRB(r.L, r.T, r.R, r.B);
+        return Bounds;
+    }
+    // la fenêtre w (premier plan ou sous la souris) est-elle « ailleurs » ?
+    internal bool IsElsewhere(IntPtr w) {
+        if (w == IntPtr.Zero || OwnedByMe(w)) return false;                // liste déroulante, dialogue, menu de la discussion
+        IntPtr root = GetAncestor(w, 2); if (root == IntPtr.Zero) root = w;   // GA_ROOT
+        if (root == owner.SettingsHwnd) return (DateTime.Now - settingsAsked).TotalSeconds >= 3;   // ⚙ cliqué ici : ce n'est pas « ailleurs »
+        uint pid; GetWindowThreadProcessId(root, out pid);
+        return pid != Program.Pid;                                          // le chat, un post-it, les volets, un dialogue de Bébène : on reste
+    }
+    void WatchClicks(bool on) {
+        if (!on) { if (clickWatch != null) clickWatch.Stop(); return; }
+        if (clickWatch == null) {
+            clickWatch = new System.Windows.Forms.Timer { Interval = 25 };
+            clickWatch.Tick += (s, e) => {
+                bool down = (GetAsyncKeyState(0x01) & 0x8000) != 0 || (GetAsyncKeyState(0x02) & 0x8000) != 0;
+                bool press = down && !btnWasDown; btnWasDown = down;
+                if (!press || !Visible || Pinned || NoActivate) return;
+                var pt = Cursor.Position;
+                if (VisibleBounds().Contains(pt)) return;
+                if (IsElsewhere(WindowFromPoint(pt))) Hide();
+            };
+        }
+        btnWasDown = (GetAsyncKeyState(0x01) & 0x8000) != 0;              // un bouton déjà enfoncé à l'ouverture ne compte pas
+        clickWatch.Start();
+    }
     protected override void OnDeactivate(EventArgs e) {
         base.OnDeactivate(e);
         if (Pinned || NoActivate) return;
+        int tries = 0;
         var t = new System.Windows.Forms.Timer { Interval = 120 };          // laisse Windows activer la nouvelle fenêtre
         t.Tick += (s, e2) => {
+            if (!Visible || Pinned || ContainsFocus) { t.Stop(); t.Dispose(); return; }
+            var fg = GetForegroundWindow();
+            if (fg == IntPtr.Zero && ++tries < 8) return;                   // transition : on réessaie (jusqu'à ~1 s)
             t.Stop(); t.Dispose();
-            if (!Visible || Pinned || ContainsFocus) return;
-            var fg = GetForegroundWindow(); uint pid; GetWindowThreadProcessId(fg, out pid);
-            if (fg == IntPtr.Zero || OwnedByMe(fg)) return;                 // rien au premier plan (transition) ou fenêtre de la discussion : on reste
-            if (fg == owner.SettingsHwnd && (DateTime.Now - settingsAsked).TotalSeconds < 3) return;   // ⚙ cliqué ici : ce n est pas « ailleurs »
-            if (pid == Program.Pid && fg != owner.SettingsHwnd) return;    // le chat, un post-it, un dialogue de Bébène… (les réglages comptent comme « ailleurs »)
-            Hide();
+            if (IsElsewhere(fg)) Hide();
         };
         t.Start();
     }
@@ -408,7 +443,7 @@ class ChatPanel : Form {
         calW.Changed = LayoutSide;
         upW.OpenSettings = () => owner.ShowSettings("manual");
         upW.Changed = LayoutSide;
-        VisibleChanged += (s, e) => { if (!Visible && !Pinned) { Moved = false; calW.Moved = false; upW.Moved = false; } LayoutSide(); };
+        VisibleChanged += (s, e) => { WatchClicks(Visible); if (!Visible && !Pinned) { Moved = false; calW.Moved = false; upW.Moved = false; } LayoutSide(); };
         LocationChanged += (s, e) => LayoutSide(false);   // simple déplacement : on bouge les volets sans les redessiner
         SizeChanged += (s, e) => LayoutSide(false);
     }
