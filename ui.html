@@ -202,6 +202,14 @@ pre { background: rgba(var(--sunk),calc(.35 * var(--sk))); border-color: rgba(va
 .msg.bot .md.live ~ .typing { display: none; }
 .lc { display: inline-block; width: 7px; height: 7px; margin-left: 4px; border-radius: 50%; background: #d97757; vertical-align: middle; animation: lcp 1s ease-in-out infinite; }
 @keyframes lcp { 50% { opacity: .25; transform: scale(.7); } }
+/* progression estimée de la réponse : barre fine juste sous la bulle, étape + % */
+.msg.bot.pgo { position: relative; margin-bottom: 20px; }
+.pgb { position: absolute; left: 4px; top: calc(100% + 5px); width: max(calc(100% - 8px), 230px); display: flex; align-items: center; gap: 8px; pointer-events: none; }
+.pgb .pgt { flex: 1; height: 4px; border-radius: 99px; background: rgba(var(--ov),.08); overflow: hidden; }
+.pgb .pgf { height: 100%; width: 0; border-radius: 99px; background: linear-gradient(90deg, var(--accent), var(--accent-2)); transition: width .3s ease; position: relative; overflow: hidden; }
+.pgb .pgf::after { content: ""; position: absolute; inset: 0; background: linear-gradient(90deg, transparent, rgba(255,255,255,.35), transparent); animation: pgs 1.6s linear infinite; }
+@keyframes pgs { from { transform: translateX(-100%); } to { transform: translateX(100%); } }
+.pgb .pgl { font-size: 10.5px; color: var(--muted); white-space: nowrap; font-variant-numeric: tabular-nums; }
 
 /* zone de saisie */
 footer { padding: 8px 12px 12px; }
@@ -381,6 +389,7 @@ html.light .updot { border-color: #fff; }
 /* note de compactage dans la conversation */
 .note { align-self: center; font-size: 11.5px; color: var(--muted); background: rgba(var(--ov),.04); border: 1px solid rgba(var(--ov),.07); border-radius: 999px; padding: 4px 13px; text-align: center; max-width: 92%; }
 .note.run { color: var(--accent-2); }
+.note .hv { font: inherit; font-size: 11.5px; margin-left: 6px; padding: 2px 9px; border-radius: 999px; border: 1px solid var(--accent); background: none; color: var(--accent); cursor: pointer; }
 /* Buy Me a Coffee : tasse dorée au survol, la vapeur monte */
 .icon-btn.coffee:hover { color: #f2c66d; background: rgba(242,198,109,.14); }
 .coffee .steam { opacity: .55; transition: opacity .2s; }
@@ -969,8 +978,49 @@ function showPlan(todos) {
     + esc(String(t.status === 'in_progress' && t.activeForm ? t.activeForm : t.content || '')) + '</div>').join('');
   let p = cur.querySelector('.plan');
   if (p) p.innerHTML = html; else p = addToCur('plan', html);
+  pgNote(cur, 'todo', todos);
   post('progress\n' + rkey + '\n' + done + '\n' + todos.length);
 }
+// ---- progression estimée : rien ne dit vraiment combien il reste, on combine des indices ----
+// temps écoulé (réflexion), nombre d'actions, liste d'étapes TodoWrite (le plus fiable), texte en cours d'écriture.
+// L'état vit sur la bulle (cur._pg) : il suit la conversation même en fond. La barre ne recule jamais, plafonnée à 97 % avant la fin.
+const PGS = new Set();
+function pgStart(m) {
+  if (!m) return;
+  const b = document.createElement('div'); b.className = 'pgb';
+  b.innerHTML = '<div class="pgt"><div class="pgf"></div></div><span class="pgl"></span>';
+  m.classList.add('pgo'); m.appendChild(b);
+  m._pg = { t0: Date.now(), acts: 0, txt: 0, todo: null, phase: 'Réflexion', shown: 0, bar: b }; PGS.add(m); pgDraw(m);
+}
+function pgNote(m, k, v) {
+  const p = m && m._pg; if (!p) return;
+  if (k === 'act') { p.acts++; p.txt = 0; p.phase = v || 'Actions'; }
+  else if (k === 'txt') { p.txt += v; p.phase = 'Rédaction'; }
+  else if (k === 'todo') p.todo = v;
+}
+function pgTarget(p) {
+  const t = (Date.now() - p.t0) / 1000, e = x => 1 - Math.exp(-x);
+  let base;
+  if (p.todo && p.todo.length) {                                         // étapes connues : la vraie avancée
+    const n = p.todo.length, d = p.todo.filter(x => x.status === 'completed').length, w = p.todo.some(x => x.status === 'in_progress') ? .5 : 0;
+    base = .08 + .8 * (d + w) / n + .03 * e(t / 90);
+  } else base = .04 + .26 * e(t / 25) + .4 * e(p.acts / 5);
+  if (p.txt) base += (.95 - base) * e(p.txt / 600);                     // il écrit : on approche de la fin, d'autant plus que le texte s'allonge
+  return Math.min(.97, base);
+}
+function pgDraw(m) {
+  const p = m._pg; if (!p) return;
+  p.shown = Math.max(p.shown, p.shown + (pgTarget(p) - p.shown) * .25);
+  const pc = Math.round(p.shown * 100), dn = p.todo ? p.todo.filter(x => x.status === 'completed').length : 0;
+  const lab = p.phase === 'Rédaction' ? 'Rédaction' : p.todo && p.todo.length ? 'Étape ' + Math.min(p.todo.length, dn + 1) + '/' + p.todo.length : p.phase;
+  p.bar.querySelector('.pgf').style.width = pc + '%';
+  p.bar.querySelector('.pgl').textContent = lab + ' · ≈ ' + pc + ' %';
+}
+function pgEnd(m) {
+  if (!m || !m._pg) return;
+  PGS.delete(m); m._pg.bar.remove(); m.classList.remove('pgo'); delete m._pg;
+}
+setInterval(() => PGS.forEach(m => { if (m.isConnected) pgDraw(m); }), 250);
 // ---- besoin de toi : Bébène a besoin de ta souris / ton clavier, ou de voir une fenêtre qu'il ne peut pas capturer ----
 function showHand(h) {
   const card = el('ask hand', '');
@@ -1126,6 +1176,15 @@ document.addEventListener('click', e => {                         // boutons Cop
 // ---- compactage automatique : quand la conversation a grossi de ~40 000 tokens depuis son début (ou le dernier compactage),
 // Bébène en résume le début (modèle Haiku) : chaque message suivant renvoie beaucoup moins de tokens à Claude.
 const COMPACT_GROWTH = 40000;
+// conversation très lourde (souvent des images lues) : chaque échange est plus lent → proposer d'en ouvrir une nouvelle, sans rien imposer
+const HEAVY_CTX = 150000;
+function heavyNote() {
+  log.querySelectorAll('.note.heavy').forEach(n => n.remove());
+  const n = el('note heavy', '🐢 Cette conversation est devenue lourde (' + Math.round(lastCtx / 1000) + 'k tokens) : les réponses ralentissent. '
+    + '<button class="hv">Nouvelle conversation' + (project ? ' dans ' + esc(project) : '') + '</button>');
+  n.querySelector('.hv').onclick = () => { n.remove(); newChat({ project }); };
+  scroll();
+}
 function maybeCompact(code) {
   if (code !== '0' || !sid || compacting || !lastCtx) return;
   const holder = conv || (window.__flashBase = window.__flashBase || {});
@@ -1143,9 +1202,17 @@ function compacted(ok, pre, post_) {
     else compactNote.remove();
   }
   compactNote = null; lastCtx = 0; refresh(); save();
+  const q = queued.get(rkey);
+  if (q) { queued.delete(rkey); q.note.remove(); const keep = input.value; submit(q.text, undefined, false, true); input.value = keep; autosize(); }
 }
+const queued = new Map();                                            // clé de conversation → message tapé pendant le résumé
 function submit(text, allowed, silent, noDraft) {
   text = (text || input.value).trim();
+  if (compacting && !busy && !silent && text && !queued.has(rkey)) {  // résumé en cours : le message attend sa fin, rien à retaper
+    if (!noDraft && DRAFT.items.length) text += draftContext(takeDraft());
+    queued.set(rkey, { text, note: el('note run', '⏳ Message gardé : il part dès que le résumé est fini.') });
+    input.value = ''; store.set('draftText', ''); autosize(); scroll(); return;
+  }
   if (busy || compacting || !text) return;
   if (!silent && !noDraft && DRAFT.items.length) text += draftContext(takeDraft());   // question tapée sur ce que le raccourci a capturé (texte, dossiers…)
   if (!silent) {
@@ -1153,9 +1220,10 @@ function submit(text, allowed, silent, noDraft) {
     if (pc) { if (resumePause(pc, false, text)) { input.value = ''; autosize(); } return; }
     turn = { req: text, files: [], todos: null, acts: 0 };
   } else if (!turn) turn = { req: text, files: [], todos: null, acts: 0 };
+  log.querySelectorAll('.ask .ab').forEach(b => { b.outerHTML = '<div class="done">→ Répondu par message</div>'; });   // question ou plan sans clic : un nouveau message la ferme
   if (!silent) { input.value = ''; store.set('draftText', ''); autosize(); el('msg user', esc(text)); decorate(); }
   cur = el('msg bot', '<div class="typing"><span></span><span></span><span></span></div>');
-  busy = true; gotResult = false; denials = []; pendingAsk = null; pendingReady = null; pendingHand = null; refresh(); scroll();
+  busy = true; gotResult = false; denials = []; pendingAsk = null; pendingReady = null; pendingHand = null; pgStart(cur); refresh(); scroll();
   if (conv) conv.attn = '';
   post('send\n' + rkey + '\n' + (auto.checked || autoAll ? 1 : 0) + '\n' + sid + '\n' + (allowed || [...granted].join(',')) + '\n' + (flash ? 1 : 0) + '\n' + project + '\n' + text);
   renderMenu();
@@ -1217,6 +1285,7 @@ function liveTick(ts) {
   if (liveShown < t.length) liveRaf = requestAnimationFrame(liveTick);
 }
 function liveDelta(s) {
+  pgNote(cur, 'txt', s.length);
   if (inBg) return;                                                    // tâche en fond : pas d'aperçu, le message complet arrivera
   if (!live) liveStart(); if (!live) return;
   liveText += s; if (!liveRaf) liveRaf = requestAnimationFrame(liveTick);
@@ -1260,6 +1329,7 @@ function onLine(l) {
       if (c.type === 'tool_use') {
         const i = c.input || {};
         if (turn) turn.acts++;
+        if (!o.parent_tool_use_id) pgNote(cur, 'act', toolName(c.name));
         const sr = searchOf(c.name, i);
         if (sr) { showSearch(sr); continue; }                            // recherche : ligne temporaire, retirée à la fin
         hideSearch();
@@ -1295,9 +1365,14 @@ function tidyTurn(m) {
   ds.forEach(d => box.appendChild(d));
   m.appendChild(box);
 }
-function tidyAll() { log.querySelectorAll('.msg.bot').forEach(m => { if (m !== cur) tidyTurn(m); }); }
+function tidyAll() {
+  log.querySelectorAll('.msg.bot').forEach(m => { if (m !== cur) tidyTurn(m); });
+  log.querySelectorAll('.pgo').forEach(m => { if (m !== cur) { m.classList.remove('pgo'); m.querySelectorAll(':scope > .pgb').forEach(x => x.remove()); } });   // barre de progression enregistrée en cours de route
+  log.querySelectorAll('.note.heavy').forEach(n => n.remove());       // alerte « conversation lourde » : son bouton ne survit pas au rechargement
+}
 function finish(code, err) {
   if (live) liveEnd(liveCut(liveText));                               // arrêté en pleine écriture : on garde ce qui est arrivé
+  pgEnd(cur);
   const lastTxt = cur ? textOf(cur) : '';
   if (cur) {
     const t = cur.querySelector('.typing'); if (t) t.remove();
@@ -1316,6 +1391,7 @@ function finish(code, err) {
   else if (pendingReady && code === '0') showReady(pendingReady);
   pendingAsk = null; pendingReady = null; pendingHand = null;
   denials = []; decorate(); scroll(); save(); askTitle(code); maybeCompact(code);
+  if (code === '0' && !compacting && !flash && lastCtx > HEAVY_CTX) heavyNote();
   if (conv && inBg) { conv.attn = kind; persist(); }                  // pastille dans l'historique jusqu'à ce qu'on la rouvre (après save : la conversation existe)
   if (code !== '-1') post('notify\n' + kind + '\n' + (inBg ? 0 : 1) + '\n' + rkey + '\n' + (flash ? 'Flash' : conv && conv.title ? conv.title : 'Nouvelle conversation'));
 }

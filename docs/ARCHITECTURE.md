@@ -17,13 +17,13 @@ Ce document explique comment Bébène fonctionne de l'intérieur : utile pour le
 │        │                             ├── sonde de quota (claude -p --model haiku …)                         │
 │        │                             └── volets : ArrowTab ×2, CalWidget, UpWidget (fenêtres layered)       │
 │        │                                                                                                    │
-│  SpellAssist (correcteur)     Calendars / Mailbox / Reminders / Manual      Setup (assistant)               │
-│  hooks clavier+souris, UIA    iCal, IMAP Gmail, Outlook COM                 vérifie et installe             │
+│                               Calendars / Mailbox / Reminders / Manual      Setup (assistant)               │
+│                               iCal, IMAP Gmail, Outlook COM                 vérifie et installe             │
 └─────────────────────────────────────────────────────────────────────────────────────────────────────────────┘
         Réglages : registre HKCU\Software\ClaudeCompanion          Journal : %LOCALAPPDATA%\ClaudeCompanion\bebene.log
 ```
 
-Le programme est réparti en 8 fichiers C# compilés ensemble (`build.ps1` prend tous les `*.cs`) : **`Companion.cs`** (démarrage, réglages, chat animé, `Version`), `Discussion.cs` (fenêtre de discussion et tâches Claude), `PostIts.cs`, `Agenda.cs` (calendriers, mails, rappels), `Correcteur.cs`, `Modeles.cs`, `Installation.cs` (assistant, mises à jour), `Reglages.cs`. Il est compilé par le `csc.exe` du .NET Framework 4 présent dans Windows : **C# 5 uniquement** (pas de `?.`, pas de `$"…"`, pas de `nameof`, pas de fonctions locales).
+Le programme est réparti en 7 fichiers C# compilés ensemble (`build.ps1` prend tous les `*.cs`) : **`Companion.cs`** (démarrage, réglages, chat animé, `Version`), `Discussion.cs` (fenêtre de discussion et tâches Claude), `PostIts.cs`, `Agenda.cs` (calendriers, mails, rappels), `Modeles.cs`, `Installation.cs` (assistant, mises à jour), `Reglages.cs`. Il est compilé par le `csc.exe` du .NET Framework 4 présent dans Windows : **C# 5 uniquement** (pas de `?.`, pas de `$"…"`, pas de `nameof`, pas de fonctions locales).
 
 **Tâches en parallèle** : chaque conversation a sa propre session `claude -p --input-format stream-json` gardée ouverte (classe `Runner` dans `Discussion.cs`) ; jusqu'à 3 travaillent en même temps. Les messages entre la page et C# portent la clé de la conversation (`send\n<clé>…`, `rline\n<clé>\n<json>`, `rdone\n<clé>\n<code>`) ; la page garde une « vue » par tâche en fond (`VIEWS`, `withRun`). Une session est relancée avec `--resume` si ses réglages changent, et se ferme après 10 min sans message.
 
@@ -46,7 +46,6 @@ Le programme est réparti en 8 fichiers C# compilés ensemble (`build.ps1` prend
 | `Calendars`, `CalEvent` | lecture iCal/webcal, règles de répétition, classement examen / rendez-vous |
 | `Mailbox`, `Imap`, `Mime`, `MailMsg` | lecture des mails (Gmail IMAP, Outlook COM) et extraction des dates |
 | `Reminders`, `Manual` | rappels, événements ajoutés ou masqués à la main |
-| `Speller`, `SpellAssist`, `SpellMark` | correcteur d'orthographe global |
 | `Setup` | assistant d'installation : `Check()` (état de chaque étape) et `Do()` (action) |
 | `Updater` | mises à jour : dernière Release GitHub, comparaison de version, téléchargement et remplacement du programme |
 
@@ -114,11 +113,15 @@ Chaque message lance :
 claude -p --output-format stream-json --verbose
        --include-partial-messages                              (écriture en direct, réglage Stream)
        --permission-mode acceptEdits | bypassPermissions      (mode autonome)
+       --model haiku                                           (question simple, réglage AutoModel)
+       --effort low | medium | high | xhigh                    (réglage Effort, medium par défaut)
        --resume <session>                                      (suite de la conversation)
        --allowedTools <outils autorisés>
        --append-system-prompt <persona de Bébène>
        --settings <garde-settings.json>                        (verrou de sécurité)
 ```
+
+**Rapidité** : l'effort vient du réglage `Effort` (`medium` par défaut), sauf une question simple au début d'une conversation (`low`, comme le choix de Haiku : `PickEffort`, `Runner.LowEffort`) ; jamais d'effort avec Haiku. Le persona demande aussi de regrouper le travail (lectures en parallèle, modifications en une passe), de lire le texte d'un PDF avant d'en regarder des pages en image (basse résolution), et de compiler un LaTeX une seule fois, sans recompilation forcée, hors de OneDrive. La capture d'écran `ecran.ps1` est réduite à 1 280 px de large.
 
 Le texte est envoyé sur l'entrée standard, précédé de `[Fenêtre active : …]`. Chaque ligne JSON du flux est transmise à la page, qui affiche le texte (Markdown → `marked` + `DOMPurify`), les outils utilisés, les différences de fichiers et les demandes d'autorisation (`permission_denials`).
 
@@ -156,7 +159,9 @@ Stockées dans le `localStorage` de la WebView (au plus 40, les anciennes raccou
 
 ### Titres et compactage
 - **Titres** : après les échanges 1, 2, 3 puis tous les 3, un extrait de la conversation (≤ 4 000 caractères) et les titres des autres conversations sont envoyés à `claude -p --model haiku` sans outils ni session, qui renvoie un titre de 2 à 5 mots (≤ 40 caractères, sujet concret, différent des autres). Un titre modifié à la main (✎ dans l'historique, double-clic sur le titre sous le nom) est verrouillé (`titleLock`).
-- **Compactage** : la page suit la taille du contexte (champ `usage` des messages de l'assistant : `input_tokens + cache_read_input_tokens + cache_creation_input_tokens`). Au premier échange elle mémorise la taille de départ (instructions, outils, mémoire) ; quand le contexte a grossi de **40 000 tokens**, elle demande `/compact` sur la session (`claude -p --model haiku --resume <session>`). La session garde le même identifiant et la suite de la conversation repart du résumé. L'envoi est bloqué le temps du compactage.
+- **Compactage** : la page suit la taille du contexte (champ `usage` des messages de l'assistant : `input_tokens + cache_read_input_tokens + cache_creation_input_tokens`). Au premier échange elle mémorise la taille de départ (instructions, outils, mémoire) ; quand le contexte a grossi de **40 000 tokens**, elle demande `/compact` sur la session (`claude -p --model haiku --resume <session>`). La session garde le même identifiant et la suite de la conversation repart du résumé. Un message tapé pendant le compactage est gardé (`queued`, par conversation) et envoyé dès la fin.
+- **Conversation lourde** : après un tour, si le contexte dépasse **150 000 tokens** (souvent des images lues), une note `.note.heavy` propose une nouvelle conversation dans le même projet.
+- **Questions** : un message envoyé ferme toute carte `.ask` encore ouverte (question à choix, plan prêt, demande de main) avec « → Répondu par message ».
 
 ---
 
@@ -188,18 +193,6 @@ Test sans rien installer : `ClaudeCompanion.exe --updtest out.txt` (dernière Re
 
 ---
 
-## Le correcteur d'orthographe
-
-1. Hooks bas niveau clavier et souris : on sait quand tu tapes et quand tu fais une pause.
-2. **UI Automation** (`TextPattern`) lit le texte du champ actif et donne la position de chaque mot à l'écran.
-3. **ISpellChecker** de Windows (fr-CH) trouve les fautes.
-4. Une petite fenêtre `SpellMark` (croix rouge) est posée sur chaque faute ; un clic affiche les suggestions.
-5. La correction est tapée **touche par touche** (`SendInput`, 6 à 12 ms entre les touches) : le nouveau Bloc-notes perd les envois groupés.
-
-Ignoré : champs de mot de passe, terminaux, éditeurs de code, gestionnaires de mots de passe.
-
----
-
 ## Compilation (`build.ps1`)
 
 1. Télécharge une fois le paquet NuGet **WebView2 1.0.2903.40** et copie ses DLL.
@@ -215,11 +208,10 @@ Ignoré : champs de mot de passe, terminaux, éditeurs de code, gestionnaires de
 | Clé | Contenu |
 |---|---|
 | `Name`, `Scale`, `ShowCat`, `TopMost` | compagnon |
-| `Model`, `Prompt`, `Caveman` | Claude |
+| `Model`, `Effort`, `AutoModel`, `Prompt`, `Caveman` | Claude |
 | `WorkDir`, `Pinned`, `AutoAllow` | discussion |
 | `DashCal`, `DashUp` | volets ouverts |
 | `Calendars` (JSON), `LocFilter` | calendriers |
 | `GmailUser`, `GmailPass` (DPAPI), `OutlookMail` | mails |
 | `RemindExam`, `RemindRdv`, `RemindWhen` | rappels |
 | `ManualEvents`, `HiddenEvents` | événements ajoutés / masqués |
-| `SpellCheck` | correcteur |

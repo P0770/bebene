@@ -667,8 +667,8 @@ class ChatPanel : Form {
         "  $bmp = New-Object Drawing.Bitmap $v.Width, $v.Height; $g = [Drawing.Graphics]::FromImage($bmp)\r\n" +
         "  $g.CopyFromScreen($v.Left, $v.Top, 0, 0, $bmp.Size); $g.Dispose()\r\n" +
         "}\r\n" +
-        "if ($bmp.Width -gt 1600) {\r\n" +
-        "  $s = 1600 / $bmp.Width; $sm = New-Object Drawing.Bitmap 1600, ([int]($bmp.Height * $s))\r\n" +
+        "if ($bmp.Width -gt 1280) {\r\n" +
+        "  $s = 1280 / $bmp.Width; $sm = New-Object Drawing.Bitmap 1280, ([int]($bmp.Height * $s))\r\n" +
         "  $g = [Drawing.Graphics]::FromImage($sm); $g.InterpolationMode = 'HighQualityBicubic'; $g.DrawImage($bmp, 0, 0, $sm.Width, $sm.Height); $g.Dispose()\r\n" +
         "  $bmp.Dispose(); $bmp = $sm\r\n" +
         "}\r\n" +
@@ -693,7 +693,7 @@ class ChatPanel : Form {
     // Une session reste ouverte entre deux messages (pas de redémarrage = réponse plus rapide), et se ferme après 10 min sans rien.
     // Si les réglages de lancement changent (autorisations, mode autonome, modèle…), la session est relancée avec --resume.
     class Runner {
-        public string Key, Sig = "", Model = "", HandKind = ""; public bool Busy, Asking, Hand, Stopping, Lite, Forgotten; public int Done, Total;
+        public string Key, Sig = "", Model = "", HandKind = ""; public bool Busy, Asking, Hand, Stopping, Lite, LowEffort, Forgotten; public int Done, Total;
         public Process P; public readonly StringBuilder Err = new StringBuilder(); public DateTime Used = DateTime.Now, FlagAt = DateTime.MinValue;
     }
     readonly Dictionary<string, Runner> runners = new Dictionary<string, Runner>();
@@ -769,6 +769,18 @@ class ChatPanel : Form {
         return Simple(text) && (fresh || (r != null && r.Lite)) ? "haiku" : "";            // une conversation passée au modèle normal y reste
     }
 
+    // effort de réflexion : celui des réglages (« medium » par défaut : nettement plus rapide, presque le même résultat) ;
+    // question simple au début d une conversation → « low ». Haiku : pas d effort (il répond déjà vite).
+    static readonly string[] Efforts = { "low", "medium", "high", "xhigh", "max" };
+    public static string EffortSetting() { string e = Settings.Str("Effort", "medium"); return Array.IndexOf(Efforts, e) >= 0 ? e : ""; }
+    string PickEffort(string text, string sid, Runner r, string model) {
+        if (model == "haiku") return "";
+        string e = EffortSetting();
+        if (!Settings.Bool("AutoModel", true) || e == "low") return e;
+        bool fresh = !Regex.IsMatch(sid ?? "", "^[0-9a-fA-F-]{36}$");
+        return Simple(text) && (fresh || (r != null && r.LowEffort)) ? "low" : e;   // une conversation passée à l effort normal y reste
+    }
+
     void Send(string key, string text, bool autonomous, string sessionId, string allowed, bool flash, string project) {
         project = SafeName(project);
         if (compactKey == key) { PostDone(key, "-1", "Je termine de compacter la conversation : réessaie dans un instant."); return; }
@@ -776,13 +788,13 @@ class ChatPanel : Form {
         if (r != null && r.Busy) { PostDone(key, "-1", "Claude est encore en train de répondre dans cette conversation : attends la fin ou clique sur Arrêter."); return; }
         int busyN = 0; foreach (var x in runners.Values) if (x.Busy) busyN++;
         if (busyN >= MaxBusy) { PostDone(key, "-1", MaxBusy + " tâches tournent déjà en parallèle : attends qu'une se termine, ou arrête-en une."); return; }
-        string model = PickModel(text, sessionId, r);
+        string model = PickModel(text, sessionId, r), effort = PickEffort(text, sessionId, r, model);
         // Le contexte qui change (fenêtre active) va dans le MESSAGE, pas dans le prompt système :
         // un prompt système stable garde l'historique en cache → beaucoup moins de tokens à chaque échange.
         if (Companion.LastWindow.Length > 0)
             text = "[Fenêtre active : " + Companion.LastWindow + " · pour la voir : " + ScreenCommand(Companion.LastHwnd) + "]\n" + text;
         text = "[Maintenant : " + DateTime.Now.ToString("dddd d MMMM yyyy, HH:mm", new System.Globalization.CultureInfo("fr-CH")) + "]\n" + text;   // pour les rappels (« dans 20 min »)
-        string args = BuildArgs(autonomous, allowed, flash, project, model);
+        string args = BuildArgs(autonomous, allowed, flash, project, model) + (effort.Length > 0 ? " --effort " + effort : "");
         if (r == null) { r = new Runner { Key = key }; runners[key] = r; }
         if (r.P != null && (r.P.HasExited || r.Sig != args)) Retire(r);                   // réglages changés : on relance la session
         if (r.P == null) {
@@ -790,7 +802,7 @@ class ChatPanel : Form {
             if (!StartRunner(r, full, RunDir(sessionId, flash, project))) return;
             r.Sig = args; r.Model = model;
         }
-        r.Lite = model == "haiku";
+        r.Lite = model == "haiku"; r.LowEffort = effort == "low";
         r.Busy = true; r.Asking = r.Hand = false; r.Stopping = false; r.Done = r.Total = 0; r.Used = DateTime.Now; lock (r.Err) r.Err.Clear();
         string msg = new JavaScriptSerializer().Serialize(new Dictionary<string, object> { { "type", "user" }, { "message", new Dictionary<string, object> { { "role", "user" }, { "content", text } } } });
         try {
@@ -909,6 +921,13 @@ class ChatPanel : Form {
             + "RAPPELS : si l'utilisateur te demande de lui rappeler quelque chose à un moment donné (« rappelle-moi dans 20 min », « demain à 8 h »), calcule l'heure à partir de [Maintenant : …] "
             + "et termine ta réponse par un bloc de code de langage bebene-rappel contenant du JSON {\"quand\":\"AAAA-MM-JJTHH:MM\",\"quoi\":\"le rappel, en quelques mots\"} (un bloc par rappel). "
             + "Bébène l'affichera à l'heure dite, même discussion fermée : n'utilise pas d'autre moyen (tâche planifiée, script, alarme). "
+            + "RAPIDITÉ (même résultat, moins d'attente) : regroupe le travail. Lis en une fois les fichiers dont tu auras besoin (plusieurs appels d'outils en parallèle dans le même message), "
+            + "fais toutes les modifications d'un fichier en une passe, ne relis pas un fichier que tu viens de modifier et ne revérifie pas ce qui a déjà réussi. "
+            + "PDF : lis d'abord le TEXTE (pdftotext -layout fichier.pdf -, ou -f N -l N pour quelques pages). Ne convertis une page en image que pour VOIR une mise en page ou une figure, "
+            + "seulement les pages utiles et en basse résolution (pdftoppm -r 60 -png, dans %TEMP%\\BebeneTravail) : une image en pleine résolution remplit vite la conversation et la ralentit. "
+            + "LaTeX : ne force jamais une recompilation complète (pas de latexmk -g ni -C) ; compile UNE fois à la fin d'une série de modifications, pas après chacune. "
+            + "Si le document est dans OneDrive, mets les fichiers de compilation hors de OneDrive (latexmk -pdf -interaction=nonstopmode -outdir=\"$TEMP/BebeneTravail/latex\") "
+            + "puis copie seulement le PDF final à côté du .tex. "
             + "TÂCHES LONGUES :dès qu'une tâche a plus de 3 étapes, tiens ta liste d'étapes à jour avec l'outil TodoWrite (l'utilisateur voit la progression). "
             + (Settings.Bool("Prepare", true)
                 ? "PRÉPARER AVANT DE PRODUIRE : quand l'utilisateur commence un projet ou parle de vouloir faire un fichier (rapport, présentation, document, classeur, code…), "

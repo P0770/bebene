@@ -26,7 +26,8 @@
 - **Un assistant toujours à portée de main** : un raccourci (Alt + Espace) ou un clic sur le chat, et tu poses ta question.
 - **Il agit vraiment** : c'est Claude Code, avec accès à tes fichiers et à tes programmes, et il te demande ton accord avant chaque commande.
 - **Il t'organise** : projets, calendrier, examens et rendez-vous, rappels, post-it.
-- **Il reste léger** : environ 0,1 % du processeur au repos ; calendrier, mails et correcteur fonctionnent en local, sans consommer de tokens.
+- **Il reste léger** : environ 0,1 % du processeur au repos ; calendrier et mails fonctionnent en local, sans consommer de tokens.
+- **Il répond vite** : effort de réflexion réglable, documents lus intelligemment (texte avant images), travail regroupé.
 
 Il faut Windows 10 ou 11 et un abonnement Claude **Pro ou Max** (aucune clé d'API).
 
@@ -58,7 +59,9 @@ Un seul raccourci, **Alt + Espace** (modifiable), ou un clic sur le chat. Depuis
 
 - La zone de saisie grandit avec ton texte. **Entrée** envoie, **Maj + Entrée** va à la ligne, et les listes (`1.`, `-`) se continuent toutes seules.
 - Tu peux **coller une capture d'écran** (Ctrl + V) ou **déposer des fichiers** sur la discussion ou sur le chat.
-- La réponse s'écrit **en direct**. Pendant le travail, tu vois ce que Claude fait (recherches, commandes, étapes) ; une fois la réponse arrivée, il ne reste qu'elle, avec au besoin une ligne repliée « ✏️ 2 fichiers modifiés · voir ».
+- La réponse s'écrit **en direct**. Pendant le travail, tu vois ce que Claude fait (recherches, commandes, étapes) et une **barre de progression** sous sa bulle estime où il en est ; une fois la réponse arrivée, il ne reste qu'elle, avec au besoin une ligne repliée « ✏️ 2 fichiers modifiés · voir ».
+- Bébène pose une question à choix ? Clique un choix ou **réponds simplement en écrivant** : la question se ferme toute seule.
+- Une très longue conversation est résumée automatiquement ; si tu écris pendant ce temps, ton message attend et part tout seul. Si elle devient trop lourde, Bébène te propose d'en ouvrir une nouvelle dans le même projet.
 - Tu as fermé la fenêtre entre-temps ? Le chat saute de joie avec un « ! » jusqu'à ce que tu lises sa réponse, et une notification Windows te prévient (au choix dans les réglages).
 
 <p align="center">
@@ -114,10 +117,6 @@ Pour une question rapide sans aucune trace, passe en **⚡ Flash** : rien n'est 
 
 <p align="center"><img src="docs/images/volets.png" width="640" alt="Calendrier et liste des examens et rendez-vous"></p>
 
-### Corriger ton orthographe
-
-Partout où tu écris, une petite croix rouge apparaît sur chaque faute quand tu fais une pause ; un clic affiche les suggestions et Bébène tape la correction. Correcteur de Windows, **100 % local**, jamais dans les champs de mot de passe ni les terminaux.
-
 ### Le chat
 
 Bébène est entièrement dessiné par le programme, en pixel art. Il marche, fait sa toilette, s'étire, dort dans quatre positions, chasse ta souris et ronronne quand tu le caresses. Attrapé par la peau du cou, il se balance comme un pendule. Un réglage le rend plus calme ou plus joueur.
@@ -136,10 +135,10 @@ Clic droit sur l'icône de Bébène (zone de notification) → **Réglages…**,
 | **Mes projets** | archiver ou remettre un projet dans la palette |
 | **Mes examens et rendez-vous** | en ajouter ou en retirer à la main |
 | **Alertes et rappels** | point du jour, notifications Windows au choix, outils autorisés sans demande |
-| **Claude** | modèle, mode économe, écriture en direct, instructions personnelles |
+| **Claude** | modèle, effort de réflexion, mode économe, écriture en direct, instructions personnelles |
 | **Compagnon** | nom, taille, activité du chat, mode clair |
 | **Calendriers · Boîtes mail** | liens d'agenda, Gmail, Outlook classique |
-| **Système** | raccourci, démarrage avec Windows, correcteur, version |
+| **Système** | raccourci, démarrage avec Windows, version |
 
 La section **Ce que Bébène sait faire** liste toutes les fonctions avec un exemple, et marque les nouveautés.
 
@@ -149,7 +148,7 @@ La section **Ce que Bébène sait faire** liste toutes les fonctions avec un exe
 
 - **Rien sans ton accord** : une carte te demande avant chaque commande (sauf en mode autonome), et aucun document n'est créé sans que tu le demandes.
 - **Il ne peut pas se modifier lui-même** : un verrou bloque toute écriture ou commande visant son propre programme, même en mode autonome.
-- **Local** : mails, calendriers et correcteur restent sur ton PC. Le mot de passe Gmail est chiffré (DPAPI, lisible seulement par ton compte Windows).
+- **Local** : mails et calendriers restent sur ton PC. Le mot de passe Gmail est chiffré (DPAPI, lisible seulement par ton compte Windows).
 - **Mode Flash** : aucune trace.
 - **Versions officielles protégées** : seul le propriétaire publie ; les autres proposent leurs changements par *pull request*.
 
@@ -170,6 +169,9 @@ Non, seulement quand tu discutes. La mesure du quota fait une mini-requête trè
 
 **Et mon processeur ?**
 Environ 0,1 % au repos et une centaine de Mo de mémoire. La page de discussion est libérée après 10 minutes fermée.
+
+**Il met du temps à répondre ?**
+Réglages › Claude › **Effort de réflexion** : « Équilibré » (par défaut) est rapide et suffit presque toujours ; « Poussé » réfléchit plus longtemps pour les tâches difficiles. Une conversation très longue ralentit aussi : ouvre-en une nouvelle dans le même projet.
 
 **Outlook ne fonctionne pas ?**
 Le *nouvel* Outlook ne laisse pas les autres programmes lire les mails : ouvre une fois **Outlook (classic)** et ajoutes-y ton compte.
@@ -202,7 +204,7 @@ cd bebene
 |---|---|
 | `Companion.cs` | démarrage, le chat animé, raccourci, notifications |
 | `Discussion.cs` · `Conversations.cs` | fenêtre de discussion, tâches Claude, historique, rappels |
-| `Agenda.cs` · `PostIts.cs` · `Correcteur.cs` | calendriers et mails · post-it · correcteur |
+| `Agenda.cs` · `PostIts.cs` | calendriers et mails · post-it |
 | `Installation.cs` · `Reglages.cs` · `Modeles.cs` | assistant et mises à jour · réglages · modèles de référence |
 | `ui.html` · `settings.html` | pages de la discussion et des réglages |
 | `tests/tests.ps1` · `.github/workflows/bebene.yml` | tests · intégration continue et publication |

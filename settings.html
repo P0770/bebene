@@ -219,7 +219,7 @@ html.light .hk:hover { border-color: #bdb5ae; }
 </div>
 </div></details>
 
-<details class="sec" id="alertes"><summary><span class="st"><b>Alertes et rappels</b><span>Rappels, demandes d'accord, correcteur</span></span><svg class="chev" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg></summary><div class="sb">
+<details class="sec" id="alertes"><summary><span class="st"><b>Alertes et rappels</b><span>Rappels, demandes d'accord</span></span><svg class="chev" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg></summary><div class="sb">
 <div class="card">
   <div class="row">
     <div class="lbl"><b>Point du jour</b><span style="white-space:normal">À la première ouverture de la journée : agenda du jour, examens et rendez-vous de la semaine, rappels, post-it épinglés et tâches en pause.</span></div>
@@ -254,10 +254,6 @@ html.light .hk:hover { border-color: #bdb5ae; }
       <button data-v="veille">La veille</button><button data-v="heure">1 h avant</button><button data-v="both">Les deux</button>
     </div>
   </div>
-  <div class="row">
-    <div class="lbl"><b>Croix rouges du correcteur</b><span style="white-space:normal">Même réglage que « Correcteur d'orthographe » plus bas.</span></div>
-    <label class="switch"><input type="checkbox" id="spell2"><span class="track"></span></label>
-  </div>
 </div>
 </div></details>
 
@@ -273,11 +269,21 @@ html.light .hk:hover { border-color: #bdb5ae; }
     </select>
   </div>
   <div class="row">
+    <div class="lbl"><b>Effort de réflexion</b><span>Plus d'effort = réponses plus poussées mais plus lentes. « Équilibré » suffit presque toujours.</span></div>
+    <select id="effort">
+      <option value="low">Léger : le plus rapide</option>
+      <option value="medium">Équilibré : rapide (conseillé)</option>
+      <option value="high">Poussé : plus lent</option>
+      <option value="xhigh">Très poussé : lent</option>
+      <option value="">Par défaut de Claude</option>
+    </select>
+  </div>
+  <div class="row">
     <div class="lbl"><b>Mode économe (Caveman)</b><span>Réponses concises : moins de tokens, même contenu.</span></div>
     <label class="switch"><input type="checkbox" id="caveman"><span class="track"></span></label>
   </div>
   <div class="row">
-    <div class="lbl"><b>Réponse rapide automatique</b><span>Question simple (sans fichier ni action) → Haiku, plus rapide et moins de quota. Seulement si le modèle est « par défaut ».</span></div>
+    <div class="lbl"><b>Réponse rapide automatique</b><span>Question simple (sans fichier ni action) → Haiku, plus rapide et moins de quota ; sinon effort léger au début d'une conversation. Seulement si le modèle est « par défaut ».</span></div>
     <label class="switch"><input type="checkbox" id="autoModel"><span class="track"></span></label>
   </div>
   <div class="row">
@@ -391,10 +397,6 @@ html.light .hk:hover { border-color: #bdb5ae; }
 <details class="sec" id="systeme"><summary><span class="st"><b>Système</b><span>Démarrage, raccourci, quitter</span></span><svg class="chev" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg></summary><div class="sb">
 <div class="card">
   <div class="row">
-    <div class="lbl"><b>Correcteur d'orthographe</b><span>Pendant que tu écris, n'importe où, propose les corrections dès que tu fais une pause. Local, 0 token.</span></div>
-    <label class="switch"><input type="checkbox" id="spell"><span class="track"></span></label>
-  </div>
-  <div class="row">
     <div class="lbl"><b>Lancer au démarrage de Windows</b></div>
     <label class="switch"><input type="checkbox" id="autoStart"><span class="track"></span></label>
   </div>
@@ -483,7 +485,6 @@ function sendAutoAllow() {
   set({ autoAllow: t.join(',') });
 }
 document.querySelectorAll('.aa').forEach(x => x.onchange = sendAutoAllow);
-$('#spell2').onchange = e => set({ spell: e.target.checked });
 $('#remindExam').onchange = e => set({ remindExam: e.target.checked });
 $('#remindRdv').onchange = e => set({ remindRdv: e.target.checked });
 document.querySelectorAll('#remindWhen button').forEach(b => b.onclick = () => set({ remindWhen: b.dataset.v }));
@@ -510,7 +511,6 @@ function render(s) {
   renderManual(s);
   const aa = (s.autoAllow || '').split(',');
   document.querySelectorAll('.aa').forEach(x => x.checked = x.dataset.t.split(',').every(n => aa.includes(n)));
-  $('#spell2').checked = !!s.spell;
   $('#remindExam').checked = s.remindExam !== false; $('#remindRdv').checked = s.remindRdv !== false;
   document.querySelectorAll('#remindWhen button').forEach(b => b.classList.toggle('on', b.dataset.v === (s.remindWhen || 'both')));
   if (document.activeElement !== $('#gmailUser')) $('#gmailUser').value = s.gmailUser || '';
@@ -525,8 +525,8 @@ function render(s) {
   if (document.activeElement !== $('#name')) $('#name').value = s.name;
   if (document.activeElement !== $('#prompt')) $('#prompt').value = s.prompt;
   if (s.notifs) document.querySelectorAll('#notifs [data-n]').forEach(c => c.checked = s.notifs[c.dataset.n] !== false);
-  $('#showCat').checked = s.showCat; $('#topMost').checked = s.topMost; $('#autoStart').checked = s.autoStart; $('#caveman').checked = s.caveman; $('#chrome').checked = s.chrome; $('#postits').checked = s.postits; $('#prepare').checked = s.prepare; $('#dailyBrief').checked = s.dailyBrief !== false; $('#spell').checked = s.spell; $('#stream').checked = s.stream; $('#autoModel').checked = s.autoModel; showHotkeys(s);
-  $('#model').value = s.model;
+  $('#showCat').checked = s.showCat; $('#topMost').checked = s.topMost; $('#autoStart').checked = s.autoStart; $('#caveman').checked = s.caveman; $('#chrome').checked = s.chrome; $('#postits').checked = s.postits; $('#prepare').checked = s.prepare; $('#dailyBrief').checked = s.dailyBrief !== false; $('#stream').checked = s.stream; $('#autoModel').checked = s.autoModel; showHotkeys(s);
+  $('#model').value = s.model; $('#effort').value = s.effort == null ? 'medium' : s.effort;
   $('#workDir').textContent = s.workDir; $('#workDir').title = s.workDir;
   $('#version').textContent = 'Version ' + s.version;
   $('#resume').disabled = !s.hasSession;
@@ -591,8 +591,9 @@ $('#light').onchange = e => { document.documentElement.classList.toggle('light',
 const NOTIFS = [['done', '✅ Tâche terminée'], ['ask', '❓ Une question pour toi'], ['perm', '🔐 Accord demandé'], ['hand', '🐾 Besoin de ta souris ou de ton écran'], ['pause', '⏸ Pause : quota presque épuisé'], ['rappel', '⏰ Rappels']];
 $('#notifs').innerHTML = NOTIFS.map(([k, l]) => '<label class="nchk"><input type="checkbox" data-n="' + k + '"><span>' + l + '</span></label>').join('');
 $('#notifs').addEventListener('change', e => { const k = e.target.dataset.n; if (k) set({ notif: { [k]: e.target.checked } }); });
-['showCat', 'topMost', 'autoStart', 'caveman', 'stream', 'autoModel', 'chrome', 'postits', 'prepare', 'spell', 'dailyBrief'].forEach(id => $('#' + id).onchange = e => set({ [id]: e.target.checked }));
+['showCat', 'topMost', 'autoStart', 'caveman', 'stream', 'autoModel', 'chrome', 'postits', 'prepare', 'dailyBrief'].forEach(id => $('#' + id).onchange = e => set({ [id]: e.target.checked }));
 $('#model').onchange = e => set({ model: e.target.value });
+$('#effort').onchange = e => set({ effort: e.target.value });
 $('#name').onchange = e => set({ name: e.target.value });
 $('#name').onkeydown = e => { if (e.key === 'Enter') e.target.blur(); };
 $('#prompt').onchange = e => set({ prompt: e.target.value });

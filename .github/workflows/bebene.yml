@@ -55,9 +55,11 @@ jobs:
         run: .\ci\publier-release.ps1
 
   # Version Mac : compilée sur un Mac de GitHub (swiftc, sans Xcode), puis ajoutée à la Release de la même version.
+  # EN PAUSE (décision du 2026-11-23) : la version Mac n est plus publiée pour l instant. Retirer « if: false » pour la refaire.
   mac:
     name: Version Mac
     needs: bebene
+    if: false
     runs-on: macos-latest
     timeout-minutes: 20
     steps:

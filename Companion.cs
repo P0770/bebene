@@ -19,10 +19,10 @@ using Microsoft.Web.WebView2.WinForms;
 
 [assembly: System.Reflection.AssemblyTitle("Bébène")]
 [assembly: System.Reflection.AssemblyProduct("Bébène")]
-[assembly: System.Reflection.AssemblyVersion("1.57.0.0")]
+[assembly: System.Reflection.AssemblyVersion("1.58.0.0")]
 
 static class Program {
-    public const string Version = "1.57";
+    public const string Version = "1.58";
     public static bool OpenSetup;
     public static readonly uint Pid = (uint)Process.GetCurrentProcess().Id;   // identifiant de Bébène (lu une seule fois)   // --setup : ouvrir directement l'assistant d'installation
 
@@ -66,11 +66,6 @@ static class Program {
     [STAThread]
     static void Main(string[] args) {
         Util.DpiAware();                                   // avant toute fenêtre : sinon Windows étire Bébène (flou à 125 %, 150 %…)
-        if (args.Length == 3 && args[0] == "--spelltest") { // test : --spelltest "texte" sortie.txt
-            var sb = new StringBuilder();
-            foreach (var x in Speller.Check(args[1])) sb.AppendLine(x.Word + " -> " + x.Repl);
-            File.WriteAllText(args[2], "langue=" + Speller.Lang + "\r\n" + sb, Encoding.UTF8); return;
-        }
         if (args.Length == 2 && args[0] == "--clicktest") {   // test : décision « clic ailleurs » (sans toucher à la souris)
             Application.EnableVisualStyles();
             ChatPanel.NoActivate = true;
@@ -211,16 +206,6 @@ static class Program {
             var done = new ManualResetEvent(false);
             Calendars.Refresh(() => done.Set()); done.WaitOne(60000);
             File.WriteAllText(args[1], Calendars.Json(), Encoding.UTF8); return;
-        }
-        if (args.Length == 2 && args[0] == "--spelldemo") {
-            Application.EnableVisualStyles();
-            var d = new Companion(false);
-            var t1 = new System.Windows.Forms.Timer { Interval = 2500 };
-            t1.Tick += (s, e) => { t1.Stop(); d.Spell.Demo(args[1]); };
-            var t2 = new System.Windows.Forms.Timer { Interval = 12000 };
-            t2.Tick += (s, e) => Application.Exit();
-            d.Shown += (s, e) => { t1.Start(); t2.Start(); };
-            Application.Run(d); return;
         }
         if (args.Length == 2 && args[0] == "--updtest") {   // test : dernière version sur GitHub + téléchargement (sans installer)
             var sb = new StringBuilder();
@@ -552,7 +537,6 @@ class Companion : Form {
         for (int i = 0; i < tang.Length; i++) tang[i] = SIT.ta + SIT.tc * i;
 
         Panel = new ChatPanel(this);
-        Spell = new SpellAssist(this);
         var notesT = new System.Windows.Forms.Timer { Interval = 1500 };                    // post-it : chargés juste après le démarrage
         notesT.Tick += (s, e) => {
             notesT.Stop(); notesT.Dispose();
@@ -562,8 +546,6 @@ class Companion : Form {
         };
         notesT.Start();
         remindTimer.Tick += (s, e) => CheckReminders(); remindTimer.Start();
-        spellItem = new ToolStripMenuItem("Correcteur d'orthographe") { Checked = Settings.Bool("SpellCheck", false) };
-        spellItem.Click += (s, e) => SetSpell(!spellItem.Checked);
 
         var m = new ContextMenuStrip { Renderer = new ToolStripProfessionalRenderer(new DarkColors()), ForeColor = Color.White, Font = new Font("Segoe UI", 10f), ShowImageMargin = false, Padding = new Padding(4) };
         showItem = new ToolStripMenuItem("Afficher le chat sur le bureau") { Checked = Settings.Bool("ShowCat", true) };
@@ -576,7 +558,6 @@ class Companion : Form {
         m.Items.Add(new ToolStripMenuItem("Nouveau post-it", null, (s, e) => Notes.New()));
         m.Items.Add(new ToolStripSeparator());
         m.Items.Add(showItem);
-        m.Items.Add(spellItem);
         m.Items.Add(new ToolStripMenuItem("Réglages…", null, (s, e) => ShowSettings()));
         m.Items.Add(new ToolStripMenuItem("Quitter", null, (s, e) => Quit()));
         ContextMenuStrip = m;
@@ -1425,10 +1406,9 @@ class Companion : Form {
     }
 
     // ---- App ----
-    public void Quit() { Settings.Set("X", Left); Spell.Enable(false); if (Panel.Flash) ChatPanel.Forget(SessionId); tray.Visible = false; Application.Exit(); }
+    public void Quit() { Settings.Set("X", Left); if (Panel.Flash) ChatPanel.Forget(SessionId); tray.Visible = false; Application.Exit(); }
     public void RefreshSettings() { if (settingsWin != null && !settingsWin.IsDisposed && settingsWin.Visible) settingsWin.Refresh2(); }
 
-    public SpellAssist Spell;
     // ---- rappels d examens et de rendez-vous ----
     ReminderCard remindCard; readonly System.Windows.Forms.Timer remindTimer = new System.Windows.Forms.Timer { Interval = 60000 };
     void CheckReminders() {
@@ -1446,12 +1426,6 @@ class Companion : Form {
         remindCard.ShowAt(new Point(Math.Max(wa.Left + 4, Math.Min(x, wa.Right - 324)), Math.Max(wa.Top + 4, y)));
         if (state != "ready") SetState("happy");                            // le chat saute pour attirer l attention (sans perdre « réponse prête »)
     }
-    ToolStripMenuItem spellItem;
-    void SetSpell(bool on) {
-        if (!IsHandleCreated) return;
-        Settings.Set("SpellCheck", on); spellItem.Checked = on; Spell.Enable(on);
-    }
-    protected override void OnShown(EventArgs e) { base.OnShown(e); if (Settings.Bool("SpellCheck", false)) Spell.Enable(true); }
 
     public IntPtr SettingsHwnd { get { return settingsWin != null && !settingsWin.IsDisposed && settingsWin.IsHandleCreated ? settingsWin.Handle : IntPtr.Zero; } }
     public void ShowSettings() { ShowSettings(null); }
@@ -1471,6 +1445,7 @@ class Companion : Form {
     public void OpenTerminal(bool resume) {
         string args = "", model = Settings.Str("Model", "");
         if (Regex.IsMatch(model, "^[a-z0-9.-]+$")) args += " --model " + model;
+        string eff = ChatPanel.EffortSetting(); if (eff.Length > 0 && model != "haiku") args += " --effort " + eff;
         if (resume && Regex.IsMatch(SessionId, "^[0-9a-fA-F-]{36}$")) args += " --resume " + SessionId;
         string title = ("Claude Code — " + Util.Short(Panel.WorkDir)).Replace("'", "''").Replace("\"", "");
         try {
@@ -1486,9 +1461,9 @@ class Companion : Form {
     }
     public string SettingsJson() {
         var d = new Dictionary<string, object> {
-            { "name", Settings.Name }, { "model", Settings.Str("Model", "") }, { "scale", scalePct }, { "activity", Settings.Int("Activity", 50) },
+            { "name", Settings.Name }, { "model", Settings.Str("Model", "") }, { "effort", Settings.Str("Effort", "medium") }, { "scale", scalePct }, { "activity", Settings.Int("Activity", 50) },
             { "showCat", Settings.Bool("ShowCat", true) }, { "topMost", TopMost }, { "autoStart", Settings.AutoStart },
-            { "prompt", Settings.Str("Prompt", "") }, { "hotkey1", Settings.Str("Hotkey1", HotkeyDefaults[0]) }, { "dailyBrief", Settings.Bool("DailyBrief", true) }, { "notifs", NotifPrefs() }, { "hotkeyOk", HotkeyOk }, { "stream", Settings.Bool("Stream", true) }, { "light", Settings.Bool("Light", false) }, { "autoModel", Settings.Bool("AutoModel", true) },{ "caveman", Settings.Bool("Caveman", true) }, { "chrome", Settings.Bool("Chrome", true) }, { "postits", Settings.Bool("PostIts", true) }, { "prepare", Settings.Bool("Prepare", true) }, { "spell", Settings.Bool("SpellCheck", false) }, { "autoAllow", Settings.Str("AutoAllow", "") }, { "remindExam", Settings.Bool("RemindExam", true) }, { "remindRdv", Settings.Bool("RemindRdv", true) }, { "remindWhen", Settings.Str("RemindWhen", "both") }, { "features", Features() }, { "manual", Manual.Raw() }, { "hidden", new List<string>(Manual.Hidden()) }, { "calendars", Calendars.Config() }, { "locFilter", Settings.Str("LocFilter", "") }, { "gmailUser", Mailbox.GmailUser }, { "gmailSet", Mailbox.GmailReady }, { "outlookOn", Mailbox.OutlookOn }, { "mailStatus", Mailbox.Status }, { "mailRunning", Mailbox.Running },{ "workDir", Panel.WorkDir }, { "hasSession", SessionId.Length > 0 },
+            { "prompt", Settings.Str("Prompt", "") }, { "hotkey1", Settings.Str("Hotkey1", HotkeyDefaults[0]) }, { "dailyBrief", Settings.Bool("DailyBrief", true) }, { "notifs", NotifPrefs() }, { "hotkeyOk", HotkeyOk }, { "stream", Settings.Bool("Stream", true) }, { "light", Settings.Bool("Light", false) }, { "autoModel", Settings.Bool("AutoModel", true) },{ "caveman", Settings.Bool("Caveman", true) }, { "chrome", Settings.Bool("Chrome", true) }, { "postits", Settings.Bool("PostIts", true) }, { "prepare", Settings.Bool("Prepare", true) }, { "autoAllow", Settings.Str("AutoAllow", "") }, { "remindExam", Settings.Bool("RemindExam", true) }, { "remindRdv", Settings.Bool("RemindRdv", true) }, { "remindWhen", Settings.Str("RemindWhen", "both") }, { "features", Features() }, { "manual", Manual.Raw() }, { "hidden", new List<string>(Manual.Hidden()) }, { "calendars", Calendars.Config() }, { "locFilter", Settings.Str("LocFilter", "") }, { "gmailUser", Mailbox.GmailUser }, { "gmailSet", Mailbox.GmailReady }, { "outlookOn", Mailbox.OutlookOn }, { "mailStatus", Mailbox.Status }, { "mailRunning", Mailbox.Running },{ "workDir", Panel.WorkDir }, { "hasSession", SessionId.Length > 0 },
             { "version", Program.Version }
         };
         return new JavaScriptSerializer().Serialize(d);
@@ -1505,6 +1480,9 @@ class Companion : Form {
                 case "model":
                     string md = Convert.ToString(kv.Value);
                     if (md == "" || Regex.IsMatch(md, "^[a-z0-9.-]+$")) Settings.Set("Model", md); break;
+                case "effort":
+                    string ef = Convert.ToString(kv.Value);
+                    if (ef == "" || Regex.IsMatch(ef, "^[a-z]+$")) Settings.Set("Effort", ef); break;
                 case "prompt":
                     string pr = Convert.ToString(kv.Value); if (pr.Length > 4000) pr = pr.Substring(0, 4000);
                     Settings.Set("Prompt", pr); break;
@@ -1535,7 +1513,6 @@ class Companion : Form {
                 case "chrome": Settings.Set("Chrome", Convert.ToBoolean(kv.Value)); break;
                 case "postits": Settings.Set("PostIts", Convert.ToBoolean(kv.Value)); Notes.Refresh(); Panel.Post("notes\n" + Notes.Json()); break;
                 case "prepare": Settings.Set("Prepare", Convert.ToBoolean(kv.Value)); break;
-                case "spell": SetSpell(Convert.ToBoolean(kv.Value)); break;
                 case "autoAllow": { var ok = new List<string>(); foreach (var a in Convert.ToString(kv.Value).Split(',')) if (Regex.IsMatch(a, "^[A-Za-z]+$")) ok.Add(a); Settings.Set("AutoAllow", string.Join(",", ok.ToArray())); } break;
                 case "remindExam": Settings.Set("RemindExam", Convert.ToBoolean(kv.Value)); break;
                 case "remindRdv": Settings.Set("RemindRdv", Convert.ToBoolean(kv.Value)); break;

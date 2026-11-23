@@ -53,7 +53,6 @@ Compile dans `%USERPROFILE%\ClaudeCompanion` et relance Bébène. Des modes de t
 | `ClaudeCompanion.exe --caltest out.json` | lecture des calendriers configurés |
 | `ClaudeCompanion.exe --mailtest dossier_eml out.txt` | extraction examens/RDV depuis des mails `.eml` |
 | `ClaudeCompanion.exe --manualtest cal.ics out.txt` | ajout/retrait manuel d'événements |
-| `ClaudeCompanion.exe --spelltest` / `--spelldemo "texte"` | correcteur d'orthographe |
 | `ClaudeCompanion.exe --setuptest out.txt` | état des étapes de l'assistant d'installation |
 | `ClaudeCompanion.exe --guardtest out.txt` | préparation du verrou de sécurité |
 | `ClaudeCompanion.exe --updtest out.txt` | dernière Release GitHub + téléchargement et décompression (sans installer) |
