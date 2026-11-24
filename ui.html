@@ -129,6 +129,24 @@ kbd { font: 11px "Segoe UI", sans-serif; background: var(--raised); border-radiu
 
 .approve { border: 1px solid #5a4038; background: rgba(217,119,87,.07); border-radius: 12px; padding: 10px 12px; font-size: 13px; animation: rise .25s ease; }
 .approve .ah { font-weight: 600; }
+.msg.bot > .approve { margin: 8px 0; }
+.approve:not(.done) { border-color: rgba(217,119,87,.38); background: linear-gradient(180deg, rgba(217,119,87,.11), rgba(217,119,87,.04)); box-shadow: 0 6px 20px rgba(0,0,0,.16); padding: 12px 14px; }
+.approve .pi { display: flex; gap: 10px; align-items: center; margin-top: 10px; }
+.approve .pk { flex: none; width: 30px; height: 30px; border-radius: 9px; display: grid; place-items: center; background: rgba(var(--ov),.07); font-size: 15px; }
+.approve .pt { min-width: 0; display: flex; flex-direction: column; gap: 1px; }
+.approve .pt span { color: var(--muted); font-size: 12px; overflow-wrap: anywhere; }
+.approve .pb { margin: 7px 0 0 40px; min-width: 0; }
+.approve .pc, .approve .pf { display: block; padding: 7px 10px; border-radius: 8px; background: rgba(var(--ov),.07); border: 1px solid rgba(var(--ov),.06);
+  font: 12px/1.45 Consolas, 'Cascadia Mono', monospace; white-space: pre-wrap; overflow-wrap: anywhere; max-height: 150px; overflow: auto; margin: 0; }
+.approve .pb .diff { margin-top: 6px; }
+.approve .ab { margin-top: 12px; flex-wrap: wrap; align-items: center; gap: 6px; }
+.approve:not(.done) .ab button { padding: 6px 11px; }
+.approve .ab .sp { flex: 1; }
+.approve .ab .no { background: transparent; color: var(--muted); }
+.approve .ab .no:hover { color: var(--text); border-color: rgba(var(--ov),.2); }
+.approve.done { display: flex; gap: 8px; align-items: baseline; padding: 6px 11px; font-size: 12.5px; background: rgba(var(--ov),.03); border-color: rgba(var(--ov),.08); animation: none; }
+.approve.done .dl { flex: none; font-weight: 600; }
+.approve.done .dw { color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
 .approve ul { margin: 8px 0 10px; padding-left: 1.1em; color: var(--muted); }
 .approve li { margin: 3px 0; overflow-wrap: anywhere; }
 .approve .ab { display: flex; justify-content: flex-end; gap: 8px; }
@@ -203,11 +221,18 @@ pre { background: rgba(var(--sunk),calc(.35 * var(--sk))); border-color: rgba(va
 .lc { display: inline-block; width: 7px; height: 7px; margin-left: 4px; border-radius: 50%; background: #d97757; vertical-align: middle; animation: lcp 1s ease-in-out infinite; }
 @keyframes lcp { 50% { opacity: .25; transform: scale(.7); } }
 /* progression estimée de la réponse : barre fine juste sous la bulle, étape + % */
-.msg.bot.pgo { position: relative; margin-bottom: 20px; }
-.pgb { position: absolute; left: 4px; top: calc(100% + 5px); width: max(calc(100% - 8px), 230px); display: flex; align-items: center; gap: 8px; pointer-events: none; }
-.pgb .pgt { flex: 1; height: 4px; border-radius: 99px; background: rgba(var(--ov),.08); overflow: hidden; }
-.pgb .pgf { height: 100%; width: 0; border-radius: 99px; background: linear-gradient(90deg, var(--accent), var(--accent-2)); transition: width .3s ease; position: relative; overflow: hidden; }
-.pgb .pgf::after { content: ""; position: absolute; inset: 0; background: linear-gradient(90deg, transparent, rgba(255,255,255,.35), transparent); animation: pgs 1.6s linear infinite; }
+.msg.bot.pgo { position: relative; margin-bottom: 42px; transition: margin-bottom .35s ease; }
+.pgb { position: absolute; left: 2px; top: calc(100% + 8px); width: max(calc(100% - 4px), 240px); display: grid; grid-template-columns: auto 1fr auto; align-items: center; column-gap: 7px; row-gap: 5px; pointer-events: none; animation: pgin .35s ease both; transition: opacity .4s ease, transform .4s ease; }
+.pgb.pgx { opacity: 0; transform: translateY(-3px); }
+.pgb .pgd { width: 6px; height: 6px; border-radius: 50%; background: var(--accent); box-shadow: 0 0 0 0 color-mix(in srgb, var(--accent) 60%, transparent); animation: pgp 1.6s ease-out infinite; }
+.pgb .pgl { font-size: 10.5px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; letter-spacing: .01em; }
+.pgb .pgn { font-size: 10.5px; font-weight: 600; color: var(--accent); font-variant-numeric: tabular-nums; }
+.pgb .pgt { grid-column: 1 / -1; height: 6px; border-radius: 99px; background: rgba(var(--ov),.07); box-shadow: inset 0 1px 2px rgba(0,0,0,.12); overflow: hidden; }
+.pgb .pgf { height: 100%; width: 0; border-radius: 99px; background: linear-gradient(90deg, var(--accent), var(--accent-2)); box-shadow: 0 0 8px color-mix(in srgb, var(--accent) 50%, transparent); transition: width .5s cubic-bezier(.22,1,.36,1); position: relative; overflow: hidden; }
+.pgb .pgf::after { content: ""; position: absolute; inset: 0; background: linear-gradient(90deg, transparent, rgba(255,255,255,.4), transparent); animation: pgs 2s ease-in-out infinite; }
+@keyframes pgin { from { opacity: 0; transform: translateY(-3px); } to { opacity: 1; transform: none; } }
+@keyframes pgp { 0% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--accent) 60%, transparent); } 100% { box-shadow: 0 0 0 6px transparent; } }
+@media (prefers-reduced-motion: reduce) { .pgb, .pgb .pgd, .pgb .pgf::after { animation: none; } }
 @keyframes pgs { from { transform: translateX(-100%); } to { transform: translateX(100%); } }
 .pgb .pgl { font-size: 10.5px; color: var(--muted); white-space: nowrap; font-variant-numeric: tabular-nums; }
 
@@ -389,6 +414,10 @@ html.light .updot { border-color: #fff; }
 /* note de compactage dans la conversation */
 .note { align-self: center; font-size: 11.5px; color: var(--muted); background: rgba(var(--ov),.04); border: 1px solid rgba(var(--ov),.07); border-radius: 999px; padding: 4px 13px; text-align: center; max-width: 92%; }
 .note.run { color: var(--accent-2); }
+.note.resume { display: flex; align-items: center; gap: 9px; padding: 4px 6px 4px 5px; animation: rise .25s ease; }
+.note.resume .rsm { font: inherit; font-size: 12px; font-weight: 600; padding: 3px 12px; border-radius: 999px; border: none; cursor: pointer; color: #fff;
+  background: linear-gradient(135deg, var(--accent-2), var(--accent)); box-shadow: 0 2px 8px rgba(217,119,87,.3); }
+.note.resume .rsm:hover { filter: brightness(1.08); }
 .note .hv { font: inherit; font-size: 11.5px; margin-left: 6px; padding: 2px 9px; border-radius: 999px; border: 1px solid var(--accent); background: none; color: var(--accent); cursor: pointer; }
 /* Buy Me a Coffee : tasse dorée au survol, la vapeur monte */
 .icon-btn.coffee:hover { color: #f2c66d; background: rgba(242,198,109,.14); }
@@ -905,26 +934,82 @@ function diffHtml(name, i, label) {
   return '<details class="diff"><summary>' + (label ? '<i></i><span>' + esc(label) + '</span><em>voir</em>' : 'Voir les changements') + '</summary><pre>' + rows.slice(0, 200).join('') + more + '</pre></details>';
 }
 
-function askApproval(list) {
+// ---- carte d'accord : une icône par type d'action, la commande lisible, l'aperçu des changements d'un fichier ----
+const AA_GROUPS = [['Bash', 'PowerShell'], ['WebSearch', 'WebFetch'], ['Read', 'Edit', 'Write', 'Glob', 'Grep'], ['mcp__claude-in-chrome']];
+const AA_LABEL = { Bash: 'les commandes', PowerShell: 'les commandes', WebSearch: 'le web', WebFetch: 'le web', Read: 'les fichiers', Edit: 'les fichiers', Write: 'les fichiers', Glob: 'les fichiers', Grep: 'les fichiers', 'mcp__claude-in-chrome': 'Chrome' };
+const aaGroup = n => (AA_GROUPS.find(g => g.includes(n)) || [n]);
+function permIcon(n) {
+  if (/^mcp__claude-in-chrome__/.test(n)) return '🧭';
+  return { Bash: '⌨️', PowerShell: '⌨️', WebFetch: '🌐', WebSearch: '🔎', Edit: '✏️', MultiEdit: '✏️', Write: '📝', NotebookEdit: '✏️', Read: '📄', Glob: '🗂️', Grep: '🔎', Task: '🧩' }[n] || '🔧';
+}
+function permItem(d) {
+  const n = d.tool_name || '', i = d.tool_input || {};
+  const chrome = /^mcp__claude-in-chrome__/.test(n), act = chrome ? n.replace(/^mcp__claude-in-chrome__/, '').replace(/_mcp$/, '').replace(/_/g, ' ') : '';
+  const desc = String(d.description || i.description || (chrome ? act : '')).slice(0, 160);
+  let body = '', what = '';
+  if (n === 'Bash' || n === 'PowerShell') { what = String(i.command || ''); body = '<pre class="pc">' + esc(what.slice(0, 2000)) + '</pre>'; }
+  else if (/^(Edit|MultiEdit|Write|NotebookEdit)$/.test(n)) {
+    what = String(i.file_path || i.notebook_path || '');
+    body = '<code class="pf">' + esc(what) + '</code>' + (diffHtml(n, i, '') || '').replace('<details class="diff">', '<details class="diff pdv">');
+  }
+  else if (n === 'WebFetch') { what = String(i.url || ''); body = '<code class="pf">' + esc(what) + '</code>'; }
+  else if (n === 'WebSearch') { what = String(i.query || ''); body = '<code class="pf">' + esc(what) + '</code>'; }
+  else {
+    what = String(i.url || i.file_path || i.path || i.text || i.query || i.command || '');
+    if (what) body = '<code class="pf">' + esc(what.slice(0, 300)) + '</code>';
+  }
+  return { html: '<div class="pi"><span class="pk">' + permIcon(n) + '</span><div class="pt"><b>' + esc(toolName(n)) + '</b>' + (desc ? '<span>' + esc(desc) + '</span>' : '') + '</div></div>' + (body ? '<div class="pb">' + body + '</div>' : ''),
+           sum: toolName(n) + (what ? ' · ' + what.replace(/\s+/g, ' ').slice(0, 80) : '') };
+}
+function permDone(card, label, sum) {
+  card.className = 'approve done';
+  card.innerHTML = '<span class="dl">' + label + '</span>' + (sum ? '<span class="dw">' + esc(sum) + '</span>' : '');
+}
+function askApproval(list, req) {
   const names = [...new Set(list.map(d => grantName(d.tool_name)))].filter(n => /^[A-Za-z][A-Za-z0-9_-]*$/.test(n));
-  const items = list.map(d => {
-    const i = d.tool_input || {};
-    const what = String(i.command || i.file_path || i.url || i.path || '').slice(0, 300);
-    return '<li><b>' + esc(toolName(d.tool_name)) + '</b>' + (what ? ' <code>' + esc(what) + '</code>' : '') + '</li>';
-  }).join('');
-  const card = el('approve', '<div class="ah">🔐 Claude a besoin de ton accord</div><ul>' + items + '</ul>'
-    + '<div class="ab"><button class="no">Refuser</button><button class="all" title="Plus aucune demande d\'accord dans cette conversation">Tout autoriser ici</button><button class="yes">Autoriser</button></div>');
+  const its = list.map(permItem), sum = its.map(x => x.sum).join(' · ');
+  const always = [...new Set(names.flatMap(aaGroup))], alwaysLbl = [...new Set(names.map(n => AA_LABEL[n] || toolName(n)))].join(', ');
+  const html = '<div class="ah">🔐 Claude a besoin de ton accord</div>' + its.map(x => x.html).join('')
+    + '<div class="ab"><button class="no">Refuser</button><span class="sp"></span>'
+    + '<button class="alw" title="Ne plus jamais demander pour ' + esc(alwaysLbl) + ' (Réglages › Alertes pour changer)">Toujours</button>'
+    + '<button class="all" title="Plus aucune demande d\'accord dans cette conversation">Tout autoriser</button><button class="yes">Autoriser</button></div>';
+  const LBL = { all: '🔓 Tout autorisé ici', yes: '✅ Autorisé', always: '✅ Toujours autorisé (' + alwaysLbl + ')' };
+  if (req) {                                                          // demande PENDANT le tour : Claude attend la réponse, sans relance ni nouveau message
+    const card = addToCur('approve', html), key = rkey, g = granted;
+    card.dataset.req = req;
+    card._ans = (how, msg) => {
+      if (!card.dataset.req) return;
+      delete card.dataset.req; card._ans = null;
+      permDone(card, LBL[how] || '⛔ Refusé', how === 'no' && msg ? '« ' + msg + ' »' : sum);
+      const f = () => {
+        if (how === 'all') { autoAll = true; if (conv) conv.autoAll = true; }
+        else if (how === 'yes' || how === 'always') { names.forEach(n => g.add(n)); if (conv) conv.granted = [...g]; }
+        save();
+      };
+      key === rkey ? f() : withRun(key, f);
+      post('permreply\n' + key + '\n' + req + '\n' + how + '\n' + (how === 'always' ? always.join(',') : msg || ''));
+    };
+    card.querySelector('.all').onclick = () => card._ans('all');
+    card.querySelector('.yes').onclick = () => card._ans('yes');
+    card.querySelector('.alw').onclick = () => card._ans('always');
+    card.querySelector('.no').onclick = () => card._ans('no');
+    return card;
+  }
+  const card = el('approve', html);                                   // refus constaté en fin de tour (version Mac, ancien Claude Code) : on relance
   card.querySelector('.all').onclick = () => {
-    card.innerHTML = '<div class="ah">🔓 Tout est autorisé dans cette conversation</div>';
+    permDone(card, LBL.all, sum);
     autoAll = true; if (conv) conv.autoAll = true;
     submit("Je t'autorise. Continue ce que tu faisais (tu as mon accord pour toutes les actions jusqu'à la fin de cette conversation).", '', true);
   };
-  card.querySelector('.yes').onclick = () => {
-    card.innerHTML = '<div class="ah">✅ Autorisé</div>';
+  const yes = how => {
+    permDone(card, LBL[how], sum);
+    if (how === 'always') post('alwaysallow\n' + always.join(','));
     names.forEach(n => granted.add(n)); if (conv) conv.granted = [...granted];   // valable pour toute la conversation
     submit("Je t'autorise. Continue ce que tu faisais (tu as mon accord pour ces actions jusqu'à la fin de cette conversation).", '', true);
   };
-  card.querySelector('.no').onclick = () => { card.innerHTML = '<div class="ah">⛔ Refusé</div>'; save(); };
+  card.querySelector('.yes').onclick = () => yes('yes');
+  card.querySelector('.alw').onclick = () => yes('always');
+  card.querySelector('.no').onclick = () => { permDone(card, '⛔ Refusé', sum); save(); };
   scroll();
 }
 
@@ -988,7 +1073,7 @@ const PGS = new Set();
 function pgStart(m) {
   if (!m) return;
   const b = document.createElement('div'); b.className = 'pgb';
-  b.innerHTML = '<div class="pgt"><div class="pgf"></div></div><span class="pgl"></span>';
+  b.innerHTML = '<span class="pgd"></span><span class="pgl"></span><span class="pgn"></span><div class="pgt"><div class="pgf"></div></div>';
   m.classList.add('pgo'); m.appendChild(b);
   m._pg = { t0: Date.now(), acts: 0, txt: 0, todo: null, phase: 'Réflexion', shown: 0, bar: b }; PGS.add(m); pgDraw(m);
 }
@@ -1014,11 +1099,18 @@ function pgDraw(m) {
   const pc = Math.round(p.shown * 100), dn = p.todo ? p.todo.filter(x => x.status === 'completed').length : 0;
   const lab = p.phase === 'Rédaction' ? 'Rédaction' : p.todo && p.todo.length ? 'Étape ' + Math.min(p.todo.length, dn + 1) + '/' + p.todo.length : p.phase;
   p.bar.querySelector('.pgf').style.width = pc + '%';
-  p.bar.querySelector('.pgl').textContent = lab + ' · ≈ ' + pc + ' %';
+  const s = Math.floor((Date.now() - p.t0) / 1000), ago = s < 60 ? s + ' s' : Math.floor(s / 60) + ' min ' + String(s % 60).padStart(2, '0');
+  p.bar.querySelector('.pgl').textContent = lab + ' · ' + ago;         // temps écoulé : plus concret que le pourcentage estimé
+  p.bar.querySelector('.pgn').textContent = pc + ' %';
 }
 function pgEnd(m) {
   if (!m || !m._pg) return;
-  PGS.delete(m); m._pg.bar.remove(); m.classList.remove('pgo'); delete m._pg;
+  const b = m._pg.bar;
+  PGS.delete(m); delete m._pg;
+  // fin : la barre se remplit, puis s'efface en douceur
+  b.querySelector('.pgf').style.width = '100%'; b.querySelector('.pgn').textContent = '100 %';
+  setTimeout(() => b.classList.add('pgx'), 350);
+  setTimeout(() => { b.remove(); if (!m._pg) m.classList.remove('pgo'); }, 750);
 }
 setInterval(() => PGS.forEach(m => { if (m.isConnected) pgDraw(m); }), 250);
 // ---- besoin de toi : Bébène a besoin de ta souris / ton clavier, ou de voir une fenêtre qu'il ne peut pas capturer ----
@@ -1097,6 +1189,32 @@ function attachProject(n) {
   if (conv) conv.project = n;
   if (cur) addToCur('tool keep', '<i></i><span>📁 Conversation rattachée au projet · ' + esc(n) + '</span>');
   applyMode();
+}
+// Claude annonce un projet : on DEMANDE avant de ranger la conversation (sinon plus rien ne resterait « sans projet »).
+// Une seule carte par projet et par conversation (réponse gardée dans l'historique).
+function offerProject(n) {
+  if (flash || !n || project === n || log.querySelector('.projask[data-p="' + CSS.escape(n) + '"]')) return;
+  const exists = projects.includes(n);
+  const html = '<div class="ah">📁 Ranger cette conversation dans le projet « ' + esc(n) + ' » ?</div>'
+    + '<div class="pi"><span class="pk">📁</span><div class="pt"><b>' + esc(n) + '</b><span>' + (exists ? 'Projet existant : la conversation y sera rangée et archivée.' : 'Nouveau projet : il sera créé, avec la conversation dedans.') + '</span></div></div>'
+    + '<div class="ab"><button class="no">Non, sans projet</button><span class="sp"></span><button class="yes">Oui, ranger</button></div>';
+  const card = cur ? addToCur('approve projask', html) : el('approve projask', html), key = rkey;
+  card.dataset.p = n;
+  const go = yes => {
+    permDone(card, yes ? '📁 Rangée dans le projet' : '💬 Gardée sans projet', yes ? n : '');
+    card.classList.add('projask'); card.dataset.p = n;                  // permDone remplace la classe : la réponse reste reconnaissable
+    const f = () => {
+      if (yes) {
+        if (key === rkey && !inBg) attachProject(n);
+        else { project = n; if (conv) conv.project = n; if (!projects.includes(n)) { projects.push(n); projects.sort(); post('ensureproject\n' + n); } }
+      }
+      save();
+    };
+    key === rkey ? f() : withRun(key, f);
+  };
+  card.querySelector('.yes').onclick = () => go(true);
+  card.querySelector('.no').onclick = () => go(false);
+  scroll();
 }
 // déplacer une conversation de l'historique vers un projet (ou « aucun projet »)
 function moveConv(id, p) {
@@ -1213,6 +1331,10 @@ function submit(text, allowed, silent, noDraft) {
     queued.set(rkey, { text, note: el('note run', '⏳ Message gardé : il part dès que le résumé est fini.') });
     input.value = ''; store.set('draftText', ''); autosize(); scroll(); return;
   }
+  if (busy && !silent && text) {                                      // Claude attend un accord : écrire = refuser en lui expliquant pourquoi
+    const pc = log.querySelector('.approve[data-req]');
+    if (pc && pc._ans) { pc._ans('no', text); input.value = ''; store.set('draftText', ''); autosize(); scroll(); return; }
+  }
   if (busy || compacting || !text) return;
   if (!silent && !noDraft && DRAFT.items.length) text += draftContext(takeDraft());   // question tapée sur ce que le raccourci a capturé (texte, dossiers…)
   if (!silent) {
@@ -1221,6 +1343,7 @@ function submit(text, allowed, silent, noDraft) {
     turn = { req: text, files: [], todos: null, acts: 0 };
   } else if (!turn) turn = { req: text, files: [], todos: null, acts: 0 };
   log.querySelectorAll('.ask .ab').forEach(b => { b.outerHTML = '<div class="done">→ Répondu par message</div>'; });   // question ou plan sans clic : un nouveau message la ferme
+  log.querySelectorAll('.note.resume').forEach(n => n.remove());       // nouveau tour : l'ancien « Reprendre » n'a plus lieu d'être
   if (!silent) { input.value = ''; store.set('draftText', ''); autosize(); el('msg user', esc(text)); decorate(); }
   cur = el('msg bot', '<div class="typing"><span></span><span></span><span></span></div>');
   busy = true; gotResult = false; denials = []; pendingAsk = null; pendingReady = null; pendingHand = null; pgStart(cur); refresh(); scroll();
@@ -1316,7 +1439,7 @@ function onLine(l) {
       if (c.type === 'text' && !c.text.trim() && !o.parent_tool_use_id) liveEnd();
       if (c.type === 'text' && c.text.trim()) {
         if (!o.parent_tool_use_id) hideSearch();
-        const pn = projectIn(c.text); if (pn) attachProject(pn);
+        const pn = projectIn(c.text); if (pn) offerProject(pn);             // jamais rattachée toute seule : l'utilisateur confirme
         const q = takeQuestion(c.text);
         if (live && !o.parent_tool_use_id) liveEnd(q.text);                // l'aperçu en direct devient le message définitif
         else if (q.text.trim()) addToCur('md', md(q.text)).dataset.raw = q.text;
@@ -1368,7 +1491,7 @@ function tidyTurn(m) {
 function tidyAll() {
   log.querySelectorAll('.msg.bot').forEach(m => { if (m !== cur) tidyTurn(m); });
   log.querySelectorAll('.pgo').forEach(m => { if (m !== cur) { m.classList.remove('pgo'); m.querySelectorAll(':scope > .pgb').forEach(x => x.remove()); } });   // barre de progression enregistrée en cours de route
-  log.querySelectorAll('.note.heavy').forEach(n => n.remove());       // alerte « conversation lourde » : son bouton ne survit pas au rechargement
+  log.querySelectorAll('.note.heavy, .note.resume').forEach(n => n.remove());   // alerte « conversation lourde », « Reprendre » : son bouton ne survit pas au rechargement
 }
 function finish(code, err) {
   if (live) liveEnd(liveCut(liveText));                               // arrêté en pleine écriture : on garde ce qui est arrivé
@@ -1382,15 +1505,23 @@ function finish(code, err) {
       addToCur('err', esc(err.trim() || (code === '1' ? 'Arrêté.' : 'Erreur (code ' + code + ').')));
     if (!cur.children.length) cur.remove();
   }
+  log.querySelectorAll('.approve[data-req]').forEach(c => {             // tour fini (arrêté…) : demande d'accord restée sans réponse
+    delete c.dataset.req; c._ans = null; permDone(c, '⌛ Demande expirée', '');
+  });
   cur = null; busy = false; refresh();
   let kind = 'done';
   if (quotaStop) { showPause(quotaStop, lastTxt); kind = 'pause'; quotaStop = null; denials = []; }
-  else if (denials.length) { askApproval(denials); kind = 'perm'; }
+  else if (denials.length && !(turn && turn.perm)) { askApproval(denials); kind = 'perm'; }   // refus sans carte en cours de tour (ancien Claude Code)
   else if (pendingHand && code === '0') { showHand(pendingHand); kind = 'hand'; }
   else if (pendingAsk && code === '0') { showAsk(pendingAsk); kind = 'ask'; }
   else if (pendingReady && code === '0') showReady(pendingReady);
   pendingAsk = null; pendingReady = null; pendingHand = null;
   denials = []; decorate(); scroll(); save(); askTitle(code); maybeCompact(code);
+  if (code !== '0' && kind === 'done' && sid && !compacting) {          // arrêt ou erreur : repartir dans la même session, sans rien retaper
+    const n = el('note resume', '<button class="rsm">↻ Reprendre</button><span>' + (code === '1' ? 'Arrêté' : 'Interrompu') + ' : il repart là où il s\'est arrêté.</span>');
+    n.querySelector('button').onclick = () => { n.remove(); submit("Reprends ce que tu faisais, là où tu t'es arrêté.", '', true); };
+    scroll();
+  }
   if (code === '0' && !compacting && !flash && lastCtx > HEAVY_CTX) heavyNote();
   if (conv && inBg) { conv.attn = kind; persist(); }                  // pastille dans l'historique jusqu'à ce qu'on la rouvre (après save : la conversation existe)
   if (code !== '-1') post('notify\n' + kind + '\n' + (inBg ? 0 : 1) + '\n' + rkey + '\n' + (flash ? 'Flash' : conv && conv.title ? conv.title : 'Nouvelle conversation'));
@@ -2136,6 +2267,19 @@ window.chrome.webview.addEventListener('message', e => {
   // messages d'une tâche : rline / rdone / compacted portent la clé de leur conversation (affichée ou en fond)
   const kv = s => { const j = s.indexOf('\n'); return j < 0 ? [s, ''] : [s.slice(0, j), s.slice(j + 1)]; };
   if (k === 'rline') { const [key, l] = kv(v); withRun(key, () => onLine(l)); }
+  else if (k === 'perm') {                                            // perm\n<clé>\n<id>\n<json> : Claude attend un accord, en plein tour
+    const [key, r] = kv(v), [id, j] = kv(r); let d; try { d = JSON.parse(j); } catch { return; }
+    withRun(key, () => {
+      if (!cur) { post('permreply\n' + key + '\n' + id + '\nno\n'); return; }
+      askApproval([d], id); if (turn) turn.perm = true; scroll();
+      if (conv && inBg) { conv.attn = 'perm'; persist(); }
+      post('notify\nperm\n' + (inBg ? 0 : 1) + '\n' + rkey + '\n' + (flash ? 'Flash' : conv && conv.title ? conv.title : 'Nouvelle conversation'));
+    });
+  }
+  else if (k === 'permdone') {                                        // permdone\n<clé>\n<id> : couverte par un autre accord
+    const [key, id] = kv(v);
+    withRun(key, () => { const c = log.querySelector('.approve[data-req="' + CSS.escape(id) + '"]'); if (c) { delete c.dataset.req; c._ans = null; permDone(c, '✅ Autorisé', ''); } });
+  }
   else if (k === 'rdone') { const [key, r] = kv(v), [code, err] = kv(r); withRun(key, () => finish(code, err)); }
   else if (k === 'compacted') { const [key, r] = kv(v), p = r.split('\n'); withRun(key, () => compacted(p[0] === '1', +p[1], +p[2])); }
   else if (k === 'openconv') {                                       // clic sur une notification Windows
@@ -2152,6 +2296,16 @@ window.chrome.webview.addEventListener('message', e => {
   else if (k === 'saveerr') toast('Impossible d\'enregistrer le fichier : ' + esc(v), null, true);
   else if (k === 'name') { $('#name').textContent = v; document.title = v; applyMode(); }
   else if (k === 'theme') { document.documentElement.classList.toggle('light', v === 'light'); store.set('theme', v); }
+  else if (k === 'projdeleted') {                                    // projet supprimé (réglages) : ses conversations sont déjà dans la corbeille
+    const n = v, gone = new Set(convs.filter(c => c.project === n).map(c => c.id));
+    gone.forEach(id => { post('drop\n' + id); delete VIEWS[id]; sent.delete(id); });
+    convs = convs.filter(c => !gone.has(c.id));
+    if (project === n || (conv && gone.has(conv.id))) {
+      post('drop\n' + rkey); conv = null; busy = false; compacting = false;
+      newChat({ project: '' }); Object.keys(VIEWS).forEach(id => { if (gone.has(id)) delete VIEWS[id]; });
+    }
+    projects = projects.filter(p => p !== n); persist(); renderMenu();
+  }
   else if (k === 'projects') { try { const o = JSON.parse(v); projects = Array.isArray(o) ? o : o.all || []; ARCH = new Set(o.arch || []); } catch { projects = []; } renderMenu(); }
   else if (k === 'project') { newChat({ project: v }); }
   else if (k === 'upd') { try { UPD = JSON.parse(v); } catch { UPD = null; } renderUpd(); }

@@ -35,7 +35,7 @@ But : une app `Bebene.app` téléchargeable dans chaque Release GitHub, à côt�
 
 | Fonction | Sur Mac |
 |---|---|
-| Correcteur d'orthographe global | **Retiré** en v1 (macOS a déjà son correcteur intégré dans presque toutes les applis). Section masquée. |
+| Correcteur d'orthographe global | Retiré de Bébène (Windows et Mac) depuis la v1.58. |
 | Lecture des mails Outlook (COM) | **Retirée**. Gmail (IMAP) reste. Section Outlook masquée. |
 | Calendrier Outlook | Remplacé par les liens ICS (déjà gérés) ; Calendrier Apple plus tard via EventKit. |
 | Piloter Excel/Word par COM | Remplacé par AppleScript (Office pour Mac le supporte). Moins complet. |

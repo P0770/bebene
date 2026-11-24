@@ -19,10 +19,10 @@ using Microsoft.Web.WebView2.WinForms;
 
 [assembly: System.Reflection.AssemblyTitle("Bébène")]
 [assembly: System.Reflection.AssemblyProduct("Bébène")]
-[assembly: System.Reflection.AssemblyVersion("1.58.0.0")]
+[assembly: System.Reflection.AssemblyVersion("1.59.0.0")]
 
 static class Program {
-    public const string Version = "1.58";
+    public const string Version = "1.59";
     public static bool OpenSetup;
     public static readonly uint Pid = (uint)Process.GetCurrentProcess().Id;   // identifiant de Bébène (lu une seule fois)   // --setup : ouvrir directement l'assistant d'installation
 
@@ -59,13 +59,16 @@ static class Program {
 #pragma warning disable 618
                 try { ui.Suspend(); try { stack = new StackTrace(ui, false).ToString(); } finally { ui.Resume(); } } catch (Exception ex) { stack += " " + ex.Message; }
 #pragma warning restore 618
+                // interface au repos (attend un message) : pas un blocage (veille moderne, écran éteint, fenêtre recréée…)
+                if (stack.TrimStart().StartsWith("à System.Windows.Forms.UnsafeNativeMethods.GetMessageW") || stack.TrimStart().StartsWith("at System.Windows.Forms.UnsafeNativeMethods.GetMessageW")) continue;
                 Log("BLOCAGE de l'interface depuis " + late.ToString("0") + " s — pile du thread principal :", stack);
             }
         }) { IsBackground = true, Name = "watchdog" }.Start();
     }
     [STAThread]
     static void Main(string[] args) {
-        Util.DpiAware();                                   // avant toute fenêtre : sinon Windows étire Bébène (flou à 125 %, 150 %…)
+        if (args.Length == 1 && args[0] == "--garde") { Environment.Exit(ChatPanel.Guard()); return; }   // hook PreToolUse (avant tout le reste : appelé à chaque action de Claude)
+        Util.DpiAware();                                  // avant toute fenêtre : sinon Windows étire Bébène (flou à 125 %, 150 %…)
         if (args.Length == 2 && args[0] == "--clicktest") {   // test : décision « clic ailleurs » (sans toucher à la souris)
             Application.EnableVisualStyles();
             ChatPanel.NoActivate = true;
@@ -231,6 +234,26 @@ static class Program {
             };
             tm.Start(); Application.Run(); return;
         }
+        if (args.Length == 2 && args[0] == "--permtest") {  // accord en cours de tour : 1 demande, « Autoriser », 2e commande sans demande, 2e message sans relance
+            var rc = new Companion(false); var hnd = rc.Handle; var log = new StringBuilder(); int dones = 0, perms = 0; var t0 = DateTime.Now;
+            ChatPanel.PostHook = s => {
+                var p = s.Split(new[] { '\n' }, 4);
+                if (s.StartsWith("perm\n")) { lock (log) { perms++; log.AppendLine("perm " + p[1] + " " + (p.Length > 3 ? p[3] : "")); } rc.BeginInvoke((Action)(() => rc.Panel.TestPerm(p[1], p[2], "yes"))); }
+                else if (s.StartsWith("rdone\n")) lock (log) { dones++; log.AppendLine("rdone " + p[2] + " · pid " + rc.Panel.RunnerPid("P")); }
+                else if (s.StartsWith("rline\n") && (s.Contains("\"type\":\"result\"") || s.Contains("\"tool_use\""))) lock (log) log.AppendLine("   " + Regex.Match(s, "\"(result|command|url)\":\"([^\"]*)\"").Value + " " + Regex.Match(s, "\"permission_denials\":\\[[^\\]]*\\]").Value);
+            };
+            var tm = new System.Windows.Forms.Timer { Interval = 300 }; int step = 0;
+            tm.Tick += (s, e) => {
+                if (step == 0) { rc.Panel.TestSend("P", "Avec l'outil WebFetch, lis https://example.com, puis avec WebFetch lis https://example.org, l'un après l'autre. Réponds juste : fait."); step = 1; }
+                else if (step == 1 && dones >= 1) { rc.Panel.TestSend("P", "Avec l'outil WebFetch, lis https://example.net. Réponds juste : fait."); step = 2; }
+                else if (step == 2 && dones >= 2 || (DateTime.Now - t0).TotalSeconds > 240) { tm.Stop(); log.AppendLine("perms=" + perms); File.WriteAllText(args[1], log.ToString()); rc.Panel.KillAll(); Application.Exit(); }
+            };
+            tm.Start(); Application.Run(); return;
+        }
+        if (args.Length == 3 && args[0] == "--projdeltest") {   // test : suppression d un projet (dossier + conversations → corbeille)
+            string n = ChatPanel.DeleteProject(args[1]), d = Path.Combine(Setup.Hub, "projets", args[1]);
+            File.WriteAllText(args[2], "supprime=" + n + " dossier=" + Directory.Exists(d) + " convs=" + Directory.GetFiles(Environment.GetEnvironmentVariable("BEBENE_CONVS") ?? ".", "*.json").Length + " bebene=" + (ChatPanel.DeleteProject("claude-companion").Length == 0), new UTF8Encoding(false)); return;
+        }
         if (args.Length == 2 && args[0] == "--thinktest") { new Companion(false).ThinkPreview(args[1]); return; }
         if (args.Length == 2 && args[0] == "--progtest") { var pc = new Companion(false); pc.Progress(3, 5); pc.ReadyPreview(args[1], "thinking"); return; }
         if (args.Length == 2 && args[0] == "--screentest") { File.WriteAllText(args[1], ChatPanel.ScreenCommand(0) + "\n" + ChatPanel.ScreenDir(), new UTF8Encoding(false)); return; }   // test : commande de capture d écran
@@ -255,6 +278,8 @@ static class Program {
             Application.ThreadException += (s, e) => Log("Exception (interface)", e.Exception.ToString());
             AppDomain.CurrentDomain.UnhandledException += (s, e) => Log("Exception fatale", Convert.ToString(e.ExceptionObject));
             Log("Démarrage", "v" + Version);
+            // correcteur d orthographe retiré (1.58) : on efface son ancien réglage
+            try { using (var k = Microsoft.Win32.Registry.CurrentUser.OpenSubKey(@"Software\ClaudeCompanion", true)) if (k != null) k.DeleteValue("SpellCheck", false); } catch { }
             OpenSetup = Array.IndexOf(args, "--setup") >= 0;
             Updater.Init();     // version qui vient d être installée ? (pastille verte)
             Util.FreshPath();   // programmes installés après l ouverture de session (RTK, Node…) : visibles par Bébène et par Claude
@@ -1513,7 +1538,7 @@ class Companion : Form {
                 case "chrome": Settings.Set("Chrome", Convert.ToBoolean(kv.Value)); break;
                 case "postits": Settings.Set("PostIts", Convert.ToBoolean(kv.Value)); Notes.Refresh(); Panel.Post("notes\n" + Notes.Json()); break;
                 case "prepare": Settings.Set("Prepare", Convert.ToBoolean(kv.Value)); break;
-                case "autoAllow": { var ok = new List<string>(); foreach (var a in Convert.ToString(kv.Value).Split(',')) if (Regex.IsMatch(a, "^[A-Za-z]+$")) ok.Add(a); Settings.Set("AutoAllow", string.Join(",", ok.ToArray())); } break;
+                case "autoAllow": { var ok = new List<string>(); foreach (var a in Convert.ToString(kv.Value).Split(',')) if (Regex.IsMatch(a, "^[A-Za-z][A-Za-z0-9_-]*$")) ok.Add(a); Settings.Set("AutoAllow", string.Join(",", ok.ToArray())); } break;
                 case "remindExam": Settings.Set("RemindExam", Convert.ToBoolean(kv.Value)); break;
                 case "remindRdv": Settings.Set("RemindRdv", Convert.ToBoolean(kv.Value)); break;
                 case "remindWhen": { string w = Convert.ToString(kv.Value); if (w == "both" || w == "veille" || w == "heure") Settings.Set("RemindWhen", w); } break;

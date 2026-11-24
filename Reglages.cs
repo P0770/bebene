@@ -125,6 +125,12 @@ class SettingsWindow : Form {
             case "tplanalyze": if (Templates.Valid(v)) Templates.Analyze(v, PostTemplates); break;
             case "tplclear": if (Templates.Valid(v)) { Templates.Clear(v); PostTemplates(); } break;
             case "projlist": Post("projlist\n" + ChatPanel.ProjectsJson()); break;
+            case "projdel": {                                                 // projdel\n<nom> : projet supprimé (corbeille)
+                string n = ChatPanel.DeleteProject(v.Trim());
+                Post("projlist\n" + ChatPanel.ProjectsJson());
+                if (n.Length > 0) try { owner.Panel.Post("projdeleted\n" + n); owner.Panel.PostProjects(); } catch { }   // la discussion oublie ses conversations
+                break;
+            }
             case "projarch": {                                                // projarch\n<nom>\n1 (archiver) | 0 (désarchiver)
                 var p = v.Split('\n');
                 ChatPanel.SetArchived(p[0], p.Length > 1 && p[1] == "1");

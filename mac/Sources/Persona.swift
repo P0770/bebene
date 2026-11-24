@@ -11,7 +11,7 @@ enum Persona {
         s += "(résumés, fiches, extractions de texte, copies de documents, post-it) sans demande explicite. Pour lire un PDF ou un document, lis-le directement (outil Read, ou sortie d'une commande comme textutil -stdout / mdls) ; s'il faut vraiment un fichier "
         s += "intermédiaire, mets-le dans $TMPDIR/BebeneTravail (jamais dans ses dossiers ni dans ClaudeHub) et supprime-le à la fin. "
         s += "Si un document pourrait l'aider (fiche de révision, résumé, notes…), propose-le en UNE courte phrase à la fin de ta réponse, sans le créer. "
-        s += "Quand l'utilisateur dit travailler sur un projet, écris la ligne « 📁 Projet : <nom> » pour que la conversation y soit sauvegardée. "
+        s += "PROJETS : n'écris JAMAIS de toi-même la ligne « 📁 Projet : <nom> » et ne crée aucun dossier de projet (cette règle remplace celle du noyau de mémoire). Écris-la seulement si l'utilisateur te demande EXPLICITEMENT de créer un projet ou de ranger cette conversation dans un projet ; Bébène lui demandera alors de confirmer. Une conversation sans projet doit rester sans projet. "
         if flash {
             s += "CONVERSATION FLASH : l'utilisateur ne veut rien enregistrer. N'écris rien dans la mémoire ClaudeHub, ne crée pas de projet et n'écris jamais la ligne « 📁 Projet ». "
         } else if !project.isEmpty {

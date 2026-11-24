@@ -41,7 +41,7 @@ final class SettingsWindow: NSObject, NSWindowDelegate {
             "prompt": Prefs.str("Prompt", ""), "hotkey1": "Alt+Space", "dailyBrief": Prefs.bool("DailyBrief", true), "notifs": notifPrefs(),
             "hotkeyOk": Prefs.bool("HotkeyOk", true), "stream": Prefs.bool("Stream", true), "light": Prefs.bool("Light", false),
             "autoModel": Prefs.bool("AutoModel", true), "caveman": Prefs.bool("Caveman", true), "chrome": Prefs.bool("Chrome", true),
-            "postits": Prefs.bool("PostIts", true), "prepare": Prefs.bool("Prepare", true), "spell": false, "autoAllow": Prefs.str("AutoAllow", ""),
+            "postits": Prefs.bool("PostIts", true), "prepare": Prefs.bool("Prepare", true), "autoAllow": Prefs.str("AutoAllow", ""),
             "remindExam": Prefs.bool("RemindExam", true), "remindRdv": Prefs.bool("RemindRdv", true), "remindWhen": Prefs.str("RemindWhen", "both"),
             "features": features(), "manual": [Any](), "hidden": [String](), "calendars": [Any](), "locFilter": Prefs.str("LocFilter", ""),
             "gmailUser": "", "gmailSet": false, "outlookOn": false, "mailStatus": "", "mailRunning": false,

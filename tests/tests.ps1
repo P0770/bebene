@@ -42,6 +42,25 @@ RunApp @('--guardtest', "$out\guard.json") | Out-Null
 $gp = if (Test-Path "$out\guard.json") { (Get-Content "$out\guard.json" -Raw).Trim() } else { '' }   # chemin du fichier de réglages du gardien
 $g = if ($gp -and (Test-Path $gp)) { Get-Content $gp -Raw } else { '' }
 Result 'gardien prêt' ($g -match 'PreToolUse' -and $g -match 'garde') "settings du gardien inattendus"
+function GuardExit($json) {
+  $psi = New-Object Diagnostics.ProcessStartInfo $exe, '--garde'
+  $psi.UseShellExecute = $false; $psi.RedirectStandardInput = $true; $psi.RedirectStandardError = $true; $psi.CreateNoWindow = $true
+  $gpr = [Diagnostics.Process]::Start($psi); $gpr.StandardInput.Write($json); $gpr.StandardInput.Close()
+  $gpr.StandardError.ReadToEnd() | Out-Null; $gpr.WaitForExit(); $gpr.ExitCode
+}
+$sw = [Diagnostics.Stopwatch]::StartNew()
+$gBlock = GuardExit '{"tool_input":{"file_path":"C:\\Users\\x\\ClaudeCompanion\\ui.html"},"cwd":"C:\\Users\\x"}'
+$gFree = GuardExit '{"tool_input":{"command":"ls Documents"},"cwd":"C:\\Users\\x"}'
+Result 'gardien : bloque Bébène, laisse le reste' ($gBlock -eq 2 -and $gFree -eq 0) "codes $gBlock / $gFree"
+Write-Host ("        gardien : {0} ms par action" -f [int]($sw.ElapsedMilliseconds / 2))
+# suppression d'un projet : dossier + ses conversations à la corbeille, les autres conversations gardées, jamais claude-companion
+$tp = Join-Path $env:USERPROFILE 'OneDrive\ClaudeHub\projets\zz-test-suppression'; New-Item -ItemType Directory -Force $tp | Out-Null
+Set-Content "$tp\NOTES.md" '# test' -Encoding UTF8
+$tc = Join-Path $out 'convs-suppr'; Remove-Item $tc -Recurse -Force -ErrorAction SilentlyContinue; New-Item -ItemType Directory -Force $tc | Out-Null
+Set-Content "$tc\a.json" '{"id":"a","project":"zz-test-suppression"}' -Encoding UTF8; Set-Content "$tc\b.json" '{"id":"b","project":""}' -Encoding UTF8
+$env:BEBENE_CONVS = $tc; RunApp @('--projdeltest', 'zz-test-suppression', "$out\projdel.txt") | Out-Null; Remove-Item Env:BEBENE_CONVS
+$pd = if (Test-Path "$out\projdel.txt") { Get-Content "$out\projdel.txt" -Raw } else { '' }
+Result 'projet supprimé (corbeille)' ($pd -eq 'supprime=zz-test-suppression dossier=False convs=1 bebene=True') $pd
 RunApp @('--screentest', "$out\screen.txt") | Out-Null
 $s = if (Test-Path "$out\screen.txt") { Get-Content "$out\screen.txt" -Raw } else { '' }
 Result 'commande de capture' ($s -match 'ecran\.ps1' -and $s -match 'BebeneEcran') "commande inattendue"
@@ -125,6 +144,21 @@ else {
         'var b=/1 fichier modifié/.test(m.querySelector("details.acts summary").textContent);' +
         'log.innerHTML="<div class=\"msg bot\"><div class=\"tool\"><i></i><span>Lire · x</span></div><div class=\"srch\">s</div><div class=\"md\">ok</div></div>";tidyAll();var c=!$("#log .tool")&&!$("#log .srch");' +
         'document.title="R:"+a+b+c+JSON.stringify(__err)') 'R:truetruetrue[]'
+    PageTest 'accord en cours de tour · Toujours · Reprendre' 'ui.html' (
+        'const send=m=>__h({data:m});input.value="Lance git init";submit();const k=rkey;' +
+        'send("rline\n"+k+"\n"+JSON.stringify({type:"system",subtype:"init",session_id:"11111111-1111-1111-1111-111111111111"}));' +
+        'send("perm\n"+k+"\nR1\n"+JSON.stringify({tool_name:"Bash",tool_input:{command:"git init"},description:"Créer un dépôt"}));' +
+        'const c=document.querySelector(".approve[data-req]");const a=!!c&&c.querySelector(".pk").textContent.length>0&&c.querySelector(".pc").textContent==="git init";' +
+        'c.querySelector(".alw").click();const b=__posts.includes("permreply\n"+k+"\nR1\nalways\nBash,PowerShell")&&c.classList.contains("done");' +
+        'send("rdone\n"+k+"\n1\n");const d=!!document.querySelector(".note.resume .rsm");' +
+        'document.title="R:"+a+b+d+JSON.stringify(__err)') 'R:truetruetrue[]'
+    PageTest 'projet annoncé : demandé, pas rattaché tout seul' 'ui.html' (
+        'const send=m=>__h({data:m});input.value="Bonjour";submit();const k=rkey;' +
+        'send("rline\n"+k+"\n"+JSON.stringify({type:"assistant",message:{content:[{type:"text",text:"Voilà.\n📁 Projet : essai-x"}]}}));' +
+        'const c=document.querySelector(".projask");const a=!!c&&project==="";' +
+        'send("rline\n"+k+"\n"+JSON.stringify({type:"assistant",message:{content:[{type:"text",text:"📁 Projet : essai-x"}]}}));const b=document.querySelectorAll(".projask").length===1;' +
+        'c.querySelector(".yes").click();const d=project==="essai-x"&&__posts.includes("ensureproject\nessai-x");' +
+        'document.title="R:"+a+b+d+JSON.stringify(__err)') 'R:truetruetrue[]'
     PageTest 'zone de saisie à la taille du texte' 'ui.html' (
         'input.value="";autosize();var h1=input.offsetHeight,a=input.scrollHeight<=input.clientHeight+1&&getComputedStyle(input).overflowY==="hidden";' +
         'input.value="a\nb\nc";autosize();var h3=input.offsetHeight,b=h3>h1&&getComputedStyle(input).overflowY==="hidden";' +
@@ -234,6 +268,11 @@ if ($Claude) {
     $pids = $r | Where-Object { $_ -match 'result .* · A · pid (\d+)' } | ForEach-Object { [regex]::Match($_, 'pid (\d+)').Groups[1].Value }
     Result 'Claude · 2 tâches en parallèle' (($r | Where-Object { $_ -match 'rdone \| [AB] \| 0' }).Count -ge 3) ($r -join ' / ')
     Result 'Claude · session gardée ouverte' ($pids.Count -ge 2 -and ($pids | Select-Object -Unique).Count -eq 1) ("pids A : " + ($pids -join ', '))
+    Remove-Item "$out\perm.txt" -ErrorAction SilentlyContinue
+    RunApp @('--permtest', "$out\perm.txt") 260 | Out-Null
+    $pr = if (Test-Path "$out\perm.txt") { Get-Content "$out\perm.txt" -Encoding UTF8 } else { @() }
+    $ppids = $pr | Where-Object { $_ -match '^rdone 0 · pid (\d+)' } | ForEach-Object { [regex]::Match($_, 'pid (\d+)').Groups[1].Value }
+    Result 'Claude · accord en cours de tour, sans relance' (($pr -contains 'perms=1') -and $ppids.Count -eq 2 -and ($ppids | Select-Object -Unique).Count -eq 1) ($pr -join ' / ')
 }
 
 Write-Host ""

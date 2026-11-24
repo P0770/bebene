@@ -57,7 +57,7 @@
   // réglages : ce qui n'existe pas (encore) sur Mac est masqué
   var HIDE = '#calendriers, #mails, #manual, [data-os-hide]';
   function hideRows() {
-    ['spell', 'spell2', 'remindExam', 'remindRdv', 'remindWhen', 'hk1'].forEach(function (id) {
+    ['remindExam', 'remindRdv', 'remindWhen', 'hk1'].forEach(function (id) {
       var el = document.getElementById(id), row = el && el.closest('.row');
       if (row && !row.hidden) {
         row.hidden = true;

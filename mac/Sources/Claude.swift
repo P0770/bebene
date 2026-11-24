@@ -81,6 +81,10 @@ final class Runner {
     var err = ""
     var readers: [LineReader] = []          // gardés en vie tant que le processus tourne
     var used = Date(), flagAt = Date.distantPast
+    // accords (--permission-prompt-tool stdio) : appliqués par Bébène, hors des arguments → pas de relance
+    var auto = false
+    var granted = Set<String>()
+    var pending: [String: (tool: String, input: Any)] = [:]
     init(key: String) { self.key = key }
 }
 

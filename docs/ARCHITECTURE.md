@@ -112,14 +112,16 @@ Chaque message lance :
 ```
 claude -p --output-format stream-json --verbose
        --include-partial-messages                              (écriture en direct, réglage Stream)
-       --permission-mode acceptEdits | bypassPermissions      (mode autonome)
+       --permission-mode acceptEdits --permission-prompt-tool stdio   (accord demandé en cours de tour, voir plus bas)
        --model haiku                                           (question simple, réglage AutoModel)
        --effort low | medium | high | xhigh                    (réglage Effort, medium par défaut)
        --resume <session>                                      (suite de la conversation)
-       --allowedTools <outils autorisés>
+       --allowedTools <outils du réglage AutoAllow + capture d écran>
        --append-system-prompt <persona de Bébène>
        --settings <garde-settings.json>                        (verrou de sécurité)
 ```
+
+**Accords en cours de tour** : avec `--permission-prompt-tool stdio`, Claude écrit `{"type":"control_request","request":{"subtype":"can_use_tool",…}}` sur sa sortie et attend un `control_response` (`allow` + `updatedInput`, ou `deny` + `message`) sur son entrée. `ChatPanel.OnControl` répond tout de suite si l outil est déjà accordé dans la conversation (`Runner.Granted`) ou si « Tout autoriser » / mode autonome est actif (`Runner.Auto`) ; sinon il envoie `perm` à la page, qui affiche la carte 🔐 dans la bulle en cours et renvoie `permreply` (yes / all / no + message). Écrire un message pendant l attente = refuser en expliquant. Les accords ne sont plus dans les arguments : les changer ne relance plus Claude. Test réel : `--permtest`.
 
 **Rapidité** : l'effort vient du réglage `Effort` (`medium` par défaut), sauf une question simple au début d'une conversation (`low`, comme le choix de Haiku : `PickEffort`, `Runner.LowEffort`) ; jamais d'effort avec Haiku. Le persona demande aussi de regrouper le travail (lectures en parallèle, modifications en une passe), de lire le texte d'un PDF avant d'en regarder des pages en image (basse résolution), et de compiler un LaTeX une seule fois, sans recompilation forcée, hors de OneDrive. La capture d'écran `ecran.ps1` est réduite à 1 280 px de large.
 
@@ -179,7 +181,7 @@ Test sans rien installer : `ClaudeCompanion.exe --updtest out.txt` (dernière Re
 
 ## Le verrou de sécurité
 
-`ChatPanel.GuardSettings()` écrit `garde.ps1` et `garde-settings.json`, passés à chaque appel de Claude par `--settings`. C'est un hook **PreToolUse** sur `Edit|Write|MultiEdit|NotebookEdit|Bash|PowerShell` : si la commande ou le chemin visé contient `claude-companion` ou `claudecompanion`, il sort avec le code 2 → Claude Code **refuse l'action**, même en `bypassPermissions`. La persona indique aussi à Bébène qu'il ne peut pas modifier son programme.
+`ChatPanel.GuardSettings()` écrit `garde-settings.json`, passé à chaque appel de Claude par `--settings`. C'est un hook **PreToolUse** (`ClaudeCompanion.exe --garde`, `ChatPanel.Guard()`, ≈ 90 ms par action contre ≈ 700 ms pour l'ancien script PowerShell) sur `Edit|Write|MultiEdit|NotebookEdit|Bash|PowerShell` : si la commande ou le chemin visé contient `claude-companion` ou `claudecompanion`, il sort avec le code 2 → Claude Code **refuse l'action**, même en `bypassPermissions`. La persona indique aussi à Bébène qu'il ne peut pas modifier son programme.
 
 ---
 

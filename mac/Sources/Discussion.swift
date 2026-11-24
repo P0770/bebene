@@ -128,6 +128,9 @@ final class Discussion: NSObject, NSWindowDelegate {
         case "forget": forget(a1)
         case "stop": if let r = runners[a1], r.busy { r.stopping = true; Shell.killTree(r.proc) }
         case "drop": dropRun(a1)
+        case "alwaysallow": addAutoAllow(a1)                              // « Toujours » sur une carte de fin de tour
+        case "permreply":                                                  // permreply\n<clé>\n<id>\n<yes|all|always|no>\n<message ou outils>
+            if parts.count >= 4 { permReply(key: a1, id: parts[2], how: parts[3], msg: parts.count > 4 ? parts[4] : "") }
         case "calm": for r in runners.values where (a1.isEmpty || r.key == a1) && !r.busy { r.asking = false; r.hand = false }; updateCat(false, 0)
         case "send":
             let sp = m.split(separator: "\n", maxSplits: 7, omittingEmptySubsequences: false).map(String.init)
@@ -251,10 +254,13 @@ final class Discussion: NSObject, NSWindowDelegate {
         if let a = app?.lastApp, !a.isEmpty { msg = "[Application active : " + a + " · pour la voir : " + screenCommand + "]\n" + msg }
         let df = DateFormatter(); df.locale = Locale(identifier: "fr_CH"); df.dateFormat = "EEEE d MMMM yyyy, HH:mm"
         msg = "[Maintenant : " + df.string(from: Date()) + "]\n" + msg
-        let args = buildArgs(autonomous: autonomous, allowed: allowed, flash: flash, project: project, model: model)
+        let args = buildArgs(flash: flash, project: project, model: model)
         let sigStr = args.joined(separator: "\u{1}")
         if r == nil { r = Runner(key: key); runners[key] = r }
         let run = r!
+        run.auto = autonomous
+        for x in allowed.split(separator: ",").map(String.init) where matches(x, "^[A-Za-z][A-Za-z0-9_-]*$") { run.granted.insert(x) }
+        run.pending.removeAll()
         if let p = run.proc, !p.isRunning || run.sig != sigStr { retire(run) }
         if run.proc == nil {
             var full = args
@@ -272,13 +278,14 @@ final class Discussion: NSObject, NSWindowDelegate {
     func startRunner(_ r: Runner, exe: String, args: [String], dir: String) -> Bool {
         let p = Process(); p.executableURL = URL(fileURLWithPath: exe); p.arguments = args
         p.currentDirectoryURL = URL(fileURLWithPath: dir)
-        var env = Shell.env; env["CAVEMAN_DEFAULT_MODE"] = Prefs.bool("Caveman", true) ? "caveman" : "off"; p.environment = env
+        var env = Shell.env; env["CAVEMAN_DEFAULT_MODE"] = Prefs.bool("Caveman", true) ? "caveman" : "off"; env["BEBENE_SESSION"] = "1"; p.environment = env
         let i = Pipe(), o = Pipe(), e = Pipe()
         p.standardInput = i; p.standardOutput = o; p.standardError = e
         let key = r.key
         let outR = LineReader(o.fileHandleForReading) { [weak self] d in
             DispatchQueue.main.async {
-                guard let self = self else { return }
+                guard let self = self, r.proc == nil || r.proc === p else { return }   // session remplacée : ses dernières lignes sont ignorées
+                if d.contains("\"control_request\""), let o = J.dec(d) as? [String: Any], "\(o["type"] ?? "")" == "control_request" { self.onControl(r, o); return }
                 let isResult = d.contains("\"type\":\"result\""), mark = d.contains("bebene-")
                 var type = ""
                 if isResult || mark, let o = J.dec(d) as? [String: Any] { type = "\(o["type"] ?? "")" }
@@ -296,7 +303,9 @@ final class Discussion: NSObject, NSWindowDelegate {
         p.terminationHandler = { [weak self] pr in
             DispatchQueue.main.async {
                 guard let self = self else { return }
-                if r.proc === pr { r.proc = nil }
+                // processus remplacé (retire) : sa fin ne concerne pas le tour en cours (sinon « Erreur (code 2) »)
+                guard r.proc === pr else { return }
+                r.proc = nil
                 if r.busy {
                     let code = pr.terminationStatus
                     r.busy = false
@@ -319,14 +328,52 @@ final class Discussion: NSObject, NSWindowDelegate {
     // voir l'écran : capture sans bruit (autorisation « Enregistrement de l'écran » demandée par macOS la première fois)
     var screenCommand: String { "screencapture -x " + (Paths.screenDir as NSString).appendingPathComponent("ecran.png") }
 
-    func buildArgs(autonomous: Bool, allowed: String, flash: Bool, project: String, model: String) -> [String] {
+    // ---- demandes d'accord PENDANT le tour (--permission-prompt-tool stdio), comme sur Windows ----
+    func grantName(_ t: String) -> String { t.hasPrefix("mcp__claude-in-chrome__") ? "mcp__claude-in-chrome" : t }
+    func autoAllowed(_ n: String) -> Bool { Prefs.str("AutoAllow", "").split(separator: ",").map(String.init).contains(n) }
+    func addAutoAllow(_ csv: String) {
+        var l = Prefs.str("AutoAllow", "").split(separator: ",").map(String.init)
+        for x in csv.split(separator: ",").map(String.init) where matches(x, "^[A-Za-z][A-Za-z0-9_-]*$") && !l.contains(x) { l.append(x) }
+        Prefs.set("AutoAllow", l.joined(separator: ","))
+    }
+    func answer(_ r: Runner, _ id: String, allow: Bool, input: Any?, why: String) {
+        let resp: [String: Any] = allow ? ["behavior": "allow", "updatedInput": input ?? [String: Any]()] : ["behavior": "deny", "message": why]
+        let line = J.enc(["type": "control_response", "response": ["subtype": "success", "request_id": id, "response": resp] as [String: Any]]) + "\n"
+        try? r.stdin?.write(contentsOf: line.data(using: .utf8)!)
+    }
+    func onControl(_ r: Runner, _ o: [String: Any]) {
+        let id = "\(o["request_id"] ?? "")"
+        guard let req = o["request"] as? [String: Any], "\(req["subtype"] ?? "")" == "can_use_tool" else {
+            let line = J.enc(["type": "control_response", "response": ["subtype": "error", "request_id": id, "error": "non géré par Bébène"] as [String: Any]]) + "\n"
+            try? r.stdin?.write(contentsOf: line.data(using: .utf8)!); return
+        }
+        let tool = "\(req["tool_name"] ?? "")", input = req["input"] ?? [String: Any](), n = grantName(tool)
+        if r.auto || r.granted.contains(n) || autoAllowed(n) { answer(r, id, allow: true, input: input, why: ""); return }
+        r.pending[id] = (tool, input)
+        post("perm\n" + r.key + "\n" + id + "\n" + J.enc(["tool_name": tool, "tool_input": input, "description": "\(req["description"] ?? "")"]))
+        r.asking = true; r.flagAt = Date(); updateCat(false, 0)
+    }
+    func permReply(key: String, id: String, how: String, msg: String) {
+        guard let r = runners[key], r.proc != nil, let it = r.pending.removeValue(forKey: id) else { return }
+        if how == "all" { r.auto = true }
+        else if how == "yes" { r.granted.insert(grantName(it.tool)) }
+        else if how == "always" { r.granted.insert(grantName(it.tool)); addAutoAllow(msg + "," + grantName(it.tool)) }
+        if how == "no" {
+            answer(r, id, allow: false, input: nil, why: msg.isEmpty ? "L'utilisateur a refusé cette action. Ne la relance pas ; continue sans elle ou demande-lui comment faire." : "L'utilisateur a refusé cette action et t'écrit : " + msg)
+        } else { answer(r, id, allow: true, input: it.input, why: "") }
+        for (k, v) in r.pending where r.auto || r.granted.contains(grantName(v.tool)) || autoAllowed(grantName(v.tool)) {   // demandes en parallèle couvertes
+            r.pending.removeValue(forKey: k); answer(r, k, allow: true, input: v.input, why: ""); post("permdone\n" + key + "\n" + k)
+        }
+        if r.pending.isEmpty { r.asking = false }
+        updateCat(false, 0)
+    }
+
+    func buildArgs(flash: Bool, project: String, model: String) -> [String] {
         var a = ["-p", "--input-format", "stream-json", "--output-format", "stream-json", "--verbose"]
         if Prefs.bool("Stream", true) { a.append("--include-partial-messages") }
-        a += ["--permission-mode", autonomous ? "bypassPermissions" : "acceptEdits"]
-        var allow: [String] = []
-        for x in (allowed + "," + Prefs.str("AutoAllow", "")).split(separator: ",").map(String.init) where matches(x, "^[A-Za-z][A-Za-z0-9_-]*$") && !allow.contains(x) { allow.append(x) }
-        allow.append("Bash(screencapture -x *)")                             // regarder l'écran : lecture seule, sans carte d'accord
-        a += ["--allowedTools", allow.joined(separator: ","), "--add-dir", Paths.screenDir]
+        // accords (conversation, « tout autoriser », réglage AutoAllow) : appliqués dans onControl, hors des arguments
+        a += ["--permission-mode", "acceptEdits", "--permission-prompt-tool", "stdio"]
+        a += ["--allowedTools", "Bash(screencapture -x *)", "--add-dir", Paths.screenDir]   // regarder l'écran : lecture seule, sans carte d'accord
         let chrome = Prefs.bool("Chrome", true)
         if chrome { a.append("--chrome") }
         if matches(model, "^[a-z0-9.-]+$") { a += ["--model", model] }

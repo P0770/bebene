@@ -27,6 +27,9 @@ body { padding: 26px 26px 40px; max-width: 640px; margin: 0 auto; }
 .btn.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
 .btn.primary:hover { background: var(--accent-2); border-color: var(--accent-2); }
 .btn.danger { color: var(--danger); }
+.btn.pdel { margin-left: 6px; background: transparent; color: var(--muted); padding: 8px 12px; }
+.btn.pdel:hover { color: var(--danger); border-color: var(--danger); background: transparent; }
+.btn.pdel.sure { background: var(--danger); border-color: var(--danger); color: #fff; }
 .btn.danger:hover { border-color: var(--danger); }
 .btn:disabled { opacity: .4; cursor: default; }
 
@@ -188,7 +191,7 @@ html.light .hk:hover { border-color: #bdb5ae; }
   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6l6 6-6 6"/></svg>
 </button>
 
-<details class="sec" id="projets"><summary><span class="st"><b>Mes projets</b><span id="pCount">Archiver ceux qu'on ne veut plus dans le menu</span></span><svg class="chev" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg></summary><div class="sb">
+<details class="sec" id="projets"><summary><span class="st"><b>Mes projets</b><span id="pCount">Archiver ou supprimer les projets</span></span><svg class="chev" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg></summary><div class="sb">
 <input type="text" id="pFilter" placeholder="Filtrer les projets…" style="width:100%;margin-bottom:10px" maxlength="40">
 <div class="pcap">Dans le menu de la discussion</div>
 <div class="card" id="pActive"></div>
@@ -239,6 +242,10 @@ html.light .hk:hover { border-color: #bdb5ae; }
   <div class="row">
     <div class="lbl"><b>Les fichiers hors du dossier de travail</b><span style="white-space:normal">Lire et modifier des fichiers ailleurs sur ton PC.</span></div>
     <label class="switch"><input type="checkbox" class="aa" data-t="Read,Edit,Write,Glob,Grep"><span class="track"></span></label>
+  </div>
+  <div class="row">
+    <div class="lbl"><b>Le navigateur Chrome</b><span style="white-space:normal">Lire, cliquer et remplir dans tes pages Chrome (extension Claude in Chrome).</span></div>
+    <label class="switch"><input type="checkbox" class="aa" data-t="mcp__claude-in-chrome"><span class="track"></span></label>
   </div>
   <div class="row">
     <div class="lbl"><b>Rappels d'examens</b><span style="white-space:normal">Une carte au-dessus de Bébène avant chaque examen (calendrier et mails).</span></div>
@@ -480,8 +487,12 @@ $('#gmailClear').onclick = () => set({ gmailClear: true });
 $('#outlookOn').onchange = e => { set({ outlookOn: e.target.checked }); if (e.target.checked) post('set\n' + JSON.stringify({ mailScan: true })); };
 $('#mailScan').onclick = () => post('set\n' + JSON.stringify({ mailScan: true }));
 
+let AA = [];                                                          // liste enregistrée (« Toujours autoriser » d'une carte peut y ajouter d'autres outils)
 function sendAutoAllow() {
-  const t = []; document.querySelectorAll('.aa').forEach(x => { if (x.checked) t.push(x.dataset.t); });
+  const mine = new Set(), t = [];
+  document.querySelectorAll('.aa').forEach(x => { x.dataset.t.split(',').forEach(n => mine.add(n)); if (x.checked) t.push(x.dataset.t); });
+  AA.filter(n => n && !mine.has(n)).forEach(n => t.push(n));          // outils sans interrupteur ici : gardés
+  AA = t.join(',').split(',');
   set({ autoAllow: t.join(',') });
 }
 document.querySelectorAll('.aa').forEach(x => x.onchange = sendAutoAllow);
@@ -509,7 +520,7 @@ function render(s) {
   document.documentElement.classList.toggle('light', !!s.light); $('#light').checked = !!s.light;
   FEAT = s.features || []; VERSION = s.version || ''; renderFeatures();
   renderManual(s);
-  const aa = (s.autoAllow || '').split(',');
+  const aa = (s.autoAllow || '').split(','); AA = aa;
   document.querySelectorAll('.aa').forEach(x => x.checked = x.dataset.t.split(',').every(n => aa.includes(n)));
   $('#remindExam').checked = s.remindExam !== false; $('#remindRdv').checked = s.remindRdv !== false;
   document.querySelectorAll('#remindWhen button').forEach(b => b.classList.toggle('on', b.dataset.v === (s.remindWhen || 'both')));
@@ -547,7 +558,8 @@ const hueOf = s => { let h = 0; for (const c of String(s)) h = (h * 31 + c.charC
 function renderProj() {
   const arch = new Set(PROJ.arch), q = $('#pFilter').value.trim().toLowerCase();
   const row = (p, a) => '<div class="row prow"><span class="pdot" style="--h:' + hueOf(p) + '"></span><div class="lbl"><b>' + escH(p) + '</b></div>'
-    + '<button class="btn' + (a ? ' primary' : '') + '" data-parch="' + escH(p) + '" data-a="' + (a ? 0 : 1) + '">' + (a ? 'Remettre dans le menu' : 'Archiver') + '</button></div>';
+    + '<button class="btn' + (a ? ' primary' : '') + '" data-parch="' + escH(p) + '" data-a="' + (a ? 0 : 1) + '">' + (a ? 'Remettre dans le menu' : 'Archiver') + '</button>'
+    + (p === 'claude-companion' ? '' : '<button class="btn pdel" data-pdel="' + escH(p) + '" title="Supprimer le dossier du projet (notes, conversations archivées) et ses conversations : tout part dans la corbeille">Supprimer</button>') + '</div>';
   const act = PROJ.all.filter(p => !arch.has(p) && p.includes(q)), ar = PROJ.all.filter(p => arch.has(p) && p.includes(q));
   $('#pActive').innerHTML = act.length ? act.map(p => row(p, false)).join('') : '<div class="row"><div class="lbl"><span>' + (q ? 'Aucun projet actif ne correspond.' : 'Aucun projet actif.') + '</span></div></div>';
   $('#pArch').innerHTML = ar.length ? ar.map(p => row(p, true)).join('') : '<div class="row"><div class="lbl"><span>' + (q ? 'Aucun projet archivé ne correspond.' : 'Aucun projet archivé. « Archiver » cache un projet terminé du menu, sans rien effacer.') + '</span></div></div>';
@@ -555,6 +567,17 @@ function renderProj() {
 }
 $('#pFilter').addEventListener('input', renderProj);
 document.addEventListener('click', e => { const b = e.target.closest('[data-parch]'); if (b) post('projarch\n' + b.dataset.parch + '\n' + b.dataset.a); });
+// supprimer : 2e clic pour confirmer (le bouton redevient normal après 4 s)
+document.addEventListener('click', e => {
+  const b = e.target.closest('[data-pdel]'); if (!b) return;
+  if (!b.classList.contains('sure')) {
+    document.querySelectorAll('.pdel.sure').forEach(x => { x.classList.remove('sure'); x.textContent = 'Supprimer'; });
+    b.classList.add('sure'); b.textContent = 'Sûr ? Tout à la corbeille';
+    clearTimeout(b._t); b._t = setTimeout(() => { b.classList.remove('sure'); b.textContent = 'Supprimer'; }, 4000);
+    return;
+  }
+  b.disabled = true; b.textContent = 'Suppression…'; post('projdel\n' + b.dataset.pdel);
+});
 window.chrome.webview.addEventListener('message', e => {
   const d = String(e.data), i = d.indexOf('\n');
   if (d.slice(0, i) === 'projlist') { try { PROJ = JSON.parse(d.slice(i + 1)); renderProj(); } catch (x) { } }

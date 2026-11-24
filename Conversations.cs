@@ -23,6 +23,19 @@ static class ConvStore {
             if (File.Exists(f)) File.Replace(tmp, f, null); else File.Move(tmp, f);
         } catch (Exception ex) { Program.Log("Conversations", ex.Message); }
     }
+    // projet supprimé : ses conversations partent dans la corbeille (champ « project » de chaque fichier)
+    public static void RecycleProject(string project) {
+        lock (L) try {
+            if (!Directory.Exists(Dir)) return;
+            foreach (var f in Directory.GetFiles(Dir, "*.json")) {
+                try {
+                    var o = new System.Web.Script.Serialization.JavaScriptSerializer { MaxJsonLength = int.MaxValue }.DeserializeObject(File.ReadAllText(f, Encoding.UTF8)) as Dictionary<string, object>;
+                    object p; if (o == null || !o.TryGetValue("project", out p) || Convert.ToString(p) != project) continue;
+                    Microsoft.VisualBasic.FileIO.FileSystem.DeleteFile(f, Microsoft.VisualBasic.FileIO.UIOption.OnlyErrorDialogs, Microsoft.VisualBasic.FileIO.RecycleOption.SendToRecycleBin);
+                } catch (Exception ex) { Program.Log("Conversations", ex.Message); }
+            }
+        } catch (Exception ex) { Program.Log("Conversations", ex.Message); }
+    }
     public static void Delete(string id) {
         if (!Ok(id)) return;
         lock (L) try { File.Delete(Path.Combine(Dir, id + ".json")); } catch (Exception ex) { Program.Log("Conversations", ex.Message); }

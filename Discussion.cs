@@ -201,6 +201,20 @@ class ChatPanel : Form {
         try { File.WriteAllText(ArchFile, string.Join("\n", l.ToArray()) + (l.Count > 0 ? "\n" : ""), new UTF8Encoding(false)); }
         catch (Exception ex) { Program.Log("Projet", ex.Message); }
     }
+    // supprimer un projet : son dossier (NOTES.md, conversations archivées…) et les conversations de Bébène rattachées
+    // partent dans la CORBEILLE (récupérables). Jamais le projet de Bébène lui-même.
+    public static string DeleteProject(string name) {
+        string n = SafeName(name);
+        if (n.Length == 0 || n == "claude-companion") return "";
+        string d = Path.Combine(ProjectsDir, n);
+        try {
+            if (Directory.Exists(d))
+                Microsoft.VisualBasic.FileIO.FileSystem.DeleteDirectory(d, Microsoft.VisualBasic.FileIO.UIOption.OnlyErrorDialogs, Microsoft.VisualBasic.FileIO.RecycleOption.SendToRecycleBin);
+        } catch (Exception ex) { Program.Log("Projet", "suppression " + n + " : " + ex.Message); return ""; }
+        SetArchived(n, false);                                                  // retiré aussi de la liste des archivés
+        ConvStore.RecycleProject(n);
+        return n;
+    }
     // {all: tous les projets, arch: ceux qui sont archivés}
     public static string ProjectsJson() {
         var all = ListProjects(); var a = Archived();
@@ -379,7 +393,7 @@ class ChatPanel : Form {
     }
 
     static void KillAfter(Process p, int ms) {
-        new Thread(() => { try { if (!p.WaitForExit(ms)) p.Kill(); } catch { } }) { IsBackground = true, Name = "délai" }.Start();
+        new Thread(() => { try { if (!p.WaitForExit(ms)) KillProc(p); } catch { } /* arbre entier : sinon les commandes lancées par Claude restent orphelines */ }) { IsBackground = true, Name = "délai" }.Start();
     }
 
     // ---- agrandir / réduire par les bords : on suit la souris tant que le bouton gauche est enfoncé ----
@@ -581,6 +595,8 @@ class ChatPanel : Form {
             case "noteshow": Notes.Show(parts.Length > 1 ? parts[1] : ""); break;
             case "notehide": Notes.Hide(parts.Length > 1 ? parts[1] : ""); break;
             case "notedel": Notes.Delete(parts.Length > 1 ? parts[1] : ""); break;
+            case "alwaysallow": AddAutoAllow(parts.Length > 1 ? parts[1] : ""); break;          // « Toujours » sur une carte de fin de tour
+            case "permreply": { var sp = m.Split(new[] { '\n' }, 5); if (sp.Length >= 4) PermReply(sp[1], sp[2], sp[3], sp.Length == 5 ? sp[4] : ""); break; }
             case "stop": StopRun(parts.Length > 1 ? parts[1] : ""); break;                       // stop\n<clé>
             case "drop": DropRun(parts.Length > 1 ? parts[1] : ""); break;                   // drop\n<clé> : conversation supprimée
             case "calm": Calm(parts.Length > 1 && parts[1].Length > 0 ? parts[1] : null); break;   // question / demande abandonnée
@@ -607,27 +623,36 @@ class ChatPanel : Form {
     // ---- Gardien : Bébène ne peut pas modifier son propre programme (code, installation, réglages, données) ----
     // Chaque conversation de Bébène charge un hook PreToolUse qui bloque toute écriture ou commande visant Bébène.
     // Seul Claude Code lancé par l'utilisateur dans le terminal (sans ce hook) fait évoluer Bébène.
-    const string GuardScript =
-        "# Gardien de Bébène : bloque toute modification de son propre programme depuis ses conversations\r\n" +
-        "$in = [Console]::In.ReadToEnd() | ConvertFrom-Json\r\n" +
-        "$t = $in.tool_input\r\n" +
-        "$s = (@($t.command, $t.file_path, $t.notebook_path, $t.path, $in.cwd) -join ' ').Replace('\\', '/').ToLower()\r\n" +
-        "foreach ($p in @('claudehub/projets/claude-companion', 'claude-companion', 'claudecompanion')) {\r\n" +
-        "  if ($s.Contains($p)) {\r\n" +
-        "    [Console]::Error.WriteLine('Bloqué : Bébène ne peut pas modifier son propre programme, ses réglages ou ses données. Pour faire évoluer Bébène, utilise Claude Code dans le terminal.')\r\n" +
-        "    exit 2\r\n" +
-        "  }\r\n" +
-        "}\r\n" +
-        "exit 0\r\n";
+    // Le hook est ClaudeCompanion.exe --garde (≈ 0,1 s par action ; l ancien script PowerShell coûtait ≈ 0,7 s à CHAQUE action).
+    static readonly string[] Guarded = { "claudehub/projets/claude-companion", "claude-companion", "claudecompanion" };
+    public static int Guard() {
+        string s = "";
+        try {
+            string json = new StreamReader(Console.OpenStandardInput(), new UTF8Encoding(false)).ReadToEnd();
+            var o = new JavaScriptSerializer { MaxJsonLength = int.MaxValue }.DeserializeObject(json) as Dictionary<string, object>;
+            if (o == null) return 0;
+            var t = o.ContainsKey("tool_input") ? o["tool_input"] as Dictionary<string, object> : null;
+            var sb = new StringBuilder();
+            if (t != null) foreach (var k in new[] { "command", "file_path", "notebook_path", "path" }) { object v; if (t.TryGetValue(k, out v)) sb.Append(Convert.ToString(v)).Append(' '); }
+            object cwd; if (o.TryGetValue("cwd", out cwd)) sb.Append(Convert.ToString(cwd));
+            s = sb.ToString().Replace('\\', '/').ToLowerInvariant();
+        } catch { return 0; }
+        foreach (var p in Guarded) if (s.Contains(p)) {
+            var b = Encoding.UTF8.GetBytes("Bloqué : Bébène ne peut pas modifier son propre programme, ses réglages ou ses données. Pour faire évoluer Bébène, utilise Claude Code dans le terminal.\n");
+            using (var e = Console.OpenStandardError()) e.Write(b, 0, b.Length);
+            return 2;
+        }
+        return 0;
+    }
     static string guardSettings;
     public static string GuardSettings() {
         if (guardSettings != null && File.Exists(guardSettings)) return guardSettings;
         string dir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "ClaudeCompanion");
         Directory.CreateDirectory(dir);
-        string ps1 = Path.Combine(dir, "garde.ps1"), js = Path.Combine(dir, "garde-settings.json");
-        File.WriteAllText(ps1, GuardScript, new UTF8Encoding(true));
+        string js = Path.Combine(dir, "garde-settings.json");
+        try { File.Delete(Path.Combine(dir, "garde.ps1")); } catch { }   // ancien gardien PowerShell
         var hook = new Dictionary<string, object> { { "type", "command" }, { "timeout", 15 },
-            { "command", "powershell -NoProfile -ExecutionPolicy Bypass -File \"" + ps1.Replace('\\', '/') + "\"" } };
+            { "command", "\"" + Application.ExecutablePath.Replace('\\', '/') + "\" --garde" } };
         var settings = new Dictionary<string, object> { { "hooks", new Dictionary<string, object> { { "PreToolUse", new object[] {
             new Dictionary<string, object> { { "matcher", "Edit|Write|MultiEdit|NotebookEdit|Bash|PowerShell" }, { "hooks", new object[] { hook } } } } } } } };
         File.WriteAllText(js, new JavaScriptSerializer().Serialize(settings), new UTF8Encoding(false));
@@ -694,6 +719,8 @@ class ChatPanel : Form {
     // Si les réglages de lancement changent (autorisations, mode autonome, modèle…), la session est relancée avec --resume.
     class Runner {
         public string Key, Sig = "", Model = "", HandKind = ""; public bool Busy, Asking, Hand, Stopping, Lite, LowEffort, Forgotten; public int Done, Total;
+        public bool Auto; public readonly HashSet<string> Granted = new HashSet<string>(); public readonly Dictionary<string, object[]> Pending = new Dictionary<string, object[]>();
+        public readonly object InLock = new object();
         public Process P; public readonly StringBuilder Err = new StringBuilder(); public DateTime Used = DateTime.Now, FlagAt = DateTime.MinValue;
     }
     readonly Dictionary<string, Runner> runners = new Dictionary<string, Runner>();
@@ -728,6 +755,7 @@ class ChatPanel : Form {
     void KillTree() { foreach (var r in runners.Values) KillProc(r.P); }
     public void KillAll() { KillTree(); }
     public void TestSend(string key, string text) { var lw = Companion.LastWindow; Companion.LastWindow = ""; Send(key, text, false, "", "", true, ""); Companion.LastWindow = lw; }
+    public void TestPerm(string key, string id, string how) { PermReply(key, id, how, ""); }
     public int RunnerPid(string key) { Runner r; return runners.TryGetValue(key, out r) && r.P != null ? r.P.Id : 0; }
     void PostDone(string key, string code, string err) { Post("rdone\n" + key + "\n" + code + "\n" + err); }
 
@@ -794,8 +822,13 @@ class ChatPanel : Form {
         if (Companion.LastWindow.Length > 0)
             text = "[Fenêtre active : " + Companion.LastWindow + " · pour la voir : " + ScreenCommand(Companion.LastHwnd) + "]\n" + text;
         text = "[Maintenant : " + DateTime.Now.ToString("dddd d MMMM yyyy, HH:mm", new System.Globalization.CultureInfo("fr-CH")) + "]\n" + text;   // pour les rappels (« dans 20 min »)
-        string args = BuildArgs(autonomous, allowed, flash, project, model) + (effort.Length > 0 ? " --effort " + effort : "");
+        string args = BuildArgs(flash, project, model) + (effort.Length > 0 ? " --effort " + effort : "");
         if (r == null) { r = new Runner { Key = key }; runners[key] = r; }
+        // autorisations de la conversation : gérées ici (réponse aux demandes de Claude), pas dans les arguments → pas de relance
+        lock (r.Granted) {
+            r.Auto = autonomous;
+            foreach (var a in (allowed ?? "").Split(',')) if (Regex.IsMatch(a, "^[A-Za-z][A-Za-z0-9_-]*$")) r.Granted.Add(a);
+        }
         if (r.P != null && (r.P.HasExited || r.Sig != args)) Retire(r);                   // réglages changés : on relance la session
         if (r.P == null) {
             string full = args + (Regex.IsMatch(sessionId, "^[0-9a-fA-F-]{36}$") ? " --resume " + sessionId : "");
@@ -804,11 +837,74 @@ class ChatPanel : Form {
         }
         r.Lite = model == "haiku"; r.LowEffort = effort == "low";
         r.Busy = true; r.Asking = r.Hand = false; r.Stopping = false; r.Done = r.Total = 0; r.Used = DateTime.Now; lock (r.Err) r.Err.Clear();
+        lock (r.Granted) r.Pending.Clear();                                              // demandes d accord d un tour précédent : sans objet
         string msg = new JavaScriptSerializer().Serialize(new Dictionary<string, object> { { "type", "user" }, { "message", new Dictionary<string, object> { { "role", "user" }, { "content", text } } } });
+        WriteIn(r, r.P, msg);   // Claude s'est arrêté tout de suite : son message d'erreur arrivera par « rdone »
+        UpdateCat(false, 0);
+    }
+    static void WriteIn(Runner r, Process p, string json) {
         try {
-            var bytes = Encoding.UTF8.GetBytes(msg + "\n");
-            r.P.StandardInput.BaseStream.Write(bytes, 0, bytes.Length); r.P.StandardInput.BaseStream.Flush();
-        } catch (Exception) { }   // Claude s'est arrêté tout de suite : son message d'erreur arrivera par « rdone »
+            var bytes = Encoding.UTF8.GetBytes(json + "\n");
+            lock (r.InLock) { p.StandardInput.BaseStream.Write(bytes, 0, bytes.Length); p.StandardInput.BaseStream.Flush(); }
+        } catch (Exception) { }
+    }
+
+    // ---- demandes d'accord PENDANT le tour (--permission-prompt-tool stdio) ----
+    // Claude envoie {"type":"control_request","request":{"subtype":"can_use_tool",…}} et attend la réponse sur son entrée :
+    // déjà autorisé (conversation, « tout autoriser », réglages) → oui tout de suite ; sinon carte d'accord dans la discussion.
+    // Avant : refus en fin de tour, puis nouveau message « Continue » ET relance de Claude (--allowedTools changé).
+    static string GrantName(string tool) { return Regex.IsMatch(tool ?? "", "^mcp__claude-in-chrome__") ? "mcp__claude-in-chrome" : tool ?? ""; }
+    static void Answer(Runner r, Process p, string id, bool allow, object input, string why) {
+        var resp = allow ? new Dictionary<string, object> { { "behavior", "allow" }, { "updatedInput", input ?? new Dictionary<string, object>() } }
+                         : new Dictionary<string, object> { { "behavior", "deny" }, { "message", why ?? "Refusé par l'utilisateur." } };
+        WriteIn(r, p, new JavaScriptSerializer { MaxJsonLength = int.MaxValue }.Serialize(new Dictionary<string, object> { { "type", "control_response" },
+            { "response", new Dictionary<string, object> { { "subtype", "success" }, { "request_id", id }, { "response", resp } } } }));
+    }
+    void OnControl(Runner r, Process p, string line) {
+        Dictionary<string, object> o, req; object v;
+        try { o = new JavaScriptSerializer { MaxJsonLength = int.MaxValue }.DeserializeObject(line) as Dictionary<string, object>; } catch { return; }
+        if (o == null || !o.TryGetValue("request_id", out v)) return;
+        string id = Convert.ToString(v);
+        req = o.TryGetValue("request", out v) ? v as Dictionary<string, object> : null;
+        string sub = req != null && req.TryGetValue("subtype", out v) ? Convert.ToString(v) : "";
+        if (sub != "can_use_tool") {                                       // autre demande : on répond « pas géré » pour ne pas bloquer Claude
+            WriteIn(r, p, new JavaScriptSerializer().Serialize(new Dictionary<string, object> { { "type", "control_response" },
+                { "response", new Dictionary<string, object> { { "subtype", "error" }, { "request_id", id }, { "error", "non géré par Bébène" } } } }));
+            return;
+        }
+        string tool = req.TryGetValue("tool_name", out v) ? Convert.ToString(v) : "";
+        object input = req.TryGetValue("input", out v) ? v : null;
+        bool ok; lock (r.Granted) { ok = r.Auto || r.Granted.Contains(GrantName(tool)) || AutoAllowed(GrantName(tool)); if (!ok) r.Pending[id] = new object[] { tool, input }; }
+        if (ok) { Answer(r, p, id, true, input, null); return; }
+        Post("perm\n" + r.Key + "\n" + id + "\n" + new JavaScriptSerializer { MaxJsonLength = int.MaxValue }.Serialize(new Dictionary<string, object> { { "tool_name", tool }, { "tool_input", input },
+            { "description", req.TryGetValue("description", out v) ? Convert.ToString(v) : "" } }));
+        try { OnUi(() => { if (r.P == p) { r.Asking = true; r.FlagAt = DateTime.Now; UpdateCat(false, 0); } }); } catch { }
+    }
+    // réglage « ne plus demander » : noms simples « Bash » ou serveur MCP « mcp__claude-in-chrome »
+    static bool AutoAllowed(string name) { return Array.IndexOf(Settings.Str("AutoAllow", "").Split(','), name) >= 0; }
+    static void AddAutoAllow(string csv) {
+        var l = new List<string>(Settings.Str("AutoAllow", "").Split(new[] { ',' }, StringSplitOptions.RemoveEmptyEntries));
+        foreach (var a in (csv ?? "").Split(',')) if (Regex.IsMatch(a, "^[A-Za-z][A-Za-z0-9_-]*$") && !l.Contains(a)) l.Add(a);
+        Settings.Set("AutoAllow", string.Join(",", l.ToArray()));
+    }
+    // réponse de la carte : permreply\n<clé>\n<id>\n<yes|all|always|no>\n<message (no) ou outils à toujours autoriser (always)>
+    void PermReply(string key, string id, string how, string msg) {
+        Runner r; if (!runners.TryGetValue(key ?? "", out r) || r.P == null) return;
+        var now = new List<KeyValuePair<string, object>>(); var later = new List<string>();
+        lock (r.Granted) {
+            object[] it; if (!r.Pending.TryGetValue(id ?? "", out it)) return;
+            r.Pending.Remove(id);
+            if (how == "all") r.Auto = true; else if (how == "yes") r.Granted.Add(GrantName((string)it[0]));
+            else if (how == "always") { r.Granted.Add(GrantName((string)it[0])); AddAutoAllow(msg + "," + GrantName((string)it[0])); }   // « Toujours » : ajouté à « ne plus demander »
+            if (how != "no") now.Add(new KeyValuePair<string, object>(id, it[1]));
+            else Answer(r, r.P, id, false, null, msg.Length > 0 ? "L'utilisateur a refusé cette action et t'écrit : " + msg : "L'utilisateur a refusé cette action. Ne la relance pas ; continue sans elle ou demande-lui comment faire.");
+            // demandes en parallèle maintenant couvertes par l'accord : acceptées aussi
+            foreach (var kv in new List<KeyValuePair<string, object[]>>(r.Pending))
+                if (r.Auto || r.Granted.Contains(GrantName((string)kv.Value[0])) || AutoAllowed(GrantName((string)kv.Value[0]))) { r.Pending.Remove(kv.Key); now.Add(new KeyValuePair<string, object>(kv.Key, kv.Value[1])); later.Add(kv.Key); }
+            if (r.Pending.Count == 0) r.Asking = false;
+        }
+        foreach (var kv in now) Answer(r, r.P, kv.Key, true, kv.Value, null);
+        foreach (var k in later) Post("permdone\n" + key + "\n" + k);
         UpdateCat(false, 0);
     }
 
@@ -835,10 +931,12 @@ class ChatPanel : Form {
         };
         // Caveman (réponses concises) : en mode non interactif, il faut l'activer explicitement
         psi.EnvironmentVariables["CAVEMAN_DEFAULT_MODE"] = Settings.Bool("Caveman", true) ? "caveman" : "off";
+        psi.EnvironmentVariables["BEBENE_SESSION"] = "1";                   // hook d archivage : projet seulement s il a été confirmé (dossier existant)
         var p = new Process { StartInfo = psi, EnableRaisingEvents = true };
         string key = r.Key;
         p.OutputDataReceived += (s, e) => {
-            string d = e.Data; if (d == null) return;
+            string d = e.Data; if (d == null || r.P != p) return;              // session remplacée (Retire) : ses dernières lignes ne vont pas dans le tour en cours
+            if (d.Contains("\"control_request\"") && TopType(d) == "control_request") { OnControl(r, p, d); return; }   // demande d accord
             // l ordre des clés JSON n est pas fixe : on lit le « type » de premier niveau
             string type = d.Contains("\"type\":\"result\"") || d.Contains("bebene-") ? TopType(d) : "";
             if (type == "assistant") {
@@ -855,12 +953,15 @@ class ChatPanel : Form {
                 }); } catch { }
             }
         };
-        p.ErrorDataReceived += (s, e) => { if (e.Data != null) lock (r.Err) r.Err.AppendLine(e.Data); };
+        p.ErrorDataReceived += (s, e) => { if (e.Data != null && r.P == p) lock (r.Err) r.Err.AppendLine(e.Data); };
         p.Exited += (s, e) => {
             int code = -1; try { p.WaitForExit(); code = p.ExitCode; } catch { }
             try { OnUi(() => {
-                if (r.P == p) r.P = null;
-                if (r.Busy) {
+                // processus remplacé (Retire : réglages ou autorisations changés) : sa fin ne concerne pas le tour en cours
+                // (sinon « Erreur (code 2) » juste après une autorisation ou une réponse à une question)
+                bool mine = r.P == p;
+                if (mine) r.P = null;
+                if (mine && r.Busy) {
                     string er; lock (r.Err) er = r.Err.ToString();
                     r.Busy = false; PostDone(key, r.Stopping ? "1" : (code == 0 ? "2" : code.ToString()), r.Stopping ? "" : er);
                     r.Stopping = false;
@@ -876,12 +977,12 @@ class ChatPanel : Form {
         return true;
     }
 
-    string BuildArgs(bool autonomous, string allowed, bool flash, string project, string model) {
-        string args = "-p --input-format stream-json --output-format stream-json --verbose " + (Settings.Bool("Stream", true) ? "--include-partial-messages " : "") + "--permission-mode " + (autonomous ? "bypassPermissions" : "acceptEdits");
-        // actions autorisées : celles accordées dans la conversation + celles pour lesquelles l utilisateur ne veut plus d alerte (réglages)
-        // (noms simples « Bash » ou serveurs MCP « mcp__claude-in-chrome »)
+    string BuildArgs(bool flash, string project, string model) {
+        // accord demandé PENDANT le tour (--permission-prompt-tool stdio, voir OnControl) ; « tout autoriser » et les accords
+        // de la conversation sont appliqués par Bébène, hors des arguments : les changer ne relance plus Claude
+        string args = "-p --input-format stream-json --output-format stream-json --verbose " + (Settings.Bool("Stream", true) ? "--include-partial-messages " : "") + "--permission-mode acceptEdits --permission-prompt-tool stdio";
+        // « ne plus demander » (réglage AutoAllow) : appliqué dans OnControl, hors des arguments (le changer ne relance pas Claude)
         var allow = new List<string>();
-        foreach (var a in (allowed + "," + Settings.Str("AutoAllow", "")).Split(',')) if (Regex.IsMatch(a, "^[A-Za-z][A-Za-z0-9_-]*$") && !allow.Contains(a)) allow.Add(a);
         // regarder l écran : toujours permis (lecture seule), sans carte d accord
         allow.Add("Bash(powershell -NoProfile -ExecutionPolicy Bypass -File \"" + ScreenTool().Replace('\\', '/') + "\"*)");
         args += " --allowedTools " + Util.Quote(string.Join(",", allow.ToArray()));
@@ -903,7 +1004,7 @@ class ChatPanel : Form {
             + "(résumés, fiches, extractions de texte, copies de documents, post-it) sans demande explicite. Pour lire un PDF ou un document, lis-le directement (sortie de la commande, ex. pdftotext fichier.pdf -) ; s'il faut vraiment un fichier "
             + "intermédiaire, mets-le dans %TEMP%\\BebeneTravail (jamais dans ses dossiers ni dans ClaudeHub) et supprime-le à la fin. "
             + "Si un document pourrait l'aider (fiche de révision, résumé, notes…), propose-le en UNE courte phrase à la fin de ta réponse, sans le créer. "
-            + "Quand l'utilisateur dit travailler sur un projet, écris la ligne « 📁 Projet : <nom> » pour que la conversation y soit sauvegardée. "
+            + "PROJETS : n'écris JAMAIS de toi-même la ligne « 📁 Projet : <nom> » et ne crée aucun dossier de projet (cette règle remplace celle du noyau de mémoire). Écris-la seulement si l'utilisateur te demande EXPLICITEMENT de créer un projet ou de ranger cette conversation dans un projet ; Bébène lui demandera alors de confirmer. Une conversation sans projet doit rester sans projet. "
             + (flash ? "CONVERSATION FLASH : l'utilisateur ne veut rien enregistrer. N'écris rien dans la mémoire ClaudeHub, ne crée pas de projet et n'écris jamais la ligne « 📁 Projet ». "
                      : project.Length > 0 ? "Cette conversation fait partie du projet « " + project + " » (dossier " + Path.Combine(ProjectsDir, project) + " ; elle est archivée automatiquement dans le projet). Lis NOTES.md au début pour savoir où en est le projet, et mets-le à jour (court) quand ça avance ; n'ajoute aucun autre fichier dans ce dossier sans demande. " : "")
             + "Le message peut commencer par [Fenêtre active : …] : c'est la fenêtre que l'utilisateur avait devant lui (souvent « le fichier ouvert devant moi »). "
